@@ -1,0 +1,7 @@
+POST /post HTTP/1.1
+Host: httpbin.org
+Content-Type: application/json
+Content-Length: 181
+Connection: close
+
+{"name":"山田太郎","phone":"090-1234-5678","gender":"male","email":"taro@example.com","address":{"zip":"100-0001","city":"Tokyo"},"profile":"{\"nickname\":\"taro\",\"age\":30}"}

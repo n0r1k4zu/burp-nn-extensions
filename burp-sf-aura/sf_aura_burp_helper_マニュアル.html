@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SF Aura Helper 利用者マニュアル</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#1c2126; --muted:#5c6570;
+    --line:#e2e6ea; --accent:#1f4fb8; --accent-soft:#eaf0fb;
+    --red:#c62436; --red-bg:#fdecee; --warn:#a86400; --warn-bg:#fbf3e2;
+    --ok:#1f7a44; --ok-bg:#e9f6ee; --code-bg:#0f1420; --code-ink:#e6e9ef;
+    --auth:#1f4fb8; --guest:#0a7d70; --guestbg:#e2f5f1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#9aa6b2;
+      --line:#2a313c; --accent:#6b8cff; --accent-soft:#182238;
+      --red:#ff6b78; --red-bg:#2a1418; --warn:#e0954a; --warn-bg:#2a1f12;
+      --ok:#5fd07f; --ok-bg:#12241a; --code-bg:#0a0e16; --code-ink:#dfe6f0;
+      --auth:#6b8cff; --guest:#5ad1c2; --guestbg:#0e2623;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,"Segoe UI",sans-serif;
+    line-height:1.8; font-size:15px;}
+  .wrap{max-width:980px; margin:0 auto; padding:38px 24px 90px}
+  header.doc{border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:30px 34px; margin-bottom:20px; border-top:5px solid var(--accent)}
+  header.doc .eyebrow{color:var(--accent); font-weight:700; font-size:13px; letter-spacing:.05em; margin-bottom:8px}
+  header.doc h1{margin:0 0 8px; font-size:24px; line-height:1.45}
+  header.doc .sub{color:var(--muted); font-size:13.5px}
+  table.kv{width:100%; border-collapse:collapse; margin:6px 0}
+  table.kv td{padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; font-size:13.5px}
+  table.kv td:first-child{width:150px; color:var(--muted); font-weight:600; background:var(--accent-soft)}
+  h2{font-size:19px; margin:44px 0 12px; padding-bottom:8px; border-bottom:2px solid var(--line)}
+  h3{font-size:16px; margin:24px 0 8px; color:var(--accent)}
+  h4{font-size:14px; margin:16px 0 6px}
+  p{margin:9px 0}
+  ul,ol{margin:8px 0; padding-left:22px} li{margin:6px 0}
+  strong{color:var(--ink)}
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  th{background:var(--accent-soft); text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); font-size:12.5px}
+  td{padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .scroll{overflow-x:auto}
+  code{background:var(--accent-soft); color:var(--accent); padding:1.5px 6px; border-radius:5px; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12.5px; word-break:break-word}
+  pre{background:var(--code-bg); color:var(--code-ink); padding:14px 16px; border-radius:10px; overflow-x:auto; font-size:12.5px; line-height:1.6}
+  pre code{background:none; color:inherit; padding:0}
+  .toc{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 22px; margin:16px 0; font-size:13.5px}
+  .toc a{color:var(--accent); text-decoration:none}
+  .toc ol{margin:6px 0} .toc ol ol{margin:2px 0}
+  .callout{border-radius:10px; padding:12px 16px; margin:14px 0; font-size:14px}
+  .callout.tip{background:var(--accent-soft); border:1px solid var(--accent)}
+  .callout.warn{background:var(--warn-bg); border:1px solid var(--warn)}
+  .callout.ok{background:var(--ok-bg); border:1px solid var(--ok)}
+  .callout.hot{background:var(--red-bg); border:1px solid var(--red)}
+  .why{background:var(--accent-soft); border-left:4px solid var(--accent); border-radius:0 8px 8px 0; padding:10px 16px; margin:10px 0; font-size:13.5px}
+  .why b{color:var(--accent)}
+  .caveat{background:var(--warn-bg); border-left:4px solid var(--warn); border-radius:0 8px 8px 0; padding:10px 16px; margin:10px 0; font-size:13.5px}
+  .caveat b{color:var(--warn)}
+  .badge{display:inline-block; font-weight:800; font-size:11px; padding:2px 9px; border-radius:6px; margin-right:4px; vertical-align:middle}
+  .badge.auth{background:#e7eefb; color:var(--auth); border:1px solid var(--auth)}
+  .badge.guest{background:var(--guestbg); color:var(--guest); border:1px solid var(--guest)}
+  .badge.opt{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent)}
+  .badge.on{background:var(--ok-bg); color:var(--ok); border:1px solid var(--ok)}
+  .step{border:1px solid var(--line); border-radius:10px; padding:12px 16px; margin:10px 0; background:var(--panel)}
+  .step .n{display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; background:var(--accent); color:#fff; border-radius:50%; font-size:12px; margin-right:8px}
+  .foot{margin-top:44px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; text-align:center}
+  .console{background:#141a12; color:#7dffa0; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12.5px; border-radius:10px; padding:14px 16px; border:1px solid #2a3a26}
+  @media print{ body{background:#fff; font-size:11.5px} table,.callout,.why,.caveat,header.doc{break-inside:avoid} h2{break-after:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <div class="eyebrow">利用者マニュアル</div>
+  <h1>SF Aura Helper 利用者マニュアル</h1>
+  <div class="sub">Salesforce(Aura/Experience Cloud) 診断を、Burp Suite の HTTP history 上で直接支援する拡張機能</div>
+</header>
+
+<table class="kv">
+  <tr><td>対象ファイル</td><td><code>plugin/sf_aura_burp_helper.py</code>（このファイル1本で完結。追加ライブラリ不要）</td></tr>
+  <tr><td>対応</td><td>Burp Suite Pro / Community（Jython拡張が使えるエディション）</td></tr>
+  <tr><td>言語</td><td>Python 2 / Jython（Burpの拡張機構の制約によるもの。§12参照）</td></tr>
+  <tr><td>姉妹ツール</td><td><code>python/burp_to_csv.py</code>（同一ロジックで実装。CLI側の一括レポート出力ツール）</td></tr>
+  <tr><td>通信</td><td>[Aura診断]タブ以外は一切行わない（Burpが保持する history の注釈・表示のみ）。[Aura診断]タブのみ能動送信あり（要認可・§9参照）</td></tr>
+  <tr><td>バージョン</td><td>1.0</td></tr>
+</table>
+
+<div class="toc">
+<strong>目次</strong>
+<ol>
+  <li><a href="#overview">概要・目的</a></li>
+  <li><a href="#setup">導入方法</a></li>
+  <li><a href="#basics">全体の使い方（タブ構成・実行ログ欄）</a></li>
+  <li><a href="#cockpit">コックピット タブ</a></li>
+  <li><a href="#rules">ルール タブ（ワード照合の設定）</a></li>
+  <li><a href="#analysis">解析 タブ
+    <ol>
+      <li><a href="#scope">Scope による絞り込み</a></li>
+      <li><a href="#summary">種別ごとの集計</a></li>
+      <li><a href="#vulnlist">ワード照合 一覧</a></li>
+      <li><a href="#csvexport">ワード照合一覧のCSV出力</a></li>
+      <li><a href="#writeback">解析結果をCommentへ追記</a></li>
+    </ol>
+  </li>
+  <li><a href="#numbering">採番 タブ</a></li>
+  <li><a href="#color">集約色 タブ／Aura集約の根拠</a></li>
+  <li><a href="#auraaudit">Aura診断 タブ（能動送信・要認可）
+    <ol>
+      <li><a href="#auraaudit-target">① ターゲット設定</a></li>
+      <li><a href="#auraaudit-recon">② 偵察</a></li>
+      <li><a href="#auraaudit-extract">③ データ抽出</a></li>
+    </ol>
+  </li>
+  <li><a href="#packettab">各パケットの専用タブ「SF Vuln/Agg」</a></li>
+  <li><a href="#compare">burp_to_csv.py との使い分け</a></li>
+  <li><a href="#tech">技術的な注記（Python2/Jython・パリティ検証・確認手順）</a></li>
+  <li><a href="#troubleshoot">トラブルシューティング</a></li>
+  <li><a href="#safety">安全上の注意</a></li>
+</ol>
+</div>
+
+<h2 id="overview">1. 概要・目的</h2>
+<p>Salesforce Experience Cloud（Aura）の診断では、<strong>「同じ操作の通信が何度も重複していないか」「どのパラメータにワードリストの語がヒットしたか」「Burpの履歴エクスポートと後で突き合わせられるか」</strong>を、診断作業のその場で確認したい場面が多くあります。</p>
+<p><code>python/burp_to_csv.py</code> はこれをXMLエクスポート後にまとめて処理するCLIツールですが、本プラグインは<strong>同一のロジック（分類・Aura集約キー・ワード照合）をBurp上でリアルタイムに実行</strong>し、次を実現します。</p>
+<ol>
+  <li><strong>採番</strong>：各パケットのCommentに固定番号を記入し、後でXML出力した際にBurpの履歴とburp_to_csv.pyの出力を対応付けられるようにする</li>
+  <li><strong>Aura集約判別</strong>：同一操作の繰り返し通信（フォーム逐次送信等）を「代表／集約対象／単独」で判別し、予約色でオンデマンドに可視化する</li>
+  <li><strong>ワード照合</strong>：GUIで登録したCSV（word.csv互換）で、選択中パケットのどこにどの語がヒットしたかをその場で確認する</li>
+</ol>
+<p>これらの結果はComment欄への追記を通じて<strong>Save items(XML)経由でburp_to_csv.pyの出力と突き合わせ可能</strong>です。ユーザー自身の色分け作業やComment欄の既存メモには一切自動介入しません（すべてボタン操作によるオンデマンド実行）。</p>
+
+<h2 id="setup">2. 導入方法</h2>
+<h3>2.1 Jython のセットアップ</h3>
+<div class="step"><span class="n">1</span><a href="https://www.jython.org/download">jython-standalone.jar</a> をダウンロード（バージョン 2.7.x を推奨）</div>
+<div class="step"><span class="n">2</span>Burp Suite → <strong>Extender → Options → Python Environment</strong></div>
+<div class="step"><span class="n">3</span><strong>"Location of Jython standalone JAR file"</strong> に、ダウンロードした jar のパスを設定</div>
+
+<h3>2.2 拡張のロード</h3>
+<div class="step"><span class="n">1</span>Burp Suite → <strong>Extender → Extensions → Add</strong></div>
+<div class="step"><span class="n">2</span><strong>Extension type: Python</strong></div>
+<div class="step"><span class="n">3</span><strong>Extension file</strong>: <code>sf_aura_burp_helper.py</code> を選択</div>
+<div class="step"><span class="n">4</span><strong>Next</strong> → エラーが出ないことを確認（Errorsタブも確認）</div>
+<div class="step"><span class="n">5</span>ロードが成功すると、Burpのタブに <strong>"SF Helper"</strong> が追加されます</div>
+<div class="callout warn">日本語を含むフォルダパスでロードすると、JVMの文字コード設定次第で <code>OSError: (2, 'No such file or directory', ...)</code> のようなエラーになることがあります。その場合は、拡張ファイルをASCII文字のみのパス（例: <code>/Users/xxx/burp-extensions/</code>）にコピーしてから読み込んでください。</div>
+
+<h2 id="basics">3. 全体の使い方</h2>
+<p>Burpの <strong>"SF Helper"</strong> タブの中に、さらに5つのサブタブがあります（この順で並んでいます）。</p>
+<table>
+  <tr><th>タブ</th><th>役割</th></tr>
+  <tr><td><strong>ルール</strong></td><td>ワード照合用CSVの読み込み・編集</td></tr>
+  <tr><td><strong>コックピット</strong></td><td>主要操作をまとめたダッシュボード。最初に迷ったらここ</td></tr>
+  <tr><td><strong>解析</strong></td><td>集計・ワード照合一覧の確認、Commentへの一括追記</td></tr>
+  <tr><td><strong>採番</strong></td><td>Comment先頭への通し番号付与</td></tr>
+  <tr><td><strong>集約色</strong></td><td>集約対象への予約色のオンデマンド適用</td></tr>
+</table>
+<p>どのサブタブを開いていても、画面下部に<strong>「実行ログ」</strong>という枠で囲まれたコンソール風（暗背景＋明るい緑文字＋太字）のログ欄が常に表示されます。ボタン操作の結果・件数・エラー等はすべてここに追記されるので、<strong>何か操作した後はまずここを見てください。</strong></p>
+<div class="console">解析完了: 252 パケット（Scope外 12 件を除外）/ 集約グループ(隣接run) 4 件<br>解析結果（集約判定＋ワード照合）をCommentへ追記しました: 252 件</div>
+
+<h2 id="cockpit">4. コックピット タブ</h2>
+<p>診断中に何度も使う操作を1画面にまとめたタブです。<strong>「Auto実行」</strong>の枠と<strong>「個別操作」</strong>の枠が上下に並びます。</p>
+
+<h3>4.1 Auto実行</h3>
+<p>チェックボックス2つで事前にオプションを選び、<strong>[▶ Auto実行]</strong> を押すと、以下を<strong>この順番で自動的に</strong>まとめて実行します。</p>
+<pre><code>(追加コメント全クリア ※チェック時のみ) → 採番 → 解析更新 →
+(集約対象へ予約色を適用 ※チェック時のみ) → 解析結果をCommentへ追記</code></pre>
+<ul>
+  <li><strong>[▶ Auto実行]</strong> を押すと、まず<strong>ルール（ワードリスト）のインポート状況を確認するダイアログ</strong>が出ます。読み込み済みなら件数を表示、未読み込みなら「ワード照合は常に該当なしになります」という警告付きで表示され、実行/中断を選べます。</li>
+  <li><strong>「実行前に追加コメント全クリアを行う」</strong>：<span class="badge on">既定でON</span>。チェックすると、Comment内の <code>[ ... ]</code> をすべて削除する処理を先に行います。<strong>元に戻せない操作</strong>のため、確認ダイアログが必ず出ます（ONのままでも誤操作にはなりません）。</li>
+  <li><strong>「解析後に集約対象へ予約色を適用を行う」</strong>：<span class="badge on">既定でON</span>。解析更新の直後に予約色を適用します。色そのものは[集約色]タブの設定を使います。</li>
+  <li>採番の接頭辞・桁数・開始番号は[採番]タブの現在の設定を使います。各ステップは<strong>既存の各ボタンとまったく同じ処理</strong>を順番に呼び出すだけなので、個別実行と結果が変わることはありません。</li>
+</ul>
+
+<h3>4.2 個別操作</h3>
+<p>1つずつ実行したい場合のショートカットです。ボタンと説明を1行ずつ並べたグリッドで、各タブに元々あるボタンと同じ処理を呼び出します。</p>
+<table>
+  <tr><th>ボタン</th><th>説明</th></tr>
+  <tr><td>追加コメント全クリア</td><td>Comment内の <code>[ ]</code> 部分をすべて削除します（元に戻せません）</td></tr>
+  <tr><td>採番</td><td>Comment先頭に通し番号（例: <code>[0001]</code>）を追記します</td></tr>
+  <tr><td>解析更新</td><td>Proxy history 全件を再解析し、集計・一覧を更新します</td></tr>
+  <tr><td>解析結果をCommentへ追記</td><td>集約判定・ワード照合の結果をCommentへ追記します</td></tr>
+  <tr><td>集約対象に予約色を適用</td><td>「集約対象」のパケットにのみ予約色を適用します</td></tr>
+  <tr><td>予約色のみクリア</td><td>現在「予約色」になっているパケットのハイライトだけを解除します</td></tr>
+</table>
+
+<h2 id="rules">5. ルール タブ（ワード照合の設定）</h2>
+<p>画面は上下2段に分かれています。<strong>① リクエスト用ルール</strong>（上段）と<strong>② レスポンス用ルール</strong>（下段）はそれぞれ完全に独立した表・ボタン群・AND/OR設定を持ちます（実行ログだけは共有）。上段はパス・クエリ・リクエストヘッダ・リクエストボディを、下段はレスポンスヘッダ・レスポンスボディを照合対象にします。同じVuln-Noを両方の表に定義することもでき、その場合は[解析]タブ・Commentへの追記マーカー上では1件のVuln-Noとして（両方のヒット箇所をまとめて）表示されます。</p>
+<div class="step"><span class="n">1</span>各段の <strong>[CSVロード...]</strong> ボタンで <code>word.csv</code>（または独自作成のCSV）を読み込みます（上段＝リクエスト用、下段＝レスポンス用として個別に読み込みます）</div>
+<div class="step"><span class="n">2</span>読み込んだ内容は各段の表に展開され、直接セルを編集できます</div>
+<div class="step"><span class="n">3</span>編集後は各段の <strong>[表からルール反映]</strong> を押して確定してください（押さないと編集内容は使われません。上段・下段それぞれ個別に反映が必要です）</div>
+<div class="step"><span class="n">4</span><strong>結合条件</strong> は各段の <strong>AND / OR</strong> ラジオボタンで切り替えます（既定 AND、上段・下段で独立して設定可能。例：リクエスト側はAND、レスポンス側はOR、という組み合わせも可能）</div>
+
+<div class="callout tip"><strong>文字コードは自動判定します</strong>（UTF-8[BOM可]を優先し、デコードできない場合のみ cp932[Shift_JIS系]にフォールバック）。comment列に日本語を入れて読み込んだ際、ログに「文字コード: UTF-8」等の判定結果が表示されます。</div>
+<div class="callout tip">セルを入力した直後（Tab/Enterで確定する前）に<strong>[表からルール反映]</strong>を押しても、直前の入力が正しく反映されます。[行追加]で新規行を作ってすぐ入力→反映、という使い方をしても、最後のセルの入力が抜け落ちることはありません（Swingの仕様上、ボタンクリックだけではセル編集が自動確定しないため、内部的に明示的な確定処理を行っています）。wordlist1/wordlist2・Vuln-No・commentのいずれも、<strong>日本語を含めて問題なく使えます</strong>。</div>
+
+<h3>5.1 ヒット状況・ヒット数の目印</h3>
+<p>各段の表の5列目に <strong>「ヒット状況」</strong>、6列目に <strong>「ヒット数」</strong> 列があります。[解析]タブで [解析更新] を実行するたびに、その回の解析結果に基づいて <strong>「ヒットあり」</strong> または <strong>「★ 未ヒット」</strong> の目印と、そのVuln-Noにヒットしたパケット数（1パケット内で複数箇所ヒットしても1件と数える）が自動的に付きます（解析未実施、またはCSVを読み込み直した直後はそれぞれ <code>-</code> / <code>0</code> のまま）。</p>
+<div class="callout tip"><strong>「★ 未ヒット」のルールは、一度もどのパケットにもヒットしていない</strong>ことを意味します。ワードの綴りが違う・そもそも対象の通信が発生していない等の見直しに使ってください。この判定は、[解析]タブの範囲指定・[集約対象を除いて表示]チェックとは無関係に、<strong>解析対象全体</strong>を基準にしています（表示を絞り込んでいるだけのヒットを「未ヒット」と誤判定しないため）。リクエスト用・レスポンス用のヒット状況／ヒット数はそれぞれ独立に集計されます。未ヒットの一覧表示はこの[ルール]タブの表のみで、[解析]タブ側には表示しません。</div>
+
+<h3>5.2 CSVの形式（2パターン対応、comment列は任意。リクエスト用・レスポンス用とも同一形式）</h3>
+<p><strong>パターンA：ヘッダ付き形式（+ 任意で <code>comment</code> 列）</strong></p>
+<pre><code>Vul-No,Method,param,comment
+1,QrCode/CAS_CTRL_MH024,customerNumber,認可不備の疑い。要手動確認
+2,_nc_external/hoge,buster,</code></pre>
+<p>→ ヘッダのいずれかの列名に「vul」を含む列を自動検出し、それを Vuln-No 列とみなします。同様に列名に「comment」を含む列があれば comment 列として扱います。残り2列は左から右の順で <strong>wordlist1 → wordlist2</strong> です。<strong>comment列が無い（3列だけの）CSVもそのまま読み込めます</strong>（comment欄は空になります）。</p>
+
+<p><strong>パターンB：ヘッダなし、位置指定形式（+ 任意で4列目）</strong></p>
+<pre><code>recordId/accountId,GET/POST,V-001,このパターンは要注意
+reqJson/filter,POST,V-002</code></pre>
+<p>→ 1列目が <strong>wordlist1</strong>、2列目が <strong>wordlist2</strong>、3列目が <strong>Vuln-No</strong>、4列目があれば <strong>comment</strong> です（無い行はcomment欄が空。行ごとに列数が違っても問題ありません）。</p>
+
+<p>いずれの形式でも、<strong>各セル内は <code>/</code> 区切りで複数ワードを指定でき、同一リスト内は常にOR判定</strong>です（例: <code>recordId/accountId</code> は「recordIdまたはaccountId」の意味）。<code>/</code>区切りはwordlist1・wordlist2専用で、comment列は自由記述のテキストとして扱われます。</p>
+
+<div class="callout tip"><strong>comment列の使いみち：</strong>ルール表・[解析]タブのワード照合一覧の両方に、この列の内容がそのまま表示されます（例: 「認可不備の疑い、要手動確認」）。Burp の Comment（採番・集約マーカー等）とは別物です。</div>
+
+<h3>5.3 判定ロジックと照合範囲</h3>
+<pre><code>(wordlist1のいずれかがヒット) [AND または OR] (wordlist2のいずれかがヒット)</code></pre>
+<ul>
+  <li><strong>AND</strong>（既定）: <code>burp_to_csv.py --word-list</code> と同一の判定</li>
+  <li><strong>OR</strong>: どちらか一方のリストにヒットすれば成立する、より緩い条件（本プラグイン独自の拡張）</li>
+</ul>
+
+<h4>ワイルドカード（<code>*</code>）</h4>
+<p>wordlist1・wordlist2のセルに <strong><code>*</code></strong> を1語として指定すると、そのリストは<strong>常に条件成立したものとして扱われ</strong>、実際にコーパス中で <code>*</code> という文字列を探すことはしません。片方のリストだけで判定したい場合に使います。</p>
+<pre><code>Vul-No,Method,param
+1,*,isAdmin</code></pre>
+<p>→ wordlist1（この例では<code>Method</code>列）が <code>*</code> なので無条件成立、<strong><code>isAdmin</code> が見つかるかどうかだけでVuln-No 1のヒットが決まります</strong>。</p>
+<div class="caveat"><b>ワイルドカードを含むルールは、AND/OR設定に関わらず、常にAND相当で判定されます。</b> 素直に「OR」のまま評価すると、ワイルドカード側が常に真になるため、<code>(常に真) OR (isAdminの一致)</code> は<strong>もう一方の条件を一切確認せずに常にヒットしてしまいます</strong>（意図しない緩さ）。これを避けるため、ワイルドカードが絡むルールは結合条件（AND/OR設定）を無視して常に <code>(常に真) AND (isAdminの一致)</code> として判定します。AND/OR設定を「反転」させたような形になりますが、これは「ワイルドカードでない側の実際の一致結果だけでヒットを判定したい」という意図を、OR設定時にも一貫して成立させるための挙動です。<code>burp_to_csv.py</code>側は元々AND固定のため、この反転自体は発生しません（ワイルドカード側が常に真になるだけです）。同一リスト内の他の語と <code>*</code> を併記した場合（例: <code>*/foo</code>）も、OR判定の性質上 <code>*</code> が1つでもあればリスト全体が無条件成立になります。</div>
+
+<p>照合範囲は、<strong>① リクエスト用ルール（上段）＝リクエストパケットの パス・クエリ・リクエストヘッダ（Cookie含む）・リクエストボディ</strong>、<strong>② レスポンス用ルール（下段）＝レスポンスヘッダ・レスポンスボディ</strong>です。レスポンスは分類判定にも引き続き使用されます。</p>
+<div class="callout tip">レスポンス用ルールの照合では、リクエストボディの <code>message=</code> パラメータのようなURLデコードは<strong>行いません</strong>（レスポンス本文はURLエンコードされている前提がなく、誤ってデコードすると本来の <code>+</code> 等の文字を壊してしまうため）。</div>
+<div class="why"><b>実装方式：</b>照合は Insertion Point（キー単位への分解）ではなく、対象テキスト全体を1つの文字列としたシンプルな部分文字列検索です。JSONがどれだけネストしていても、キー名や値はテキスト上では連続した文字列として存在するため、階層に関係なくワードを検出できます（JSONパース失敗や二重シリアライズの影響を受けません）。ただし Aura の <code>message=</code> パラメータ（リクエストボディ側のみ）はURLエンコードされたJSONのため、<strong>照合前にURLデコード</strong>してから検索します（デコードしないと <code>://</code> や <code>"</code> のような記号を含むワードが生テキスト上の <code>%3A</code> 等と一致しなくなるため）。</div>
+
+<h2 id="analysis">6. 解析 タブ</h2>
+<p><strong>[解析更新（HTTP history全件を再解析）]</strong> を押すと、現在の Proxy history 全件を解析します（バックグラウンド実行のため、Burpの操作は継続できます）。</p>
+
+<h3 id="scope">6.1 Scope による絞り込み</h3>
+<p><strong>[Burp Target Scope 内のみを解析対象にする]</strong> をチェックすると、Burpの <strong>Target タブ → Scope</strong> の設定（<code>callbacks.isInScope</code>）で対象URLを絞り込みます。</p>
+<div class="callout warn"><span class="badge on">既定でON</span> です。<strong>先にBurpのTargetタブでScope（Include in scope）を設定してから使ってください。</strong> Scopeを何も設定していない状態のままだと解析結果が0件になります（その場合はログに「全件がScope外と判定されました」というヒントが出ます）。Scopeを使わない場合はチェックを外せば従来通りhistory全件が対象になります。</div>
+<p>URL取得やスコープ判定自体に失敗した場合は、安全側（除外しない）に倒します。チェックの変更は<strong>次回の[解析更新]から反映</strong>されます。この絞り込みは解析（集計・一覧・集約色適用・Commentへの追記）にのみ適用され、<strong>①採番には影響しません</strong>（採番はburp_to_csv.py側のNo/Comment対応付けに使うため、history全件が対象のまま一貫させています）。</p>
+
+<h3 id="summary">6.2 種別ごとの集計</h3>
+<p>分類（<strong>画面／画面更新(SPA)／API／静的</strong>）ごとの件数と合計を表示します。個々のパケットのAggKey/AggRole/Descriptors等は、選択パケットの <strong>"SF Vuln/Agg"</strong> タブで確認します。</p>
+<ul>
+  <li><strong>表示対象の採番範囲</strong>を、①採番タブで振った番号（<code>[0001]</code>〜等）で絞り込めます。空欄のまま <strong>[表示を更新]</strong>（または解析更新後）で全件対象。範囲指定時、<strong>まだ採番していないパケットは対象から除外</strong>されます。この範囲指定は下の「ワード照合 一覧」にも同じ範囲で適用されます。
+    <br>From/Toは手入力のほか、<strong>Proxy historyでパケットを右クリック</strong>→<strong>「SF Helper: [解析]表示範囲のFromにこの採番番号をセット」</strong>／<strong>「...のToにこの採番番号をセット」</strong>でも設定できます。対象パケットのComment先頭の採番番号を読み取ってそのままFrom/To欄に入力するため、数字を見て手入力する必要がありません。複数選択時は先頭の1件を使用します。セットすると（解析済みであれば）即座に集計・一覧が再フィルタされます。未採番のパケットを選んだ場合はその旨がログに出ます。</li>
+  <li><strong>件数は「集約対象を含む」「集約対象を除く」の2列で並べて表示</strong>します。「含む」は履歴上のパケットをそのまま数える件数、「除く」は集約対象を除いた件数（＝代表+単独のみ。実質的な「操作の種類の数」に近い値）。<strong>画面／API／静的は集約判定の対象外のため、この2列は常に同じ値</strong>になります（集約対象になり得るのは画面更新(SPA)のみ）。</li>
+  <li>表の下の「表示対象: N / M パケット」の <strong>N は、下のワード照合一覧の[集約対象を除いて表示]チェックの状態に連動</strong>します。ONなら「除く」列の値、OFFなら「含む」列の値になり、チェックを切り替えると即座に数字が変わります。M（分母）は採番範囲・Scope絞り込み後の総パケット数です。<strong>このNは「パケット数」であり、下のワード照合一覧の「行数」（＝ヒット件数）とは単位が異なります</strong>（1パケットが複数のVuln-Noにヒットすれば複数行になるため）。</li>
+</ul>
+<p>一度もヒットしなかったVuln-Noの確認は、[ルール]タブの表の「ヒット状況」列（§5.1）で行います。[解析]タブ自体には未ヒットの一覧は表示しません。</p>
+
+<div class="why">
+<b>なぜ「画面」の件数が「画面更新(SPA)」より多くなるのか：</b>
+<p>分類は <code>classify()</code> 関数が次の優先順位で判定しています（<code>burp_to_csv.py</code> と同一ロジック）。</p>
+<ol>
+  <li>パスに <code>auraAnalytic</code> を含む → <strong>API</strong></li>
+  <li>パスにAura関連のマーカー（<code>/aura</code>, <code>sfsites/aura</code>, <code>auraCmpDef</code>, <code>auraResources</code>）を含む、またはボディに <code>message=</code>/<code>aura.context=</code> を含む → <strong>画面更新(SPA)</strong></li>
+  <li>拡張子/レスポンスMIMEが静的アセット相当 → <strong>静的</strong></li>
+  <li>レスポンスMIMEが <code>html</code> を含む → <strong>画面</strong></li>
+  <li>どれにも該当しない → <strong>API</strong></li>
+</ol>
+<p>「画面」は、Auraの操作でも静的アセットでもない<strong>HTMLを返すリクエストすべて</strong>が該当します。ページ遷移・リロードは、Auraアクションを何も呼ばなくても1件ずつ計上されます。一方「画面更新(SPA)」は<strong>実際にAuraアクションが呼ばれた通信だけ</strong>が該当するため、サイトを巡回・閲覧しただけでフォーム操作をあまりしていない場合は「画面」が上回るのが自然です。</p>
+</div>
+
+<h3 id="vulnlist">6.3 ワード照合 一覧</h3>
+<div class="why"><strong>各列見出しをクリックするとその列でソートできます</strong>（もう一度クリックで昇順/降順切替）。例えばVuln-No列でソートして同じ脆弱性のヒットをまとめて確認する、といった使い方ができます。<strong>Vuln-No列は文字列の辞書順（1,10,3のような順）ではなく、数値としての自然順（1,3,10）でソートされます</strong>（<code>SEC-1</code>のような数値以外を含む値が混在していても、数値部分だけを数値として比較するため破綻しません）。</div>
+<p>列は次の順で表示されます。</p>
+<pre><code>Comment / AggRole / Method / URL / 分類 / Vuln-No / ヒット元 / ヒットしたワードとロケーション / ルールComment</code></pre>
+<table>
+  <tr><th>列</th><th>内容</th></tr>
+  <tr><td><code>Comment</code></td><td>Burpの Comments 欄の内容（内部の通し番号Noはhistory上の表示と対応しないため列に出さない）</td></tr>
+  <tr><td><code>AggRole</code></td><td>「代表／集約対象／単独」。Comment列のすぐ次に配置し、専用タブを開かなくても集約対象かどうかを判別できるようにしている</td></tr>
+  <tr><td><code>Method</code> / <code>URL</code></td><td>どの通信がヒットしたかを一覧上で直接確認できる（URLにHostも含むためHost専用列は無し）</td></tr>
+  <tr><td><code>分類</code></td><td>「画面／画面更新(SPA)／API／静的」（種別ごとの集計と同じ表記）</td></tr>
+  <tr><td><code>Vuln-No</code></td><td>ヒットしたルールの脆弱性番号</td></tr>
+  <tr><td><code>ヒット元</code></td><td>[ルール]タブの①リクエスト用ルール／②レスポンス用ルールのどちらでヒットしたか。<code>リクエスト</code> / <code>レスポンス</code> / 両方の表に同じVuln-Noを定義していて両方でヒットした場合は <code>リクエスト+レスポンス</code></td></tr>
+  <tr><td><code>ヒットしたワードとロケーション</code></td><td><code>語@場所</code>形式で列挙。Commentマーカーの <code>Vuln=</code> 部分と同じ表記</td></tr>
+  <tr><td><code>ルールComment</code></td><td><code>word.csv</code> の <code>comment</code> 列（あれば）の内容。同じVuln-Noが複数ある場合は最後に読み込まれたものが表示される</td></tr>
+</table>
+<p>見出しの横にある <strong>[集約対象を除いて表示]</strong> チェックボックス（<span class="badge on">既定でON</span>）で、AggRoleが「集約対象」の行を一覧から非表示にできます。同一操作を繰り返しテストすると集約対象の行が代表と同じ内容で埋まりがちなため、まず代表・単独だけの実質的な一覧を見せる運用です。チェックの変更は解析済みであれば押した瞬間に反映されます。</p>
+
+<div class="callout tip">
+表の下に <strong>「選択行: ヒットしたワードとロケーション」「選択行: ルールComment」</strong> という2つの表示欄があります。表の行を1つクリックすると、その行の内容がそれぞれの欄に表示されます。
+<ul>
+<li>「ヒットしたワードとロケーション」欄は <code>ロケーション → ヒットしたワード</code> の順の2列を持つ小さな表で、ヒット1件につき1行で表示します（1行のテキストに詰め込みません）。</li>
+<li>「ルールComment」欄は長文でも折り返して表示するテキストボックスです。テーブルのセルは列幅を広げないと長文が見切れますが、この欄はスクロール可能で文章が切れません。</li>
+</ul>
+</div>
+
+<div class="why"><strong>行を選択すると、その行のComment先頭にある採番番号（例: <code>[0005]</code>）が自動的にクリップボードにコピーされます。</strong> BurpのAPIには拡張からHistoryタブの検索窓へ直接値をセットしたり、該当行を選択・スクロールしたりする手段が存在しないため、コピー＆手動貼り付けで代替しています。コピー後、Burpの <strong>Proxy &gt; HTTP History</strong> タブに切り替えて検索窓（虫眼鏡アイコン）に貼り付ければ、該当パケットをすぐに絞り込めます。採番されていないパケットの行を選択した場合は何もコピーされません。</div>
+
+<h3 id="csvexport">ワード照合一覧のCSV出力</h3>
+<p>見出しの <strong>[この一覧をCSV出力...]</strong> ボタンを押すと、その時点で一覧に<strong>表示されている行</strong>（採番範囲の絞り込み・[集約対象を除いて表示]チェックの状態がそのまま反映されます）をCSVファイルに保存します。保存先は都度ダイアログで選択します。</p>
+<p>出力される列は次の通りです。</p>
+<pre><code>Comment / AggRole / Method / URL / 分類 / Vuln-No / ヒット元 / ヒットしたワード@ロケーション / ルールComment / Request / Response</code></pre>
+<p>先頭8列は画面のワード照合一覧と同じ内容です（<strong>「ヒット元」列</strong>でそのVuln-Noが①リクエスト用ルール／②レスポンス用ルールのどちらでヒットしたかがわかります）。加えて、該当パケットの <strong>Request</strong> と <strong>Response</strong>（生のリクエスト/レスポンス全体）を列として追加します。</p>
+<div class="callout tip"><strong>Comment列</strong>は、Burp上のComment欄の内容から、本ツールが末尾に追記する解析マーカー（<code>[SF Cls=... Vuln(N件): ...]</code> 等。6.4「解析結果をCommentへ追記」で書き込まれる部分）を取り除いたものを表示します。<strong>①採番の番号（例 <code>[0005]</code>）とユーザーが手で書いたコメントまで</strong>が対象で、本ツールが自動追記した部分は含みません。</div>
+<p>Excelでの閲覧を想定し、Request/Responseは次のように整形されます。</p>
+<ul>
+<li>改行（<code>\r\n</code> <code>\n</code> <code>\r</code>）はすべて半角スペースに置換し、1パケット=1行に収めます。</li>
+<li>長さが500文字を超える場合は先頭500文字で切り詰め、<code>&lt;---snip---&gt;</code>という目印と<code>(全N文字)</code>という元の文字数を末尾に付記します（省略されたことが一見してわかるようにするためで、省略された内容自体はCSVには含まれません。全文が必要な場合はBurp上で該当パケットを直接確認してください）。</li>
+<li>文字コードはUTF-8（BOM付き）で保存するため、Excelでそのまま開いても文字化けしません。</li>
+</ul>
+<p>ヒットが無いパケットは出力対象外です（画面の一覧と同じく、Vuln-Noにヒットした行のみが対象になります）。1パケットが複数のVuln-Noにヒットしている場合は、画面表示と同様にVuln-Noの数だけ行が分かれます。</p>
+
+<h3 id="writeback">6.4 解析結果をCommentへ追記（集約判定＋ワード照合）</h3>
+<p><strong>[解析結果をCommentへ追記]</strong> ボタンを押すと、解析済みの全パケットのComment欄末尾に、次の形式で情報を追記します。</p>
+<pre><code>[SF Cls=画面更新(SPA) Agg=集約対象(size=3)→代表[0005] Vuln(1件):
+・1(customerNumber@reqBody,QrCode@path)[要手動確認]]
+[SF Cls=画面更新(SPA) Agg=代表(size=3)]
+[SF Cls=API Agg=単独 Vuln(2件):
+・1(customerNumber@reqBody)[要手動確認]
+・3(hoge@reqBody)]</code></pre>
+<table>
+  <tr><th>要素</th><th>内容</th></tr>
+  <tr><td><code>Cls=</code></td><td>必ず書き込まれる。画面／画面更新(SPA)／API／静的の4分類のいずれか。<code>burp_to_csv.py</code>の「分類」列と完全に同じ表記</td></tr>
+  <tr><td><code>Agg=</code></td><td>必ず書き込まれる。代表 / 集約対象(グループ件数) / 単独 のいずれか</td></tr>
+  <tr><td><code>→代表[NNNN]</code></td><td>集約対象の場合、代表パケットの現在のComment先頭の採番番号を参照。未採番なら<code>(未採番)</code></td></tr>
+  <tr><td><code>Vuln(N件):</code></td><td>ワードリストにヒットしたパケットにのみ付く（無ければ省略）。<strong>ヒット件数が1件でも複数件でも常にこの見出し＋改行形式で統一</strong>している（1件だけの場合と複数件の場合で書き方が異なると見た目で気付きにくいため）。1件ずつ改行し、行頭に<code>・</code>を付けて<code>Vuln-No(語@場所, ...)[ルールComment]</code>形式で列挙する。見つかったVuln-Noと、実際にヒットした単語・場所に加え、<code>word.csv</code>の<code>comment</code>列（設定されていれば）も末尾の<code>[...]</code>に記録する。comment列が無い／空欄のルールではこの部分は付かない（§5.1のルールComment列と同じ内容・優先順位）</td></tr>
+</table>
+<p>既存のメモ内容は保持され末尾に追記されます（採番はComment先頭を使うため衝突しません）。何度実行しても前回このボタンが書いたマーカーを検出して置き換えるため、<strong>重複追記されません（冪等）</strong>。</p>
+<div class="callout tip"><strong>推奨手順：</strong>①[解析更新] → ②[採番]タブで[全history採番] → ③再度[解析更新] → ④[解析結果をCommentへ追記]。この順で行うと代表の番号が確実に反映されます。</div>
+<div class="caveat">解析は「実行した時点」の history 順序に基づきます。後からトラフィックが増えるとグループの内容（size等）が変わることがあるため、<strong>採番・集約色適用・Comment追記の直前に必ず[解析更新]を再実行</strong>してください。</div>
+
+<h2 id="numbering">7. 採番 タブ</h2>
+<ul>
+  <li><strong>接頭辞・桁数・開始番号</strong> を指定し、<strong>[全history採番]</strong> を押すと、Comment欄の先頭に <code>[0001] </code> のような番号が追加されます（既存のメモ内容は保持）。</li>
+  <li>既に採番済み（同じ接頭辞のパターンで始まる）パケットはスキップされます（再実行しても安全）。</li>
+  <li><strong>[採番解除（全history）]</strong> で、先頭の番号部分だけを取り除きます。</li>
+  <li><strong>右クリックメニュー</strong>からも、選択したパケットだけに採番できます。</li>
+  <li><strong>[追加コメント全クリア（[ ]を全削除）]</strong> で、Comment内の <code>[ ... ]</code> 形式の部分を<strong>すべて</strong>（先頭の採番トークン・末尾の解析マーカー・入れ子含む）まとめて取り除きます。本ツールは書き込みを常に <code>[ ]</code> で囲む設計のため、逆に「<code>[ ]</code>で囲まれたものを消せば本ツールが追記した分だけをまとめて取り除ける」という考え方です。<strong>手動で <code>[ ]</code> を使ったメモも区別なく削除される</strong>ため、実行前に確認ダイアログが出ます（元に戻せません）。</li>
+</ul>
+<div class="callout tip"><strong>運用のコツ：</strong>番号は「実行時点のhistory順」で決まります。トラフィック取得が完了してから、<strong>Save items でXML出力する直前</strong>に採番することを推奨します。これにより、番号と<code>burp_to_csv.py</code>が出力する<code>No</code>列がズレなく対応します。</div>
+
+<h2 id="color">8. 集約色 タブ／Aura集約の根拠</h2>
+<p>Auraのフォーム逐次通信のように、<strong>同じ操作が何度も繰り返されている通信</strong>を見分けるための機能です。</p>
+<div class="step"><span class="n">1</span><strong>予約色</strong> を選択します（ご自身の色分け作業では使っていない色を選んでください。既定は <code>gray</code>）</div>
+<div class="step"><span class="n">2</span><strong>[集約対象に予約色を適用（オンデマンド）]</strong> を押すと、[解析]タブで判定済みの「集約対象」にだけ予約色が適用されます</div>
+<div class="step"><span class="n">3</span><strong>[予約色のみクリア]</strong> を押すと、現在その予約色になっているパケットの色だけを解除します（他の色には触れません）</div>
+<p>どちらのボタンも<strong>押した時だけ</strong>動作します。適用前に必ず [解析] タブで [解析更新] を実行しておいてください。</p>
+
+<h3>8.1 集約キー（AggKey）の考え方</h3>
+<p>「集約対象」の考え方は <code>burp_to_csv.py</code> と同一です。同一のAuraアクション・対象オブジェクト・呼び出し元画面・認証状態から成る通信グループのうち、最初の1件（=代表）以外を「集約対象」と判定します。</p>
+<table>
+  <tr><th>通信の種類</th><th>AggKeyに含む要素</th></tr>
+  <tr><td>Aura（descriptorあり）</td><td>パス／descriptor／対象オブジェクト／pageURI／認証状態</td></tr>
+  <tr><td>Aura（descriptorなし。<code>auraCmpDef</code>等）</td><td>パス／<strong>パラメータの値まで含めた内容</strong>／認証状態</td></tr>
+  <tr><td>画面/API/静的</td><td>常に「単独」（集約判定の対象外）</td></tr>
+</table>
+<div class="caveat">
+<b>集約対象になり得るのは Aura の SPA通信（画面更新(SPA)）だけです。</b> それ以外の通信（画面/API/静的。例: <code>/cst/s/otc</code> のようなワンタイムトークンを含むリクエスト等）は、method+pathだけの粗いキーになり無関係な別リクエスト同士を誤って同一グループに丸めてしまうリスクがあるため、常に「単独」として扱われます。
+</div>
+<div class="why">Aura SPA通信のうち、<strong>descriptorを持たないもの</strong>（<code>auraCmpDef</code>/<code>auraResources</code>等のコンポーネント定義取得のようなGETリクエスト）も集約対象に含まれますが、この場合は<strong>パラメータの値まで含めて</strong>内容が完全に一致する場合のみ同一グループとみなします。名前だけが同じでも、値（実際に読み込んでいる内容）が違えば別グループのままです。</div>
+
+<h3>8.2 隣接性の条件</h3>
+<div class="why">
+<b>なぜ「隣接している範囲だけ」を1グループとみなすか：</b>
+<p><strong>同一AggKeyであっても、history上で隣接している（連続している）範囲だけを1つの集約グループとみなします。</strong> 間に別のAggKeyを持つAura SPA通信が1件でも挟まると、そこでグループが区切られます。</p>
+<p>これは、同じテスト手続きを時間を空けて何度も繰り返すと同一AggKeyが再度出現するため、隣接性の条件を入れないと「1回目のテスト」と「2回目のテスト」が誤って同じ集約グループに混ざってしまうためです。フォーム入力テストを1回実施した後、別の画面を操作してから同じフォームを再度テストした場合、1回目と2回目は<strong>別々の集約グループ</strong>として扱われます（間に他の通信を挟まず連続してAura通信を繰り返した場合のみ、1つのグループになります）。</p>
+</div>
+
+<h2 id="auraaudit">9. Aura診断 タブ（能動送信・要認可）</h2>
+<div class="callout hot">
+<strong>本タブは、これまでの全タブと異なり、実際に対象ホストへHTTPリクエストを送信します。</strong>
+<strong>認可された脆弱性診断対象に対してのみ使用してください。</strong>
+未認可のホストに対して実行すると、不正アクセス行為に該当するおそれがあります。
+他のタブ（ルール/コックピット/解析/採番/集約色）は引き続き完全に受動的です。
+</div>
+<p><a href="https://github.com/google/aura-inspector">Google/Mandiant aura-inspector</a> と、その解説記事
+<a href="https://cloud.google.com/blog/ja/topics/threat-intelligence/auditing-salesforce-aura-data-exposure">Auditing Salesforce Aura Data Exposure</a>
+で説明されているSalesforce Aura診断手法を、Burp上で直接実行できるようにしたタブです。
+aura-inspectorの一般公開版が意図的に実装していない<strong>実際のレコードデータ抽出</strong>まで含めて
+実装しています（本ツールは正規の認可された脆弱性診断案件でのみ使用される前提のため）。</p>
+
+<h3 id="auraaudit-target">9.1 ① ターゲット設定</h3>
+<p>診断対象（ホスト・Auraセッション情報）を設定します。2つの方法があります。</p>
+<div class="step"><span class="n">1</span><strong>推奨: 捕捉済みパケットから設定。</strong> Proxy history上で実際のAuraリクエストを<strong>右クリック</strong> → <strong>「SF Helper: このパケットをAura診断対象に設定」</strong>（[解析更新]の実行有無に関わらず使えます）。または、タブ内の「候補パケット」ドロップダウン（[解析更新]済みのAura SPA通信から選択）→<strong>[選択パケットから読込]</strong>。どちらも、選択したパケットの生リクエストから<strong>その場で有効な</strong> <code>aura.context</code>/<code>aura.token</code> を直接読み取って使うため、fwuidの再発見（HTMLスクレイピング）が不要です。</div>
+<div class="step"><span class="n">2</span><strong>コールドスタート用</strong>（未キャプチャのゲスト対象を診断する場合など）。Base URL・Auraエンドポイントパス・Appパス・<code>aura.context</code>・<code>aura.token</code>・Cookieを手入力し、<strong>[適用]</strong>。<strong>[Auraエンドポイント自動検出]</strong> ボタンで、4つの既知パス（<code>/s/sfsites/aura</code> 等）へダミーリクエストを送り、有効なパスを自動判定できます。</div>
+<div class="caveat">この方式では fwuid 等のHTML自動発見（スクレイピング）は行いません。未キャプチャの対象を診断したい場合は、先にBurp経由で一度サイトを閲覧してAuraリクエストを1件捕捉してから、①の「捕捉済みパケットから設定」を使うことを推奨します。</div>
+<p>設定した対象は、常時表示される<strong>「現在の対象」ラベル</strong>（背景色付き）で確認できます。ラベルにはホストに加えて<strong>「認証あり(Cookie送信)」／「ゲスト(Cookie未送信)」</strong>の現在のモードも表示されます。</p>
+<div class="why"><strong>ゲスト化（認証済みユーザーのパケットを未認証として実行する）：</strong> 認証済みユーザーのパケットを対象に設定した場合でも、そのユーザーとしてのアクセス範囲だけでなく、同じ操作をゲスト（未認証）で行うとどうなるかを確認したいことがあります。Salesforceの実際のユーザー認証は<strong>Cookie（セッションID）</strong>が担っており、<code>aura.token</code>はAuraフレームワーク側の検証トークンに過ぎません。そのため<strong>[ゲスト化（Cookieを外す）]</strong>ボタンを押すだけで、Cookieを送信対象から外し<code>aura.token</code>を既定値(<code>undefined</code>)にリセットし、以降の②③を未認証として実行できます。ゲストブラウザで別途Auraリクエストを再捕捉する必要がありません。<strong>この操作は不可逆</strong>（元の認証済みCookieには戻せません）のため、認証済みユーザーとしての結果も確認したい場合は、先にそちらを実施してから最後にゲスト化してください。</div>
+<div class="callout warn"><strong>アクティブ送信を有効にする</strong>チェックを入れるまで、②③のボタンはすべて無効化されています。本ツールが初めて能動送信を行う機能であるための安全策です。</div>
+
+<h3 id="auraaudit-recon">9.2 ② 偵察</h3>
+<p>チェックボックスで、<strong>どこまで調査するかを調整</strong>できます（既定は全項目ON）。</p>
+<table>
+  <tr><th>項目</th><th>内容</th></tr>
+  <tr><td>オブジェクト一覧取得</td><td><code>HostConfigController/getConfigData</code> でSalesforceオブジェクトAPI名・KeyPrefixを列挙（1リクエスト）</td></tr>
+  <tr><td>各オブジェクトの件数取得</td><td>オブジェクトごとの総レコード数を取得（オブジェクト数に応じたリクエストが発生）</td></tr>
+  <tr><td>Record List UI検出</td><td>一覧表示コンポーネントでレコードが見えるオブジェクトを検出（同上）</td></tr>
+  <tr><td>Home URL検出</td><td>未認可アクセスの可能性がある管理系URLを検出</td></tr>
+  <tr><td>自己登録確認</td><td>ゲストからのアカウント自己登録が有効か確認</td></tr>
+  <tr><td>GraphQL可用性確認</td><td>データ抽出で優先的に使うGraphQL（<code>uiapi</code>）が使えるか確認</td></tr>
+  <tr><td>カスタムコントローラ抽出</td><td>アプリページとリソースJSを取得し、通常の閲覧では呼ばれないカスタムApexコントローラ参照を検出</td></tr>
+</table>
+<div class="why">「件数取得」「UI検出」のみチェックした場合も、内部的にオブジェクト一覧取得を併せて実行します（これらの結果を得るにはオブジェクト名の一覧が必要なため）。</div>
+<p>結果は4つの表（オブジェクト一覧／ホームURL一覧／カスタムコントローラ一覧／その他チェック結果）に表示され、<strong>[偵察結果をCSV出力...]</strong>（区分列を持つ1ファイルのtall形式。Excelでの一覧確認向け）または<strong>[偵察結果をJSON出力...]</strong>（4種の結果をそのまま構造化して保持）でファイルに保存できます。</p>
+
+<h3 id="auraaudit-extract">9.3 ③ データ抽出</h3>
+<p><strong>aura-inspector公開版が意図的に実装していない、実際のレコードデータ抽出です。</strong></p>
+<div class="step"><span class="n">1</span>②の結果から、抽出対象オブジェクトを選択します。選択欄は②偵察の結果（KeyPrefix・件数・一覧UI検出・備考）をそのまま表示する表になっており、<strong>件数等を見てどのオブジェクトから抽出すべきかをその場で判断できます</strong>（複数選択可、<strong>[全選択]</strong> も利用可）</div>
+<div class="step"><span class="n">2</span><strong>1オブジェクトあたりの取得上限</strong>（既定5000件）と<strong>リクエスト間隔</strong>（既定200ms）で、<strong>どこまで収集するかを調整</strong>できます</div>
+<div class="step"><span class="n">3</span><strong>[抽出実行]</strong> を押すと、対象ホスト・対象オブジェクト・推定リクエスト数を示す<strong>確認ダイアログ</strong>が表示されます（初期フォーカスは「キャンセル」）。内容を確認し、認可された対象であることを必ず確認したうえで「実行する」を選んでください</div>
+<div class="step"><span class="n">4</span>GraphQL（<code>uiapi</code>）が利用可能な場合はそちらを優先します（Salesforceの2,000件ページ上限を回避できるため）。利用不可の場合は <code>getItems</code>（<code>layoutType=FULL</code>）にフォールバックします。<code>getItems</code>側は2,000件のページ上限があり、到達した場合は <code>sortBy=Name</code>/<code>-Name</code> での再取得を試みますが、<strong>完全性は保証されません</strong>（結果に「不完全な可能性あり」と表示されます）</div>
+<div class="step"><span class="n">5</span>進捗は表にリアルタイム表示され、<strong>[CSV出力...]</strong>（<code>ObjectApiName, RecordId, FieldName, FieldValue</code> のtall/long形式1ファイル）または<strong>[JSON出力...]</strong>（<code>{オブジェクト名: [レコード, ...], ...}</code>）でファイルに保存できます</div>
+<div class="why">②偵察の「オブジェクト一覧」表、③データ抽出の対象選択表・進捗表とも、<strong>「件数」列は列見出しをクリックすると数値としてソートできます</strong>（未取得の行は末尾に並びます）。「まず件数が多いオブジェクトから確認する」といった優先順位付けに使えます。</div>
+<div class="caveat">セッション/トークンが切れたと判断した場合（HTTPステータス異常や認証エラーらしき応答）は、その時点で抽出を打ち切ります。<strong>それまでの部分結果は破棄せず</strong>、進捗表・エクスポートの両方に残ります。再開する場合は、①でパケットを再キャプチャして対象を設定し直してください。</div>
+
+<h2 id="packettab">10. 各パケットの専用タブ「SF Vuln/Agg」</h2>
+<p>Proxy history でパケットを選択すると、リクエスト/レスポンスのビューアに <strong>"SF Vuln/Agg"</strong> という専用サブタブが表示されます（Auraらしき通信、またはワードリストにヒットする通信でのみ表示）。</p>
+<ul>
+  <li>分類（画面／画面更新(SPA)／API／静的）</li>
+  <li>Method / Path</li>
+  <li>Aura Descriptors / Aura Objects（該当する場合）</li>
+  <li>AggKey</li>
+  <li><strong>AggRole</strong>（[解析]タブで事前に[解析更新]していれば「代表」「集約対象(代表No.X)」「単独」を表示）</li>
+  <li><strong>ワード照合ヒット</strong>（Vuln-Noと、どのワードがどこ（パス/ヘッダ/ボディ、リクエスト側・レスポンス側いずれも）で見つかったか）</li>
+</ul>
+<div class="callout tip"><strong>LWC(Lightning Web Components)の検出について：</strong> descriptorに <code>ApexActionController/execute</code>（汎用Apexディスパッチコントローラ）が含まれる場合、「LWCからのimperative/wire Apex呼び出しの可能性があります」という注記が表示されます。Aura Componentsのコントローラは通常 <code>java://&lt;Class&gt;/ACTION$&lt;method&gt;</code> の形でクラス名がdescriptorに直接現れますが、LWCは呼び出し先クラス名をparams側に載せてこの汎用コントローラを呼ぶため、descriptorだけでは判別しにくい違いがあります（あくまで推定であり断定はできません）。なお、LWCが従来のAuraホスト環境（Experience Cloud/Lightning Experience）上で動いている場合は通信自体が<code>/sfsites/aura</code>を通るため、本ツールの解析・Aura診断とも通常通り機能します。Salesforceの新しいサイト実行基盤である<strong>LWR(Lightning Web Runtime)</strong>サイトはAuraを経由しないため、本ツールの検出対象外です。</div>
+
+<h2 id="compare">11. burp_to_csv.py との使い分け</h2>
+<table>
+  <tr><th></th><th>burp_to_csv.py</th><th>本プラグイン</th></tr>
+  <tr><td>動作場所</td><td>CLI（XMLを後処理）</td><td>Burp上でリアルタイム</td></tr>
+  <tr><td>用途</td><td>網羅的な一括レポート出力（triage.md等）</td><td>診断作業中のその場確認・注釈付け</td></tr>
+  <tr><td>Note/色付け</td><td>読むだけ（変更しない）</td><td>採番・集約色の書き込みができる</td></tr>
+  <tr><td>ワード照合</td><td>AND固定・リクエストのみ</td><td>AND/OR切替可（リクエスト用／レスポンス用で独立）・レスポンスも対象</td></tr>
+</table>
+<p><strong>推奨ワークフロー：</strong></p>
+<ol>
+  <li>診断中は本プラグインで、Aura集約の把握・ワード照合のその場確認・[解析結果をCommentへ追記]・採番を行う</li>
+  <li>トラフィック取得完了後、<strong>採番を実行</strong>してから Burp の <strong>Save items（Base64形式）</strong> でXML出力</li>
+  <li><code>python3 burp_to_csv.py &lt;xml&gt; -o out --word-list word.csv</code> で網羅的なCSV/triage.mdを生成</li>
+  <li><code>packets.csv</code> の <code>Comment</code> 列（プラグインが書き込んだ <code>[0005] ... [SF Cls=... Agg=... Vuln=...]</code> を含む）を見れば、Burp上で確認した内容とXML経由の解析結果を突き合わせられる</li>
+</ol>
+
+<h2 id="tech">12. 技術的な注記</h2>
+<h3>12.1 なぜ Python 2 / Jython なのか</h3>
+<p>Burp Suite Pro の拡張機構（Extender API）は、Java拡張のほか <strong>Jython（Python 2.7互換）</strong> と Ruby(JRuby) をサポートしていますが、<strong>CPython 3 の拡張は直接サポートされていません。</strong> そのため <code>python/burp_to_csv.py</code>（CPython 3）をそのまま import することはできず、本プラグインは同一アルゴリズムを Jython 向けに再実装しています。</p>
+
+<h3>12.2 挙動の一致（パリティ）について</h3>
+<p>本ファイルは、Burp/Java依存の import を <code>try/except</code> で分離する設計になっており（<code>ON_JYTHON</code> フラグ）、<strong>分類・Aura集約キー計算・ワード照合ロジック</strong>の部分はBurp環境が無くても Python 3 で直接 import して動作します。この性質を利用し、<code>python/sample_burp_packets.xml</code> を対象に、本プラグインのロジックと <code>burp_to_csv.py</code> の実際の出力を突き合わせるパリティ検証を実施し、<strong>全19パケットで 分類／AggKey／AggRole／Vuln-No が完全一致すること</strong>を確認済みです。</p>
+<p>さらに、以下の合成テストでも両ファイルが同一の結果を返すことを確認済みです。</p>
+<ul>
+  <li>同一AggKeyの通信を離れた位置に配置（間に別のAura SPA通信を挟む）→ 離れた側は別グループ／単独になる</li>
+  <li>descriptorを持たない同一内容（<code>auraCmpDef</code>等）のAura SPA通信を隣接配置 → 集約対象になる</li>
+  <li>同じくdescriptorを持たないが内容（パラメータの値）が異なるAura SPA通信を隣接配置 → 集約対象にならず単独のまま</li>
+  <li>①リクエスト用ルールの照合対象を、レスポンスにのみ存在する語で構成 → ヒットしない
+    （<code>burp_to_csv.py</code>と同じくリクエスト側のみが対象であることの確認。
+    <code>burp_to_csv.py</code>自体はレスポンス側の照合機能を持たないため、
+    この比較は①リクエスト用ルールに関するパリティ検証）</li>
+  <li>②レスポンス用ルール（<code>build_response_corpus_lower</code>／
+    <code>RESPONSE_LOCATION_ORDER</code>を指定した<code>match_rules</code>）は
+    <code>burp_to_csv.py</code>に相当機能が無いため単体テストで直接検証：
+    レスポンス本文にのみ存在する語がヒットすること、URLデコードが行われないこと
+    （<code>+</code>等の文字を壊さないこと）、<code>location_order</code>省略時は
+    既存のリクエスト側呼び出しと完全に同じ結果になること（後方互換性）を確認済み</li>
+</ul>
+<div class="caveat">これは「共通ロジック部分」の検証であり、<strong>Burp API 呼び出し部分（GUI・IMessageEditorTab・IContextMenuFactory・Comment/Highlightの読み書き等）は実際の Burp Suite Pro 環境での動作確認ができていません</strong>（開発環境にBurp/Jython実行環境が無いため）。初回導入時は次の手順で必ず動作確認してください。</div>
+
+<h3>12.3 初回導入時の確認手順</h3>
+<ol>
+  <li>Extensions に Add → <strong>エラーなくロードされること</strong>（Errors タブ確認）</li>
+  <li><code>python/word.csv</code> を[ルール]タブ上段（① リクエスト用ルール）の [CSVロード...] →
+    <strong>ルール表に正しく展開されること</strong>（下段の② レスポンス用ルールにも別途同じ手順で
+    ロードできることを確認）</li>
+  <li>② レスポンス用ルール（下段）にレスポンス本文中の文字列にヒットするルールを1件ロードし、
+    上段とは異なるAND/OR条件を設定 → [解析更新]実行後、下段の表だけにヒット状況・ヒット数が
+    付き、上段には影響しないこと。同じVuln-Noを上段・下段の両方に定義した場合、[解析]タブの
+    ワード照合一覧・"SF Vuln/Agg"タブでは1件のVuln-Noとして両方のロケーションのヒットが
+    まとめて表示されること</li>
+  <li>Aura通信（<code>/sfsites/aura</code>）を含むページを閲覧 → 選択パケットに <strong>"SF Vuln/Agg"</strong> タブが出現し、Descriptors/Objects/AggKeyが表示されること</li>
+  <li>同一フォームへの逐次入力等で複数のAura通信を<strong>連続して</strong>発生させる → [解析]タブで[解析更新] → 対象パケットを選択し <strong>"SF Vuln/Agg"</strong> タブで「代表」「集約対象」に判別されること</li>
+  <li>同じフォームテストを<strong>別の操作を挟んで</strong>もう一度実施する → 解析更新後、1回目と2回目が<strong>別々の集約グループ</strong>になり、1つの大きなグループに混ざらないこと（隣接性の条件の確認）</li>
+  <li><code>/cst/s/otc</code> のようなAura以外の通信を複数回発生させる（別トークン等）→ 解析更新後、<strong>同一method+pathでも常に「単独」</strong>になり、誤って集約されないこと</li>
+  <li><code>auraCmpDef</code>/<code>auraResources</code>のようなdescriptorを持たないAura SPA通信（GET）を同じ内容で連続発生 → <strong>集約対象</strong>として判別されること。内容が異なる同種の通信が隣接している場合は<strong>単独のまま</strong>になること</li>
+  <li>[集約対象に予約色を適用] → history上で集約対象のみ予約色になり、既存の色分けが保持されること</li>
+  <li>[全history採番] → Comment欄先頭に番号 → [解析]タブで[解析更新]を再実行 → [解析結果をCommentへ追記] → 各パケットのComment末尾に <code>[SF Agg=...]</code> が付き、集約対象パケットには <code>→代表[0005]</code> のように代表の採番番号が入ること。再度押しても重複しないこと（冪等）</li>
+  <li>Save items(XML) → <code>burp_to_csv.py</code> 実行 → <code>packets.csv</code> の No/Comment/AggKey/AggRole/Vul-No が本プラグインの表示と一致すること</li>
+  <li>[解析]タブの種別ごとの集計：採番範囲を空欄のまま[表示を更新]→全件が分類ごとにカウントされること。範囲を入れて再度[表示を更新]→件数が絞り込まれ、未採番のパケットは対象外になること。同時に下のワード照合一覧の件数・内容も同じ範囲に絞り込まれること</li>
+  <li>ワード照合一覧の[集約対象を除いて表示]（既定でON）：解析更新直後の一覧にAggRole「集約対象」の行が出ていないこと。チェックを外すと全件表示になり、種別ごとの集計のステータス行の数字も連動して切り替わること</li>
+  <li>ワード照合一覧の行を1つクリック → 選択行の詳細欄（ヒットしたワードとロケーション／ルールComment）に内容が表示されること。別の行をクリックすると内容が切り替わること</li>
+  <li>ワード照合一覧の列見出し（例: Vuln-No）をクリック → その列でソートされること。ソート後に行を1つクリックしても、選択行の詳細欄（ヒットしたワードとロケーション／ルールComment）が正しくその行の内容を表示すること（ソート前後で内容がずれないこと）</li>
+  <li>採番済みパケットの行をワード照合一覧でクリック → クリップボードに採番番号（例: <code>[0005]</code>）がコピーされ、ログにその旨が出ること。Burpの Proxy &gt; HTTP History の検索窓に貼り付けて該当パケットに絞り込めること。未採番パケットの行では何もコピーされないこと</li>
+  <li>[Burp Target Scope 内のみを解析対象にする]（既定でON）：Scope未設定のまま[解析更新]すると結果が0件になり、ログにヒントが出ること（意図した挙動）。Scopeを設定した状態で実行すると、Scope外の通信が集計・一覧から消え、ログに「Scope外 N 件を除外」と出ること</li>
+  <li>コックピットタブ → [▶ Auto実行] を押す → まずルールインポート状況の確認ダイアログが出ること。チェックを両方外した状態でOKすると、採番・解析更新・Commentへの追記が順番に実行されること。「追加コメント全クリア」にチェックを入れて実行した場合は、続けてもう一つ確認ダイアログが出ること</li>
+  <li>[Aura診断]タブ → 「アクティブ送信を有効にする」チェックを入れるまで②③のボタンが無効化されていること。認可されたテスト環境のAuraリクエストを右クリック→「このパケットをAura診断対象に設定」→「現在の対象」ラベルにホストと「認証あり(Cookie送信)」が表示されること</li>
+  <li>[Aura診断]① → 認証済みユーザーのパケットを対象に設定した状態で[ゲスト化（Cookieを外す）]を押す → ラベルが「ゲスト(Cookie未送信)」に切り替わり、以降の②③が未認証として送信されること</li>
+  <li>[Aura診断]②偵察 → チェックを外した項目は実行されず（ログ・表に反映されず）、チェックした項目のみ実行されること。[偵察結果をCSV出力...]/[偵察結果をJSON出力...]の両方でファイルが保存できること</li>
+  <li>[Aura診断]③データ抽出 → オブジェクトを選択せずに[抽出実行]を押すとエラーログが出て確認ダイアログが出ないこと。選択後に押すと、対象ホスト・対象オブジェクト・推定リクエスト数を含む確認ダイアログが出て、初期フォーカスが「キャンセル」であること。「実行する」を選んだ場合のみ送信が始まること。[CSV出力...]/[JSON出力...]で抽出結果が保存できること</li>
+</ol>
+
+<h3>12.4 ハイライト色について</h3>
+<p>Burpが受け付ける色は <code>red, orange, yellow, green, cyan, blue, pink, magenta, gray</code> です。<strong>予約色は、診断中にご自身が手動で色分けに使っていない色を選んでください。</strong>「予約色のみクリア」は、現在その色になっているセルのみを対象にするため、他の色を意図的に使い分けている場合でも安全に使えます。</p>
+
+<h2 id="troubleshoot">13. トラブルシューティング</h2>
+<table>
+  <tr><th>症状</th><th>対処</th></tr>
+  <tr><td>Extension のロードに失敗する</td><td>Jython Standalone JAR のパス設定（Extender → Options）を再確認</td></tr>
+  <tr><td>"SF Vuln/Agg" タブが出てこない</td><td>Aura通信でない、またはワードリストに何もヒットしていない場合は非表示になります（仕様）</td></tr>
+  <tr><td>AggRoleが「未解析」のまま</td><td>[解析]タブで [解析更新] を実行してください</td></tr>
+  <tr><td>集約色ボタンを押しても変化がない</td><td>先に [解析更新] を実行したか確認。予約色が他の意図と重複していないか確認</td></tr>
+  <tr><td>CSVロードでルールが0件になる</td><td>ヘッダ行の判定（列名に"vul"を含むか）／区切り文字が <code>,</code> か確認</td></tr>
+  <tr><td>comment列の日本語が <code>ã«ã¯...</code> のように文字化けする</td><td>UTF-8/cp932 以外の文字コードで保存されている可能性があります。Excel等で保存し直す場合は「CSV UTF-8（コンマ区切り）」形式を推奨します</td></tr>
+  <tr><td>解析結果が急に0件になった</td><td>[Burp Target Scope 内のみを解析対象にする]がON（既定）の場合、BurpのTargetタブでScopeが設定されているか確認してください。使わない場合はチェックを外してください</td></tr>
+  <tr><td>burp_to_csv.py の結果と一致しない</td><td>双方とも「同時点のhistory」に対して実行しているか確認（後からトラフィックが増えるとNoがズレます）。Scope絞り込みの有無も揃えてください</td></tr>
+  <tr><td>[表からルール反映]を押しても実行ログに何も出ず、日本語のcommentを入れたルールがヒットしない</td><td>古いバージョンの症状です。最新版では、セル編集中でも入力内容が確実に反映され、日本語等の非ASCII文字を含むセルでも例外にならず正常に動作します</td></tr>
+</table>
+
+<h2 id="safety">14. 安全上の注意</h2>
+<div class="callout hot">
+<ul style="margin:0">
+<li>[ルール]・[コックピット]・[解析]・[採番]・[集約色]の各タブは、Burpが<strong>既に保持している history のデータを注釈・表示するのみ</strong>です。外部へのネットワーク通信は一切行いません。</li>
+<li><strong>[Aura診断]タブのみ例外です。</strong> このタブは対象ホストへ実際にHTTPリクエストを送信します。送信は、①でユーザーが対象を明示的に設定し、かつ<strong>「アクティブ送信を有効にする」</strong>チェックをONにした場合にのみ発生します。②偵察・③データ抽出とも<strong>ボタン操作によるオンデマンド実行</strong>で、自動的・継続的に送信し続けることはありません。③データ抽出は、実行前に対象ホスト・対象オブジェクトを示す確認ダイアログでの承認が必須です。</li>
+<li><strong>[Aura診断]タブは、認可された脆弱性診断対象に対してのみ使用してください。</strong> 未認可のホストに対して実行すると、不正アクセス行為に該当するおそれがあります。§9も必ず参照してください。</li>
+<li>採番・集約色・Commentへの追記は、すべて<strong>ボタン操作によるオンデマンド実行</strong>です。自動的・継続的に動作することはありません。</li>
+<li>「追加コメント全クリア」は<strong>元に戻せない操作</strong>です。ご自身が手動で <code>[ ]</code> を使ったメモも区別なく削除されるため、実行前の確認ダイアログを必ず確認してください。</li>
+<li>取り扱いは、認可された診断のスコープ内（サンドボックス環境等）に限定してください。</li>
+</ul>
+</div>
+
+<div class="foot">SF Aura Helper 利用者マニュアル v1.0 ／ 対象ファイル: plugin/sf_aura_burp_helper.py</div>
+
+</div>
+</body>
+</html>

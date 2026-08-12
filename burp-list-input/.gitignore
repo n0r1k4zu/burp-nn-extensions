@@ -1,0 +1,9 @@
+# Jython compiled bytecode cache
+*$py.class
+
+# Python bytecode (from local syntax-checking with a CPython interpreter)
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

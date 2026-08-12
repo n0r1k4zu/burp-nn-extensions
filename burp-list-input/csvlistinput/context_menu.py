@@ -1,0 +1,201 @@
+# -*- coding: utf-8 -*-
+"""IContextMenuFactory: adds "Send to Target & List Mapping" and "Send to
+Target & Replace with Decode & Encode" entries to Repeater / Proxy-history /
+Target-site-map right-click menus. These arm TWO INDEPENDENT targets (one
+per feature, each its own ArmedTarget instance) from whichever message
+was right-clicked -- a request armed for Target & List Mapping's CSV
+substitution does not have to be the same request armed for Target &
+Replace with Decode's per-point rewriting, and vice versa. Arm-time
+detection uses the exact same detection_engine code path as every later
+live send, per the plan's path-based re-matching design.
+
+Also adds, whenever the right-click happens inside a message editor/
+viewer (Repeater, Proxy, our own Log tab's request/response panes, etc.)
+with an active text selection:
+  - "Add selection to Match & Replace" -- appends the selected text as a
+    new Before rule on whichever side (request/response) the editor was
+    showing.
+  - "Send selection to Decode" -- shows the selected text in the
+    extension's Decode tab, with every supported transform applied.
+Both reuse the same selection-extraction logic (_extract_selection).
+"""
+
+import traceback
+
+from java.awt.event import ActionListener
+from javax.swing import JMenuItem
+
+from burp import IContextMenuFactory, IContextMenuInvocation
+
+from csvlistinput import detection_engine, matching
+from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space
+
+_REQUEST_CONTEXTS = set([
+    IContextMenuInvocation.CONTEXT_MESSAGE_EDITOR_REQUEST,
+    IContextMenuInvocation.CONTEXT_MESSAGE_VIEWER_REQUEST,
+])
+_RESPONSE_CONTEXTS = set([
+    IContextMenuInvocation.CONTEXT_MESSAGE_EDITOR_RESPONSE,
+    IContextMenuInvocation.CONTEXT_MESSAGE_VIEWER_RESPONSE,
+])
+
+
+class _ArmAction(ActionListener):
+    def __init__(self, helpers, armed_target, message, feature_label, on_armed, log_fn, error_fn):
+        self.helpers = helpers
+        self.armed_target = armed_target
+        self.message = message
+        self.feature_label = feature_label  # "Target & List Mapping" or "Target & Replace with Decode & Encode"
+        self.on_armed = on_armed
+        self.log_fn = log_fn
+        self.error_fn = error_fn
+
+    def actionPerformed(self, event):
+        try:
+            http_service = self.message.getHttpService()
+            request_bytes = self.message.getRequest()
+
+            def on_detect_error(msg):
+                if self.log_fn:
+                    self.log_fn("Insertion Point detection: %s" % msg)
+                if self.error_fn:
+                    self.error_fn("%s: Insertion Point detection" % self.feature_label, msg)
+
+            lenient_flag = self.armed_target.allow_lenient_json
+            if self.log_fn:
+                self.log_fn("%s: arming with lenient=%r" % (self.feature_label, lenient_flag))
+            template_points = detection_engine.detect(
+                self.helpers, request_bytes, http_service, on_error=on_detect_error,
+                lenient=lenient_flag)
+            signature = matching.signature_from_message(self.helpers, http_service, request_bytes)
+            request_info = self.helpers.analyzeRequest(http_service, request_bytes)
+            label = "%s %s" % (request_info.getMethod(), signature.url_path)
+            self.armed_target.arm(signature, template_points, http_service, request_bytes, label=label)
+            if self.log_fn:
+                recovered_count = sum(1 for p in template_points if getattr(p, 'recovered', False))
+                self.log_fn(
+                    "%s: armed target %s (%d insertion points detected, %d recovered)."
+                    % (self.feature_label, label, len(template_points), recovered_count))
+            if self.on_armed:
+                self.on_armed()
+        except Exception as e:
+            if self.log_fn:
+                self.log_fn("%s: failed to arm target: %s" % (self.feature_label, e))
+            if self.error_fn:
+                self.error_fn("%s: Send to..." % self.feature_label, str(e), traceback.format_exc())
+
+
+class _AddSelectionToReplaceAction(ActionListener):
+    def __init__(self, rule_store, selected_text, side_label, on_change, log_fn):
+        self.rule_store = rule_store
+        self.selected_text = selected_text
+        self.side_label = side_label
+        self.on_change = on_change
+        self.log_fn = log_fn
+
+    def actionPerformed(self, event):
+        self.rule_store.add_rule(before=self.selected_text, after=u"", enabled=True, is_regex=False)
+        if self.on_change:
+            self.on_change()
+        if self.log_fn:
+            preview = self.selected_text
+            if len(preview) > 60:
+                preview = preview[:57] + u"..."
+            self.log_fn(u"Match & Replace: added selection to %s Before list: %s" % (self.side_label, preview))
+
+
+class _SendToDecodeAction(ActionListener):
+    def __init__(self, selected_text, on_decode):
+        self.selected_text = selected_text
+        self.on_decode = on_decode
+
+    def actionPerformed(self, event):
+        if self.on_decode:
+            self.on_decode(self.selected_text)
+
+
+class ContextMenuFactory(IContextMenuFactory):
+    def __init__(self, helpers, armed_target, decode_replace_target, request_replace_store,
+                 response_replace_store, on_armed=None, on_replace_added=None, on_decode=None,
+                 log_fn=None, error_fn=None):
+        self.helpers = helpers
+        self.armed_target = armed_target
+        self.decode_replace_target = decode_replace_target
+        self.request_replace_store = request_replace_store
+        self.response_replace_store = response_replace_store
+        self.on_armed = on_armed
+        self.on_replace_added = on_replace_added
+        self.on_decode = on_decode
+        self.log_fn = log_fn
+        self.error_fn = error_fn
+
+    def createMenuItems(self, invocation):
+        messages = invocation.getSelectedMessages()
+        if not messages:
+            return None
+        message = messages[0]
+
+        items = []
+        list_mapping_item = JMenuItem("Send to Target & List Mapping")
+        list_mapping_item.addActionListener(_ArmAction(
+            self.helpers, self.armed_target, message, "Target & List Mapping",
+            self.on_armed, self.log_fn, self.error_fn))
+        items.append(list_mapping_item)
+
+        decode_replace_item = JMenuItem("Send to Target & Replace with Decode & Encode")
+        decode_replace_item.addActionListener(_ArmAction(
+            self.helpers, self.decode_replace_target, message, "Target & Replace with Decode & Encode",
+            self.on_armed, self.log_fn, self.error_fn))
+        items.append(decode_replace_item)
+
+        selected_text, side_label = self._extract_selection(invocation, message)
+        if selected_text:
+            rule_store = self.request_replace_store if side_label == "Request" else self.response_replace_store
+            replace_item = JMenuItem(u"Add selection to Match & Replace → %s Before" % side_label)
+            replace_item.addActionListener(_AddSelectionToReplaceAction(
+                rule_store, selected_text, side_label, self.on_replace_added, self.log_fn))
+            items.append(replace_item)
+
+            decode_item = JMenuItem("Send selection to Decode")
+            decode_item.addActionListener(_SendToDecodeAction(selected_text, self.on_decode))
+            items.append(decode_item)
+
+        return items
+
+    def _extract_selection(self, invocation, message):
+        """Returns (selected_text, side_label) for the currently active
+        text selection in a message editor/viewer context, or (None,
+        None) if there's no applicable selection. Shared by the
+        Match & Replace and Decode context menu actions."""
+        try:
+            context = invocation.getInvocationContext()
+            bounds = invocation.getSelectionBounds()
+        except Exception:
+            return None, None
+        if not bounds or len(bounds) != 2:
+            return None, None
+        start, end = bounds[0], bounds[1]
+        if start is None or end is None or end <= start:
+            return None, None  # no active selection
+
+        if context in _REQUEST_CONTEXTS:
+            raw_bytes = message.getRequest()
+            side_label = "Request"
+        elif context in _RESPONSE_CONTEXTS:
+            raw_bytes = message.getResponse()
+            side_label = "Response"
+        else:
+            return None, None  # not a message editor/viewer -- selection bounds don't apply
+        if raw_bytes is None:
+            return None, None
+
+        try:
+            buf = bytes_to_bytestring(self.helpers, raw_bytes)
+        except Exception:
+            return None, None
+        if start < 0 or end > len(buf):
+            return None, None
+        selected_text = from_bytestring_space(buf[start:end])
+        if not selected_text:
+            return None, None
+        return selected_text, side_label

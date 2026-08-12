@@ -1,0 +1,8 @@
+No,Name,Phone,Gender,Email,Zip,City,Nickname,Age
+1,佐藤花子,080-1111-2222,female,hanako@example.com,150-0001,Shibuya,hana,25
+2,鈴木一郎,070-3333-4444,male,ichiro@example.com,160-0002,Shinjuku,ichi,42
+3,John O'Brien,555-0100,male,john@example.com,90210,Los Angeles,johnny,31
+4,"A""B\C",000-0000-0000,other,weird@example.com,00000-0000,"Test""City","nick\""name",999
+5,<script>alert(1)</script>,111-1111-1111,female,xss@example.com,12345,<b>Bold</b>,"""><img src=x>",0
+6,,,unspecified,,999-9999,,,notanumber
+7,田中🎉太郎,090-9999-8888,male,emoji@example.com,100-0005,Tokyo,🎉taro,100

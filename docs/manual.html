@@ -1,0 +1,734 @@
+<title>NN-Extensions 導入マニュアル</title>
+<style>
+  :root {
+    --paper: #eef0f3;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --ink: #1b2027;
+    --ink-soft: #565f6e;
+    --ink-faint: #88909c;
+    --line: #d6dae1;
+    --line-soft: #e4e7ec;
+    --accent: #335cb8;
+    --accent-strong: #23408a;
+    --accent-soft: #e6ecfb;
+    --code-bg: #1c212b;
+    --code-ink: #dfe4ee;
+    --code-accent: #8fb2ff;
+    --ok: #23824a;
+    --ok-soft: #e4f4ea;
+    --warn: #9c6a10;
+    --warn-soft: #fbf0dc;
+    --danger: #b3392f;
+    --danger-soft: #fbe8e6;
+    --shadow: 0 1px 2px rgba(27, 32, 39, 0.06), 0 8px 24px -12px rgba(27, 32, 39, 0.18);
+    --radius: 10px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14171c;
+      --surface: #1b1f27;
+      --surface-raised: #20242e;
+      --ink: #e7e9ee;
+      --ink-soft: #a4abb9;
+      --ink-faint: #6d7484;
+      --line: #2c313c;
+      --line-soft: #262a34;
+      --accent: #7fa0f2;
+      --accent-strong: #a7c0ff;
+      --accent-soft: #22283a;
+      --code-bg: #10141b;
+      --code-ink: #e2e7f0;
+      --code-accent: #9dbcff;
+      --ok: #57c884;
+      --ok-soft: #16261e;
+      --warn: #e0ab4c;
+      --warn-soft: #2a2213;
+      --danger: #e8776d;
+      --danger-soft: #2b1917;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171c; --surface: #1b1f27; --surface-raised: #20242e;
+    --ink: #e7e9ee; --ink-soft: #a4abb9; --ink-faint: #6d7484;
+    --line: #2c313c; --line-soft: #262a34;
+    --accent: #7fa0f2; --accent-strong: #a7c0ff; --accent-soft: #22283a;
+    --code-bg: #10141b; --code-ink: #e2e7f0; --code-accent: #9dbcff;
+    --ok: #57c884; --ok-soft: #16261e; --warn: #e0ab4c; --warn-soft: #2a2213;
+    --danger: #e8776d; --danger-soft: #2b1917;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --paper: #eef0f3; --surface: #ffffff; --surface-raised: #ffffff;
+    --ink: #1b2027; --ink-soft: #565f6e; --ink-faint: #88909c;
+    --line: #d6dae1; --line-soft: #e4e7ec;
+    --accent: #335cb8; --accent-strong: #23408a; --accent-soft: #e6ecfb;
+    --code-bg: #1c212b; --code-ink: #dfe4ee; --code-accent: #8fb2ff;
+    --ok: #23824a; --ok-soft: #e4f4ea; --warn: #9c6a10; --warn-soft: #fbf0dc;
+    --danger: #b3392f; --danger-soft: #fbe8e6;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic",
+      "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Consolas", "Menlo",
+      "Noto Sans Mono CJK JP", monospace;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    max-width: 1240px;
+    margin: 0 auto;
+    gap: 0;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 20px 40px;
+    border-right: 1px solid var(--line);
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .sidebar-brand .mark {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 5px;
+    padding: 2px 6px;
+    letter-spacing: 0.02em;
+  }
+  .sidebar-brand .name {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .sidebar-sub {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: 0 0 26px;
+  }
+  .toc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .toc-group { margin-bottom: 18px; }
+  .toc-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px 10px;
+  }
+  .toc a {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 7px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+  }
+  .toc a:hover { color: var(--ink); background: var(--surface); }
+
+  /* ---------- Main content ---------- */
+  main { min-width: 0; padding: 48px 56px 120px; }
+  .doc-header { margin-bottom: 56px; }
+  .doc-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1.doc-title {
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.3;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+  .doc-lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+    max-width: 64ch;
+    margin: 0;
+  }
+
+  section.doc-section { margin: 0 0 64px; max-width: 760px; }
+  section.doc-section:last-of-type { margin-bottom: 24px; }
+
+  .section-head { margin-bottom: 22px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .section-eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 18px 0 8px;
+  }
+  h2 {
+    font-size: 24px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance;
+  }
+  .section-dek { color: var(--ink-soft); margin: 0; font-size: 15px; max-width: 58ch; }
+
+  h3 { font-size: 18px; font-weight: 700; margin: 30px 0 10px; letter-spacing: -0.005em; }
+  h4 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; color: var(--ink); }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 16px; padding-left: 1.3em; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 700; }
+
+  .k { /* inline UI-label / keycap */
+    font-family: ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: var(--ink);
+  }
+  code.mono, code {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.88em;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  /* ---------- Steps ---------- */
+  .steps { list-style: none; margin: 0 0 20px; padding: 0; counter-reset: step; }
+  .step {
+    counter-increment: step;
+    position: relative;
+    padding: 18px 20px 18px 60px;
+    margin-bottom: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: 18px; top: 18px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, monospace;
+  }
+  .step h4 { margin: 0 0 6px; font-size: 15.5px; }
+  .step p:last-child { margin-bottom: 0; }
+  .step .step-note {
+    margin-top: 10px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--line);
+    padding-left: 10px;
+  }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 18px 0;
+    font-size: 14.5px;
+    background: var(--surface);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .callout.tip { border-left-color: var(--accent); }
+  .callout.tip .callout-label { color: var(--accent-strong); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.warn .callout-label { color: var(--warn); }
+  .callout.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+  .callout.update { border-left-color: var(--ok); background: var(--ok-soft); }
+  .callout.update .callout-label { color: var(--ok); }
+  .callout.danger .callout-label { color: var(--danger); }
+
+  /* ---------- Code / terminal block ---------- */
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+    white-space: pre;
+  }
+  .code-block .c-key { color: var(--code-accent); }
+  .code-block .c-mut { color: #93e3ac; }
+  .code-block .c-dim { color: #7d8598; }
+
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 16px 0 22px; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    background: var(--surface-raised);
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint);
+    font-weight: 700;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  td code, th code { white-space: nowrap; }
+
+  /* ---------- Cards (extension summaries) ---------- */
+  .card-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 18px 0 22px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .card-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .card-title h4 { margin: 0; font-size: 16.5px; }
+  .card-title .tab-name { font-size: 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card .card-links { margin-top: 10px; font-size: 13.5px; }
+  .card .card-links a { margin-right: 14px; }
+
+  /* ---------- Definition list (glossary) ---------- */
+  .glossary { display: grid; gap: 16px; }
+  .gterm {
+    display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 16px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--line-soft);
+  }
+  .gterm:last-child { border-bottom: none; }
+  .gterm dt { font-weight: 700; font-family: ui-monospace, monospace; font-size: 13.5px; color: var(--accent-strong); }
+  .gterm dd { margin: 0; font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ---------- Detail / FAQ ---------- */
+  details.faq {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px 16px;
+    margin-bottom: 10px;
+  }
+  details.faq summary {
+    cursor: pointer; list-style: none; padding: 14px 0;
+    font-weight: 700; font-size: 14.5px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::after {
+    content: "+"; font-family: ui-monospace, monospace; font-weight: 400;
+    color: var(--ink-faint); font-size: 18px; flex: none;
+  }
+  details.faq[open] summary::after { content: "\2212"; }
+  details.faq .faq-body { padding: 0 0 16px; color: var(--ink-soft); font-size: 14.5px; }
+  details.faq .faq-body p:last-child { margin-bottom: 0; }
+
+  footer.doc-footer {
+    max-width: 760px; margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--ink-faint);
+  }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+    main { padding: 32px 22px 90px; }
+    .gterm { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+
+<div class="shell">
+  <nav class="sidebar" aria-label="目次">
+    <div class="sidebar-brand">
+      <span class="mark">jython</span>
+      <span class="name">NN-Extensions</span>
+    </div>
+    <p class="sidebar-sub">Burp Suite 拡張ローダー 導入マニュアル</p>
+
+    <ul class="toc">
+      <li class="toc-group">
+        <p class="toc-group-label">はじめに</p>
+        <a href="#overview">これは何をするもの？</a>
+        <a href="#install">インストール</a>
+      </li>
+      <li class="toc-group">
+        <p class="toc-group-label">同梱している拡張</p>
+        <a href="#bundled">CSV List Input / SF Aura Helper</a>
+      </li>
+      <li class="toc-group">
+        <p class="toc-group-label">動作原理</p>
+        <a href="#how">なぜ1エントリで2つ動くのか</a>
+        <a href="#layout">リポジトリ構成</a>
+      </li>
+      <li class="toc-group">
+        <p class="toc-group-label">困ったとき</p>
+        <a href="#faq">トラブルシューティング</a>
+        <a href="#glossary">用語集</a>
+      </li>
+    </ul>
+  </nav>
+
+  <main>
+    <header class="doc-header">
+      <p class="doc-eyebrow">User Manual — 日本語版</p>
+      <h1 class="doc-title">NN-Extensions 導入マニュアル</h1>
+      <p class="doc-lede">
+        NN-Extensionsは、独立して完成した2つのBurp Suite拡張（<strong>CSV List Input</strong> と
+        <strong>SF Aura Helper</strong>）を、Burpの <span class="k">Extensions</span> 一覧上では
+        <strong>1つのプラグイン</strong>として扱えるようにする薄いローダーです。各拡張の内部ロジックや画面には
+        一切手を加えていません。このページでは「NN-Extensionsとしてどう導入し、内部で何が起きているか」だけを
+        説明します。各拡張そのものの使い方は、後述する個別マニュアルを参照してください。
+      </p>
+    </header>
+
+    <!-- ================= OVERVIEW ================= -->
+    <section class="doc-section" id="overview">
+      <div class="section-head">
+        <p class="section-eyebrow">Overview</p>
+        <h2>これは何をするもの？</h2>
+        <p class="section-dek">2つの拡張を、Burp上では1回のロードでまとめて有効化するためのローダーです。</p>
+      </div>
+
+      <p>
+        Burp SuiteのJython拡張は、1つの<code>.py</code>ファイルにつき1つの<code>BurpExtender</code>クラス（＝1つの
+        Extensionsエントリ）という単位でロードされます。CSV List InputとSF Aura Helperはもともと別々に配布・開発された
+        独立した拡張で、それぞれ単体でロードすると Extensions一覧に2エントリ表示されていました。
+      </p>
+      <p>
+        NN-Extensionsは、この2つを<strong>ロジックを1行も変更せずに</strong>1回のロード操作でまとめて有効化するための
+        コンポジションルート（<code>nn_extensions.py</code>）です。ロードすると Extensions一覧には
+        <strong>NN-Extensions</strong> という1エントリだけが表示され、その中に両方の拡張のSuiteタブ
+        （<span class="k">CSV List Input</span> タブと <span class="k">SF Helper</span> タブ）と右クリックメニューが
+        これまで通りすべて追加されます。
+      </p>
+
+      <div class="callout tip">
+        <span class="callout-label">対象読者</span>
+        <p>
+          Burp Suiteの基本操作とJython拡張のロード手順（Extender/Extensions &gt; Add）は分かっている前提で書いています。
+          各拡張自体の機能・使い方はこのページの範囲外です — <a href="#bundled">同梱している拡張</a>の節にあるリンク先の
+          個別マニュアルを参照してください。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= INSTALL ================= -->
+    <section class="doc-section" id="install">
+      <div class="section-head">
+        <p class="section-eyebrow">Setup</p>
+        <h2>インストール</h2>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>Jythonを用意する</h4>
+          <p>
+            <code>jython-standalone.jar</code>（バージョン 2.7.x 推奨）をダウンロードしておきます。両拡張とも
+            Jython/Python 2向けに書かれているため、この環境設定は1回で両方に効きます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>Python Environmentを設定する</h4>
+          <p>
+            Burp Suiteの <span class="k">Extender/Extensions</span> &gt; <span class="k">Options</span> &gt;
+            <span class="k">Python Environment</span> で、そのjarファイルを指定します。
+          </p>
+        </li>
+        <li class="step">
+          <h4><code>nn_extensions.py</code> を選んでロードする</h4>
+          <p>
+            <span class="k">Extender/Extensions</span> &gt; <span class="k">Extensions</span> &gt;
+            <span class="k">Add</span> で Extension typeを <span class="k">Python</span> にし、リポジトリ直下の
+            <code>nn_extensions.py</code> を選択します。
+          </p>
+          <p class="step-note">
+            <code>burp-list-input/</code> と <code>burp-sf-aura/</code> フォルダは、<code>nn_extensions.py</code> と
+            <strong>同じ場所（リポジトリのルート直下）に置いたまま</strong>にしてください。<code>nn_extensions.py</code>は
+            この2フォルダを実行時にimportするため、単体では動作しません。
+          </p>
+        </li>
+        <li class="step">
+          <h4>読み込み結果を確認する</h4>
+          <p>
+            成功すると Extensions一覧に <strong>NN-Extensions</strong> の1エントリが表示され、Burpのメインウィンドウに
+            <span class="k">CSV List Input</span> タブと <span class="k">SF Helper</span> タブの両方が追加されます。
+            出力（Output）欄には次のログが出ます。
+          </p>
+          <div class="code-block">NN-Extensions loaded: CSV List Input + SF Aura Helper (see the 'CSV List Input' and 'SF Helper' tabs).</div>
+        </li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="callout-label">読み込みエラーが出たら</span>
+        <p>
+          <span class="k">Extender/Extensions</span> &gt; <span class="k">Extensions</span> &gt; NN-Extensions &gt;
+          <span class="k">Errors</span> タブにスタックトレースが出ます。多くの場合、<code>burp-list-input/</code> または
+          <code>burp-sf-aura/</code> フォルダが <code>nn_extensions.py</code> と同じ階層に無い（配置がずれている）ことが
+          原因です。それぞれの拡張自体のエラーであれば、<a href="#bundled">個別マニュアル</a>のトラブルシューティング節も
+          あわせて確認してください。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= BUNDLED ================= -->
+    <section class="doc-section" id="bundled">
+      <div class="section-head">
+        <p class="section-eyebrow">Bundled tools</p>
+        <h2>同梱している拡張</h2>
+        <p class="section-dek">それぞれ独立して開発・完成している拡張です。詳細は個別のREADME・マニュアルを参照してください。</p>
+      </div>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-title">
+            <h4>CSV List Input</h4>
+            <span class="k tab-name">Suiteタブ: CSV List Input</span>
+          </div>
+          <p>
+            Repeaterで送るリクエストの複数項目（URL/Cookie/ヘッダー/JSON・XML本文中の値。入れ子構造も再帰的に展開）に、
+            CSVで用意したテストデータを送信のたびに自動で差し込みます。Session Handling Ruleのマクロ経由の送信にも対応。
+            armした対象とは無関係に動く <strong>Match &amp; Replace</strong>、エンコードされた値の中身だけを書き換える
+            <strong>Target &amp; Replace with Decode &amp; Encode</strong>、選択した文字列を複数形式で一気にデコードできる
+            <strong>Decode</strong> 機能も持ちます。
+          </p>
+          <p class="card-links">
+            <a href="../burp-list-input/README.md">README.md</a>
+            <a href="../burp-list-input/docs/manual.html">利用マニュアル</a>
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <h4>SF Aura Helper</h4>
+            <span class="k tab-name">Suiteタブ: SF Helper</span>
+          </div>
+          <p>
+            Salesforce(Aura/Experience Cloud) 診断を、Burpの HTTP history上で直接支援します。パケットへの採番、
+            繰り返し通信のAura集約判別（オンデマンドの予約色適用）、CSVワードリストによるリクエスト/レスポンス照合、
+            そして Google/Mandiant aura-inspector 相当の <strong>Aura診断（能動送信・要認可）</strong>
+            （オブジェクト列挙・件数取得・実データ抽出など）を提供します。
+          </p>
+          <p class="card-links">
+            <a href="../burp-sf-aura/README.md">README.md</a>
+            <a href="../burp-sf-aura/sf_aura_burp_helper_マニュアル.html">利用マニュアル</a>
+          </p>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-label">単体でのロードも可能</span>
+        <p>
+          各拡張は従来通り、<code>burp-list-input/csv_list_input.py</code> または
+          <code>burp-sf-aura/sf_aura_burp_helper.py</code> を直接選んで単体ロードすることもできます。その場合は
+          Extensions一覧に個別の名前（<code>CSV List Input</code> / <code>SF Aura Helper</code>）で2エントリ表示されます。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= HOW ================= -->
+    <section class="doc-section" id="how">
+      <div class="section-head">
+        <p class="section-eyebrow">How it works</p>
+        <h2>なぜ1エントリで2つ動くのか</h2>
+        <p class="section-dek">ロジックの統合は一切していません。同じcallbacksを2回渡しているだけです。</p>
+      </div>
+
+      <p>
+        Burpが実際に直接ロードするのは <code>nn_extensions.py</code> 1ファイルだけです。この中の
+        <code>BurpExtender.registerExtenderCallbacks()</code> は、次の3ステップだけを行います。
+      </p>
+
+      <ol>
+        <li>
+          <code>burp-list-input/</code> と <code>burp-sf-aura/</code> を <code>sys.path</code> に追加する
+        </li>
+        <li>
+          <code>csv_list_input.py</code> と <code>sf_aura_burp_helper.py</code> を通常のPythonモジュールとして
+          <code>import</code> し、それぞれの（既存の）<code>BurpExtender</code>クラスをインスタンス化する
+        </li>
+        <li>
+          Burpから渡された同じ <code>callbacks</code> オブジェクトを、2つのインスタンスそれぞれの
+          <code>registerExtenderCallbacks(callbacks)</code> に渡して呼び出す
+        </li>
+      </ol>
+
+      <div class="code-block"><span class="c-dim"># nn_extensions.py（抜粋）</span>
+<span class="c-key">import</span> csv_list_input
+self.csv_list_input_extender = csv_list_input.BurpExtender()
+self.csv_list_input_extender.registerExtenderCallbacks(callbacks)
+
+<span class="c-key">import</span> sf_aura_burp_helper
+self.sf_aura_extender = sf_aura_burp_helper.BurpExtender()
+self.sf_aura_extender.registerExtenderCallbacks(callbacks)
+
+callbacks.setExtensionName(<span class="c-mut">"NN-Extensions"</span>)  <span class="c-dim"># 最後に表示名を確定</span></div>
+
+      <p>
+        Burpの <code>callbacks</code> は <code>addSuiteTab</code>・<code>registerContextMenuFactory</code>・
+        <code>registerHttpListener</code> などを複数回呼べる作りになっているため、この方法で両拡張の初期化処理が
+        そのまま独立して動きます。両拡張はそれぞれ自分自身の <code>callbacks.setExtensionName(...)</code>
+        を呼びますが（<code>"CSV List Input"</code> / <code>"SF Aura Helper"</code>）、
+        <code>nn_extensions.py</code> 側が最後にもう一度 <code>"NN-Extensions"</code> を呼ぶことで、Extensions一覧上の
+        表示名だけを上書きしています。それ以外、両拡張のコードは1バイトも変更していません。
+      </p>
+
+      <div class="callout update">
+        <span class="callout-label">拡張のアンロード</span>
+        <p>
+          CSV List Inputは自分自身で <code>IExtensionStateListener</code> を登録しており（arm解除などの後始末を行う）、
+          これはCSV List Input側のインスタンス自身に対して行われるため、NN-Extensions経由でロードした場合でも
+          そのまま同じように機能します。SF Aura Helperはそもそも状態リスナーを持たないため、対応不要です。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= LAYOUT ================= -->
+    <section class="doc-section" id="layout">
+      <div class="section-head">
+        <p class="section-eyebrow">Repository layout</p>
+        <h2>リポジトリ構成</h2>
+      </div>
+
+      <div class="code-block">Burp-NN-Extensions/
+├── nn_extensions.py          <span class="c-dim"># Burpが直接ロードするエントリポイント</span>
+├── README.md
+├── docs/manual.html          <span class="c-dim"># このページ</span>
+├── burp-list-input/          <span class="c-dim"># CSV List Input（ロジック未変更）</span>
+│   ├── csv_list_input.py
+│   ├── csvlistinput/
+│   ├── docs/manual.html
+│   └── README.md
+└── burp-sf-aura/             <span class="c-dim"># SF Aura Helper（ロジック未変更）</span>
+    ├── sf_aura_burp_helper.py
+    ├── sf_aura_burp_helper_マニュアル.html
+    └── README.md</div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="doc-section" id="faq">
+      <div class="section-head">
+        <p class="section-eyebrow">Troubleshooting</p>
+        <h2>トラブルシューティング</h2>
+      </div>
+
+      <details class="faq">
+        <summary>Extensions一覧に2エントリ出てしまう</summary>
+        <div class="faq-body">
+          <p>
+            <code>nn_extensions.py</code>ではなく、<code>csv_list_input.py</code>と<code>sf_aura_burp_helper.py</code>を
+            それぞれ個別にAddしてしまっている場合にこうなります。一度両方をRemoveし、<code>nn_extensions.py</code>だけを
+            Addし直してください。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>片方のタブしか出てこない</summary>
+        <div class="faq-body">
+          <p>
+            <span class="k">Extender/Extensions</span> &gt; NN-Extensions &gt; <span class="k">Errors</span> タブを
+            確認してください。多くの場合、<code>burp-list-input/</code>または<code>burp-sf-aura/</code>フォルダの中身が
+            移動・欠落しているか、<code>nn_extensions.py</code>と同じ階層に無いことが原因です。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>拡張を編集したのに変更が反映されない（Reload extension）</summary>
+        <div class="faq-body">
+          <p>
+            CSV List Input側（<code>csvlistinput/</code>パッケージ）は、Burpの「Reload extension」でも
+            <code>sys.modules</code>キャッシュとJythonの<code>$py.class</code>バイトコードキャッシュを自前で
+            パージするようになっているため、通常はそのまま反映されます。反映されない場合は、一度Extensions一覧から
+            NN-Extensions自体をRemoveしてから再度Addしてください。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>片方の拡張だけを使いたい</summary>
+        <div class="faq-body">
+          <p>
+            <a href="#bundled">同梱している拡張</a>の節にある通り、各拡張は<code>burp-list-input/csv_list_input.py</code>
+            または<code>burp-sf-aura/sf_aura_burp_helper.py</code>を直接選んで単体ロードすることもできます。
+            NN-Extensionsはあくまで両方をまとめて使いたい場合のローダーです。
+          </p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= GLOSSARY ================= -->
+    <section class="doc-section" id="glossary">
+      <div class="section-head">
+        <p class="section-eyebrow">Reference</p>
+        <h2>用語集</h2>
+      </div>
+
+      <dl class="glossary">
+        <div class="gterm">
+          <dt>コンポジションルート</dt>
+          <dd>他のモジュールを組み合わせて配線するだけの、最上位の薄いエントリポイント。<code>nn_extensions.py</code>自体は独自のロジックを持たない。</dd>
+        </div>
+        <div class="gterm">
+          <dt>callbacks</dt>
+          <dd>Burpが<code>registerExtenderCallbacks()</code>に渡すオブジェクト。タブ追加・リスナー登録・拡張名設定などのAPIをまとめて持ち、複数の呼び出し元から共有して使える。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Suiteタブ</dt>
+          <dd><code>callbacks.addSuiteTab()</code>で追加される、Burpメインウィンドウ上部のタブ。1つの拡張から複数追加することも、複数の拡張が別々に追加することもできる。</dd>
+        </div>
+      </dl>
+    </section>
+
+    <footer class="doc-footer">
+      NN-Extensions — CSV List Input と SF Aura Helper を1つのBurp拡張として読み込むためのローダー。
+    </footer>
+  </main>
+</div>

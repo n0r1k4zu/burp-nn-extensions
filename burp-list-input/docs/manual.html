@@ -1,0 +1,1547 @@
+<title>CSV List Input 利用マニュアル</title>
+<style>
+  :root {
+    --paper: #eef0f3;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --ink: #1b2027;
+    --ink-soft: #565f6e;
+    --ink-faint: #88909c;
+    --line: #d6dae1;
+    --line-soft: #e4e7ec;
+    --accent: #335cb8;
+    --accent-strong: #23408a;
+    --accent-soft: #e6ecfb;
+    --code-bg: #1c212b;
+    --code-ink: #dfe4ee;
+    --code-accent: #8fb2ff;
+    --ok: #23824a;
+    --ok-soft: #e4f4ea;
+    --warn: #9c6a10;
+    --warn-soft: #fbf0dc;
+    --danger: #b3392f;
+    --danger-soft: #fbe8e6;
+    --shadow: 0 1px 2px rgba(27, 32, 39, 0.06), 0 8px 24px -12px rgba(27, 32, 39, 0.18);
+    --radius: 10px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14171c;
+      --surface: #1b1f27;
+      --surface-raised: #20242e;
+      --ink: #e7e9ee;
+      --ink-soft: #a4abb9;
+      --ink-faint: #6d7484;
+      --line: #2c313c;
+      --line-soft: #262a34;
+      --accent: #7fa0f2;
+      --accent-strong: #a7c0ff;
+      --accent-soft: #22283a;
+      --code-bg: #10141b;
+      --code-ink: #e2e7f0;
+      --code-accent: #9dbcff;
+      --ok: #57c884;
+      --ok-soft: #16261e;
+      --warn: #e0ab4c;
+      --warn-soft: #2a2213;
+      --danger: #e8776d;
+      --danger-soft: #2b1917;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171c; --surface: #1b1f27; --surface-raised: #20242e;
+    --ink: #e7e9ee; --ink-soft: #a4abb9; --ink-faint: #6d7484;
+    --line: #2c313c; --line-soft: #262a34;
+    --accent: #7fa0f2; --accent-strong: #a7c0ff; --accent-soft: #22283a;
+    --code-bg: #10141b; --code-ink: #e2e7f0; --code-accent: #9dbcff;
+    --ok: #57c884; --ok-soft: #16261e; --warn: #e0ab4c; --warn-soft: #2a2213;
+    --danger: #e8776d; --danger-soft: #2b1917;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --paper: #eef0f3; --surface: #ffffff; --surface-raised: #ffffff;
+    --ink: #1b2027; --ink-soft: #565f6e; --ink-faint: #88909c;
+    --line: #d6dae1; --line-soft: #e4e7ec;
+    --accent: #335cb8; --accent-strong: #23408a; --accent-soft: #e6ecfb;
+    --code-bg: #1c212b; --code-ink: #dfe4ee; --code-accent: #8fb2ff;
+    --ok: #23824a; --ok-soft: #e4f4ea; --warn: #9c6a10; --warn-soft: #fbf0dc;
+    --danger: #b3392f; --danger-soft: #fbe8e6;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic",
+      "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Consolas", "Menlo",
+      "Noto Sans Mono CJK JP", monospace;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    max-width: 1240px;
+    margin: 0 auto;
+    gap: 0;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 20px 40px;
+    border-right: 1px solid var(--line);
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .sidebar-brand .mark {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 5px;
+    padding: 2px 6px;
+    letter-spacing: 0.02em;
+  }
+  .sidebar-brand .name {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .sidebar-sub {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: 0 0 26px;
+  }
+  .toc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .toc-group { margin-bottom: 18px; }
+  .toc-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px 10px;
+  }
+  .toc a {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 7px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+  }
+  .toc a:hover { color: var(--ink); background: var(--surface); }
+
+  /* ---------- Main content ---------- */
+  main { min-width: 0; padding: 48px 56px 120px; }
+  .doc-header { margin-bottom: 56px; }
+  .doc-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1.doc-title {
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.3;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+    max-width: 20ch;
+  }
+  .doc-lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  section.doc-section { margin: 0 0 64px; max-width: 760px; }
+  section.doc-section:last-of-type { margin-bottom: 24px; }
+
+  .section-head { margin-bottom: 22px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .section-eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 18px 0 8px;
+  }
+  h2 {
+    font-size: 24px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance;
+  }
+  .section-dek { color: var(--ink-soft); margin: 0; font-size: 15px; max-width: 58ch; }
+
+  h3 { font-size: 18px; font-weight: 700; margin: 30px 0 10px; letter-spacing: -0.005em; }
+  h4 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; color: var(--ink); }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 16px; padding-left: 1.3em; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 700; }
+
+  .k { /* inline UI-label / keycap */
+    font-family: ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: var(--ink);
+  }
+  code.mono, code {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.88em;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  /* ---------- Steps ---------- */
+  .steps { list-style: none; margin: 0 0 20px; padding: 0; counter-reset: step; }
+  .step {
+    counter-increment: step;
+    position: relative;
+    padding: 18px 20px 18px 60px;
+    margin-bottom: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: 18px; top: 18px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, monospace;
+  }
+  .step h4 { margin: 0 0 6px; font-size: 15.5px; }
+  .step p:last-child { margin-bottom: 0; }
+  .step .step-note {
+    margin-top: 10px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--line);
+    padding-left: 10px;
+  }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 18px 0;
+    font-size: 14.5px;
+    background: var(--surface);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .callout.tip { border-left-color: var(--accent); }
+  .callout.tip .callout-label { color: var(--accent-strong); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.warn .callout-label { color: var(--warn); }
+  .callout.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+  .callout.update { border-left-color: var(--ok); background: var(--ok-soft); }
+  .callout.update .callout-label { color: var(--ok); }
+  .callout.danger .callout-label { color: var(--danger); }
+
+  /* ---------- Code / terminal block ---------- */
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+  }
+  .code-block .c-key { color: var(--code-accent); }
+  .code-block .c-mut { color: #93e3ac; }
+  .code-block .c-dim { color: #7d8598; }
+
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 16px 0 22px; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    background: var(--surface-raised);
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint);
+    font-weight: 700;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  td code, th code { white-space: nowrap; }
+
+  /* ---------- Status chips (mirrors the extension's own Log statuses) ---------- */
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 2px 8px; border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .chip.applied { color: var(--ok); background: var(--ok-soft); }
+  .chip.exhausted { color: var(--warn); background: var(--warn-soft); }
+  .chip.diagnostic { color: var(--ink-soft); background: var(--surface-raised); border-color: var(--line); }
+  .chip.replaced { color: var(--accent-strong); background: var(--accent-soft); border-color: var(--accent); }
+
+  /* ---------- Figures / diagrams ---------- */
+  figure { margin: 24px 0 30px; }
+  figure.diagram {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 18px 8px;
+  }
+  figure.diagram svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 13px; color: var(--ink-soft); margin-top: 10px; padding: 0 2px 12px;
+    max-width: 62ch;
+  }
+  .diagram text { fill: currentColor; font-family: ui-monospace, monospace; }
+  .diagram .lbl-jp {
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+  }
+
+  /* ---------- Definition list (glossary) ---------- */
+  .glossary { display: grid; gap: 16px; }
+  .gterm {
+    display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 16px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--line-soft);
+  }
+  .gterm:last-child { border-bottom: none; }
+  .gterm dt { font-weight: 700; font-family: ui-monospace, monospace; font-size: 13.5px; color: var(--accent-strong); }
+  .gterm dd { margin: 0; font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ---------- Detail / FAQ ---------- */
+  details.faq {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px 16px;
+    margin-bottom: 10px;
+  }
+  details.faq summary {
+    cursor: pointer; list-style: none; padding: 14px 0;
+    font-weight: 700; font-size: 14.5px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::after {
+    content: "+"; font-family: ui-monospace, monospace; font-weight: 400;
+    color: var(--ink-faint); font-size: 18px; flex: none;
+  }
+  details.faq[open] summary::after { content: "\2212"; }
+  details.faq .faq-body { padding: 0 0 16px; color: var(--ink-soft); font-size: 14.5px; }
+  details.faq .faq-body p:last-child { margin-bottom: 0; }
+
+  footer.doc-footer {
+    max-width: 760px; margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--ink-faint);
+  }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+    main { padding: 32px 22px 90px; }
+    .gterm { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+
+<div class="shell">
+  <nav class="sidebar" aria-label="目次">
+    <div class="sidebar-brand">
+      <span class="mark">jython</span>
+      <span class="name">CSV List Input</span>
+    </div>
+    <p class="sidebar-sub">Burp Suite 拡張 利用マニュアル</p>
+
+    <ul class="toc">
+      <li class="toc-group">
+        <p class="toc-group-label">はじめに</p>
+        <a href="#overview">これは何をするツール？</a>
+        <a href="#install">インストール</a>
+      </li>
+      <li class="toc-group">
+        <p class="toc-group-label">使い方</p>
+        <a href="#usage">基本の流れ（6ステップ）</a>
+        <a href="#decode-replace">Target &amp; Replace with Decode &amp; Encode</a>
+        <a href="#match-replace">Match &amp; Replace（置換）</a>
+        <a href="#decode">Decode（デコード）</a>
+        <a href="#ui-reference">画面の見方</a>
+      </li>
+      <li class="toc-group">
+        <p class="toc-group-label">動作原理</p>
+        <a href="#how-flow">全体の仕組み</a>
+        <a href="#how-detect">Insertion Pointの検出</a>
+        <a href="#how-escape">値の差し込み方（エスケープ）</a>
+        <a href="#how-tool">ツールフラグとマクロ</a>
+        <a href="#how-response">レスポンスの対応付け</a>
+      </li>
+      <li class="toc-group">
+        <p class="toc-group-label">困ったとき</p>
+        <a href="#faq">トラブルシューティング</a>
+        <a href="#limits">制限事項</a>
+        <a href="#glossary">用語集</a>
+      </li>
+    </ul>
+  </nav>
+
+  <main>
+    <header class="doc-header">
+      <p class="doc-eyebrow">User Manual — 日本語版</p>
+      <h1 class="doc-title">CSV List Input 利用マニュアル</h1>
+      <p class="doc-lede">
+        Repeaterで送るリクエストの複数の項目（名前・電話番号・性別など）に、CSVで用意した大量のテストデータを
+        1送信ごとに自動で差し込んでいくためのBurp Suite拡張です。加えて、armした対象とは無関係に動く
+        <a href="#match-replace">Match &amp; Replace</a>機能、エンコードされた値の中身だけを書き換える
+        <a href="#decode-replace">Target &amp; Replace with Decode &amp; Encode</a>機能、選択した文字列を複数形式で一気に
+        デコードできる<a href="#decode">Decode</a>機能も備えています。拡張内部でエラーが起きた場合は
+        <span class="k">Errors</span> タブに自動で記録されます。このページでは、初めて触る人向けに
+        「使い方」と「中で何が起きているか」の両方を説明します。
+      </p>
+    </header>
+
+    <!-- ================= OVERVIEW ================= -->
+    <section class="doc-section" id="overview">
+      <div class="section-head">
+        <p class="section-eyebrow">Overview</p>
+        <h2>これは何をするツール？</h2>
+        <p class="section-dek">大量の登録者データを1件ずつ手で書き換える作業を、自動化するための拡張です。</p>
+      </div>
+
+      <p>
+        たとえば「名前・電話番号・性別」を受け付ける登録APIをテストするとき、100人分のテストデータを1件ずつ
+        Repeaterで書き換えて送るのは現実的ではありません。この拡張は、次の3つを行います。
+      </p>
+      <ul>
+        <li>対象のリクエストから、書き換え可能な項目（<strong>Insertion Point</strong>）を自動で見つけ出す</li>
+        <li>CSVファイルの各列を、見つかった項目に手動で対応付ける</li>
+        <li>Repeaterから送信するたびに、CSVの次の1行を自動で差し込んで送る</li>
+      </ul>
+      <p>
+        JSON本文の中に、さらにJSON文字列が埋め込まれているような入れ子構造も再帰的に解析するため、
+        単純なトップレベルの項目だけでなく、深い階層にある値も個別に差し込み対象にできます
+        （詳しくは <a href="#how-detect">Insertion Pointの検出</a> を参照）。
+      </p>
+
+      <div class="callout tip">
+        <span class="callout-label">対象読者</span>
+        <p>
+          Burp Suiteの基本操作（Proxy／Repeaterの使い方）は分かっている前提で書いています。
+          Jython拡張の仕組みそのものについては知らなくても読めるようにしています。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= INSTALL ================= -->
+    <section class="doc-section" id="install">
+      <div class="section-head">
+        <p class="section-eyebrow">Setup</p>
+        <h2>インストール</h2>
+      </div>
+
+      <ol>
+        <li><strong>Jythonを用意する</strong> — <code>jython-standalone.jar</code> をダウンロードしておきます。</li>
+        <li>
+          Burp Suiteの <span class="k">Extender</span> → <span class="k">Options</span> →
+          <span class="k">Python Environment</span> で、そのjarファイルを指定します。
+        </li>
+        <li>
+          <span class="k">Extender</span> → <span class="k">Extensions</span> → <span class="k">Add</span> で、
+          Extension typeを <span class="k">Python</span> にし、<code>csv_list_input.py</code> を選択します。
+        </li>
+        <li>
+          読み込みに成功すると、Burpのメインウィンドウに <span class="k">CSV List Input</span> タブが追加されます。
+        </li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="callout-label">読み込みエラーが出たら</span>
+        <p>
+          エラー画面に表示されるスタックトレースをよく見てください。多くの場合、拡張の設置パスがずれている、
+          もしくはBurpのバージョン差異が原因です。<span class="k">Extender</span> →
+          <span class="k">Extensions</span> → 拡張名 → <span class="k">Errors</span> タブにも詳細が出ます。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= USAGE ================= -->
+    <section class="doc-section" id="usage">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>基本の流れ</h2>
+        <p class="section-dek">対象を決めてから、送信してログを確認するまでの一連の操作です。</p>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>対象の通信を「Arm」する</h4>
+          <p>
+            テストしたいリクエストを Proxy の履歴や Repeater 上で右クリックし、
+            <span class="k">Send to Target &amp; List Mapping</span> を選びます。これで、その通信が「対象
+            （armed target）」としてこの機能に登録されます。
+          </p>
+          <p class="step-note">
+            v1では、Target &amp; List Mappingとして同時にarmできる対象は1つだけです。別のリクエストを対象にしたい
+            場合は、あらためて右クリックからやり直してください（マッピングは可能な範囲で引き継がれます）。
+            なお、右クリックメニューには <span class="k">Send to Target &amp; Replace with Decode &amp; Encode</span> という
+            別項目もあります — これは<a href="#decode-replace">Target &amp; Replace with Decode &amp; Encode</a>機能専用の、
+            完全に独立した対象です。同じリクエストを両方に送ってもよいですし、別々のリクエストをそれぞれの機能に
+            割り当てることもできます。
+          </p>
+        </li>
+
+        <li class="step">
+          <h4>検出されたInsertion Pointを確認する</h4>
+          <p>
+            <span class="k">CSV List Input</span> タブ →
+            <span class="k">Target &amp; List Mapping</span> を開くと、自動検出された書き換え可能な項目が
+            一覧表示されます。URLパラメータ、Cookie、ヘッダー、JSON/XML本文の各項目（入れ子のものも含む）が対象です。
+          </p>
+        </li>
+
+        <li class="step">
+          <h4>CSVを読み込む</h4>
+          <p>
+            <span class="k">Load CSV...</span> でファイルを選びます。1行目はヘッダー行で、
+            <code>No, 項目1, 項目2, ...</code> のように列数は自由です。文字コードはUTF-8 / Shift_JIS / CP932 から選べます。
+          </p>
+          <p class="step-note">読み込んだ後、表の値はその場で直接編集できます。編集内容はすぐに実データへ反映されます。</p>
+        </li>
+
+        <li class="step">
+          <h4>Insertion PointとCSVの列を対応付ける</h4>
+          <p>
+            一覧の「Mapped Column」の欄で、各Insertion PointにCSVのどの列を使うかを選びます。
+            親子関係にある項目（入れ子のJSONとその外側の文字列など）を同時に選ぶことはできません — 競合する側は自動でグレーアウトされます。
+          </p>
+        </li>
+
+        <li class="step">
+          <h4>「Active」を有効にして送信する</h4>
+          <p>
+            Target情報欄の <span class="k">Active</span> にチェックを入れ、有効にするツール（通常は
+            <span class="k">Repeater</span>）にもチェックを入れます。あとはRepeaterからいつも通り送信するだけで、
+            CSVの次の行が自動的に差し込まれます。
+          </p>
+        </li>
+
+        <li class="step">
+          <h4>Logタブで結果を確認する</h4>
+          <p>
+            送信のたびに一覧が増えていきます。行を選択すると、実際に送信されたリクエストと、返ってきたレスポンスの
+            両方を確認できます。CSVの行番号（No列の値）もそのまま表示されるので、どのデータで何が起きたか追跡できます。
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ================= TARGET & REPLACE WITH DECODE ================= -->
+    <section class="doc-section" id="decode-replace">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Target &amp; Replace with Decode &amp; Encode</h2>
+        <p class="section-dek">エンコードされたInsertion Pointの中身だけを、デコード→置換→再エンコードして書き換える機能です。</p>
+      </div>
+
+      <p>
+        Insertion Pointの値がBase64やURLエンコードなどでラップされていると、その中に含まれる本当の値（例えば
+        Base64デコードすると出てくるJSON）を直接、通常のマッピングで書き換えることはできません。この機能は、
+        対象のInsertion Pointについて <strong>①デコード → ②指定した文字列（またはパターン）で置換 → ③同じ方式で
+        再エンコード</strong> を送信のたびに自動で行ってから送り出します。
+      </p>
+
+      <div class="callout tip">
+        <span class="callout-label">Target &amp; List Mappingとは別の対象</span>
+        <p>
+          この機能の対象は、<a href="#usage">Target &amp; List Mapping</a>の対象とは<strong>完全に独立</strong>
+          しています。右クリックメニューの <span class="k">Send to Target &amp; Replace with Decode &amp; Encode</span> で、
+          この機能専用にarmします。同じリクエストをTarget &amp; List Mappingにも送っておけば両方の機能を同じ
+          対象に対して使えますし、まったく別のリクエストをそれぞれの機能に割り当てることもできます。
+        </p>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>対象をarmする</h4>
+          <p>
+            Repeater/Proxy履歴で対象のリクエストを右クリックし、
+            <span class="k">Send to Target &amp; Replace with Decode &amp; Encode</span> を選びます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>書き換えたいInsertion Pointを設定する</h4>
+          <p>
+            一覧から行を選択すると、画面下部に <span class="k">Original Value (full)</span>
+            （そのInsertion Pointの現在の値）が表示されます。値が何らかの方式でエンコードされている場合は
+            <span class="k">Codec</span> 列でその方式（None / URL / Base64 / Hex / HTML Entity /
+            Unicode <code>\uXXXX</code> / ROT13）を選んでください。選ぶと同時に、画面下部の
+            <span class="k">Decoded Value (using selected Codec)</span> 欄にデコード結果がその場でプレビュー
+            表示されるので、正しいCodecを選べているか（意味の通る値になっているか）をすぐ確認できます。
+            エンコードされていない値であれば <span class="k">None</span> のままで構いません。
+          </p>
+          <p class="step-note">
+            デコードに失敗した場合（Codecの選択が値と合っていない等）は、Decoded Value欄に
+            「(decode failed with Codec=...)」のようにエラー内容が表示されます。拡張が止まることはありません。
+          </p>
+          <p class="step-note">
+            プレビューで方式が正しいことを確認できたら、その行の <span class="k">Enabled</span> にチェックを
+            入れます。<span class="k">Find</span> に書き換えたい部分（プレーン文字列、または
+            <span class="k">Regex</span> にチェックを入れて正規表現）を、<span class="k">Replace With</span> に
+            置換後の値を入力します。送信のたびに、その時点のInsertion Pointの値を選んだCodecでデコードし、
+            Find/Replaceを適用してから再度同じCodecでエンコードして差し込みます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>機能を有効化して送信する</h4>
+          <p>
+            タブ最上部の <span class="k">Target &amp; Replace with Decode &amp; Encode: Enabled</span> をONにし、対象のツール
+            （通常はRepeater・Proxy）にチェックを入れます。これはTarget &amp; List Mappingの
+            <span class="k">Active</span>／ツールフラグとは独立した設定です — 両方を同時に有効化することもできます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>Logタブで結果を確認する</h4>
+          <p>
+            実際に書き換えが行われた送信は、既存の <span class="k">Log</span> タブに記録されます。Find に一致しな
+            かった場合や、選んだCodecでデコードできなかった場合はその行の置換だけがスキップされ（他の有効な行の
+            置換は継続されます）、対象のInsertion Pointの構造上の場所（path）がリクエストから見つからなくなった
+            場合も同様にスキップされます。
+          </p>
+        </li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="callout-label">対象は自分自身がarmした1つの対象のみ</span>
+        <p>
+          Match &amp; Replaceとは異なり、この機能は自分自身でarmした「1つの対象」（Target &amp; List Mappingとは
+          別の対象）にのみ適用されます。armしていない状態、またはarmした対象と host/port/protocol/method/path が
+          一致しない送信には適用されません。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= MATCH & REPLACE ================= -->
+    <section class="doc-section" id="match-replace">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Match &amp; Replace（置換）</h2>
+        <p class="section-dek">armした対象とは無関係に、選択したツールを通る全トラフィックへ単純な文字列置換を適用する機能です。</p>
+      </div>
+
+      <p>
+        CSV Insertion Point機能は「1つの対象リクエストをarmして、送信のたびにCSVの値を差し込む」仕組みですが、
+        Match &amp; Replace はそれとは独立した、Burp本体の <span class="k">Match and Replace</span> に近い機能です。
+        armする必要はなく、選択したツール（Repeater・Proxyなど）を通るリクエスト／レスポンスすべてに対して、
+        置換前後の文字列リストを常時適用します。
+      </p>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>置換ルールを用意する</h4>
+          <p>
+            <span class="k">Match &amp; Replace</span> タブを開き、左側（リクエスト用）・右側（レスポンス用）の
+            それぞれの表に <span class="k">Add rule</span> で行を追加するか、<span class="k">Load CSV...</span> で
+            <code>Before, After</code> の2列のCSVを読み込みます。読み込んだ行は既存の行を消さず末尾に追加されます。
+          </p>
+          <p class="step-note">
+            各行には <span class="k">Enabled</span>（この行を使うか）と <span class="k">Regex</span>
+            （BeforeをPythonの正規表現として扱うか）のチェックボックスがあります。Regexが有効な場合、
+            <span class="k">After</span> 側では <code>\1</code> のような後方参照が使えます（<code>re.sub</code>準拠）。
+            チェックを入れた行だけがマッチ判定・置換の対象になり、複数行に同時にチェックを入れれば
+            まとめて適用されます（上から順に、前の置換結果に対して次のルールが累積的に効きます）。
+          </p>
+          <p class="step-note">
+            もっと手早くBeforeを埋めたい場合は、Repeater・Proxy・このLogタブなどのリクエスト/レスポンス
+            表示欄で置き換えたい文字列を選択し、右クリックメニューから
+            <span class="k">Add selection to Match &amp; Replace → Request Before</span>（または
+            <span class="k">... → Response Before</span>）を選んでください。選択した文字列がそのまま
+            該当リストの末尾にBeforeとして追加されます（Afterは空欄のまま、Enabledはデフォルトでオンです）。
+          </p>
+        </li>
+        <li class="step">
+          <h4>対象ツールとパケット部位を選ぶ</h4>
+          <p>
+            タブ上部で、置換を適用するBurpのツール（Repeater・Proxyなど）にチェックを入れます。これは
+            Target &amp; List Mappingタブのツールフラグ設定とは独立した、Match &amp; Replace専用の設定です。
+            その下で、Method／Path／Header／Bodyのどの部分を対象にするかを選びます
+            （<span class="k">All</span>をONにすると4つ全部が選択され、編集不可になります）。
+            この範囲設定はリクエスト側・レスポンス側の両方のリストに共通です（レスポンスにはMethod/Pathが
+            存在しないため、その2つは無視されます）。
+          </p>
+        </li>
+        <li class="step">
+          <h4>機能全体を有効化する</h4>
+          <p>
+            タブ最上部の <span class="k">Match &amp; Replace: Enabled</span> をONにすると動作を開始します。
+            OFFにすればいつでも即座に止められます（この拡張の他の機能には影響しません）。
+          </p>
+        </li>
+        <li class="step">
+          <h4>Logタブで確認する</h4>
+          <p>
+            置換が実際にヒットした通信だけが、既存の <span class="k">Log</span> タブに記録されます
+            （ルールにマッチしなかった通信はログに出ません）。armed targetのCSV差し込みと同じ送信で
+            両方が発火した場合も、行は1つにまとまり、Note欄に何件置換されたかが表示されます。
+          </p>
+          <p class="step-note">
+            行を選択し、Logタブ上部の <span class="k">Show before Match &amp; Replace</span> にチェックを入れると、
+            Request/Response欄の表示が置換前の内容に切り替わります。チェックを外すと実際に送信/受信された
+            置換後の内容に戻ります。CSV Insertion Pointだけが効いた行や、Match &amp; Replaceが片側にしか
+            当たらなかった行では、当たらなかった側は置換前後で同じ内容が表示されます。
+          </p>
+        </li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="callout-label">chunked応答のBodyについて</span>
+        <p>
+          レスポンスの <span class="k">Content-Length</span> は置換後のBodyサイズに合わせて自動調整されますが、
+          <span class="k">Transfer-Encoding: chunked</span> のレスポンスにはそもそも<span class="k">Content-Length</span>
+          ヘッダーが無いため、この自動調整は行われません（chunkの境界自体を書き換える機能ではありません）。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= DECODE ================= -->
+    <section class="doc-section" id="decode">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Decode（デコード）</h2>
+        <p class="section-dek">選択した文字列を、複数の形式で同時にデコード・エンコードして一覧表示するタブです。</p>
+      </div>
+
+      <p>
+        Burp標準の <span class="k">Decoder</span> タブは1つの変換を選んでチェーンしていく方式で、画面が細長く
+        結果が読みにくいことがあります。この拡張の <span class="k">Decode</span> タブは、左半分に選択した文字列を
+        表示し、右半分に対応する変換結果を<strong>すべて同時に</strong>並べて表示します。各結果は幅いっぱいに
+        自動で折り返されるため、横スクロールなしで全体を見渡せます。
+      </p>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>文字列をDecodeタブへ送る</h4>
+          <p>
+            Repeater・Proxy・このLogタブなどのリクエスト/レスポンス表示欄で調べたい文字列を選択し、右クリックから
+            <span class="k">Send selection to Decode</span> を選びます。<span class="k">Decode</span> タブが自動で
+            前面に出て、選択した文字列が左側に表示されます。
+          </p>
+          <p class="step-note">
+            直接 <span class="k">Decode</span> タブを開いて左側のテキスト欄に貼り付け、
+            <span class="k">Decode</span> ボタンを押しても同じように使えます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>右側で結果を確認する</h4>
+          <p>
+            右側には次の変換結果が常に一覧表示されます（左側の文字列を変えるたびに再計算されます）。
+          </p>
+          <ul>
+            <li>URL Decode / URL Encode</li>
+            <li>Base64 Decode / Base64 Encode（URL-safeなBase64やパディング省略にもある程度対応）</li>
+            <li>Hex Decode / Hex Encode</li>
+            <li>HTML Entity Decode / HTML Entity Encode</li>
+            <li>Unicode <code>\uXXXX</code> Decode</li>
+            <li>ROT13</li>
+            <li>JWT Decode（header/payloadをBase64デコードして表示するのみ。署名の検証は行いません）</li>
+          </ul>
+          <p class="step-note">
+            その変換が対象の文字列に当てはまらない場合（例: JWTでない文字列に対するJWT Decode）は、
+            エラーで拡張が止まることはなく、その項目だけ「(not applicable: ...)」と表示されます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>表示する変換を手動で絞り込む</h4>
+          <p>
+            タブ最上部に変換ごとのチェックボックスが並んでおり、初期状態は全部ONです（＝どれが当てはまるか
+            お任せで一覧表示）。特定の変換だけ見たい場合はチェックを外す/入れることで手動切り替えできます。
+            <span class="k">All</span> / <span class="k">None</span> ボタンで一括切り替えも可能です。
+            チェックを変えるとその場で右側の一覧が再計算されます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>左右それぞれで検索する</h4>
+          <p>
+            左側（元データ）の <span class="k">Find:</span> 欄に文字列を入れると、一致箇所が黄色くハイライトされ、
+            <span class="k">◀</span>/<span class="k">▶</span> ボタン（またはEnterキー）で一致箇所を順に移動できます。
+            件数は「現在位置 / 総数」の形式で表示されます。
+          </p>
+          <p class="step-note">
+            右側（デコード結果）の <span class="k">Find in results:</span> 欄に文字列を入れると、その文字列を含む
+            変換結果だけが残り、それ以外の変換ブロックは自動的に非表示になります。表示されたブロック内でも
+            一致箇所は黄色くハイライトされます。「今どの形式にこの文字列が含まれているか」を素早く絞り込みたい
+            ときに使います。欄を空にすると全ての変換結果が再び表示されます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>デコード結果をMatch &amp; ReplaceのBeforeに送る</h4>
+          <p>
+            左側の元データ欄、右側のいずれかのデコード結果欄のどちらでも、文字列を選択して右クリックすると
+            <span class="k">Add selection to Match &amp; Replace → Request Before</span> /
+            <span class="k">... → Response Before</span> が表示されます。Repeater/Proxyの右クリックメニューと
+            違い、このタブは特定のリクエスト・レスポンスに紐づいていないため、どちら側のBeforeに追加するかを
+            ここで明示的に選びます。
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ================= UI REFERENCE ================= -->
+    <section class="doc-section" id="ui-reference">
+      <div class="section-head">
+        <p class="section-eyebrow">Reference</p>
+        <h2>画面の見方</h2>
+      </div>
+
+      <h3>Target &amp; List Mapping タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Active</span></td><td>ONの間だけ、対象への送信に差し込みが適用されます。</td></tr>
+            <tr><td>ツールフラグの一覧</td><td>チェックしたツール（Repeaterなど）からの送信だけを差し込み対象にします。</td></tr>
+            <tr><td><span class="k">Log DIAGNOSTIC entries for non-enabled tools...</span></td>
+              <td>有効化していないツールから同じhost/pathへの送信があった場合、その実際のツールフラグを診断ログに出します（マクロの実際のtoolFlagを調べる時だけONにする想定）。</td></tr>
+            <tr><td><span class="k">Attempt lenient recovery for malformed nested JSON</span></td>
+              <td>実験的機能。壊れたJSONでも可能な限り値を拾おうとします（<a href="#how-detect">詳細</a>）。</td></tr>
+            <tr><td><span class="k">Re-detect</span></td><td>armした時点のリクエストに対して、Insertion Point検出をやり直します。</td></tr>
+            <tr><td>Insertion Point一覧</td>
+              <td>
+                Insertion Points（構造上の場所）・種類・階層の深さ・元の値・対応付けたCSV列・エスケープ方式を表示／編集します。
+                「Filter (path contains):」欄にキーワードを入れると、該当するPathの行だけに絞り込めます。
+                行を選択すると、下に表示される2つのテキスト欄にPathとOriginal Valueの全文（表内では省略されている場合がある）が表示されます。
+              </td></tr>
+            <tr><td>CSV欄</td><td>読み込み、開始行の指定、ポインタのリセット、内容の直接編集を行います。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Target &amp; Replace with Decode &amp; Encode タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Target &amp; Replace with Decode &amp; Encode: Enabled</span></td>
+              <td>この機能全体の有効/無効を切り替えるマスタースイッチです。Target &amp; List Mappingの<span class="k">Active</span>とは独立しています。</td></tr>
+            <tr><td>ツールフラグの一覧</td>
+              <td>Target &amp; List Mappingとは別の、この機能専用のツール選択です。</td></tr>
+            <tr><td><span class="k">Re-detect insertion points</span></td><td>Target &amp; List Mappingの同名ボタンと同じ動作です（armした対象を再検出）。</td></tr>
+            <tr><td>Insertion Points一覧</td>
+              <td>
+                <span class="k">Enabled</span>（この行を対象にするか）、Insertion Points・種類・元の値（参照用）、
+                <span class="k">Codec</span>（None/URL/Base64/Hex/HTML Entity/Unicode <code>\uXXXX</code>/ROT13）、
+                <span class="k">Regex</span>（Findを正規表現として扱うか）、<span class="k">Find</span>、
+                <span class="k">Replace With</span> を行ごとに設定します。
+              </td></tr>
+            <tr><td>Original Value (full) / Decoded Value (using selected Codec)</td>
+              <td>
+                一覧で行を選択すると、画面下部の2つのテキスト欄にその行の元の値（全文）と、選んだCodecで
+                デコードした結果がその場で表示されます。Codecを切り替えるたびにデコード結果も再計算されるので、
+                正しいCodecを選べているかをFind/Replaceを設定する前に確認できます。デコードに失敗した場合は
+                「(decode failed with Codec=...)」とエラー内容が表示されます。
+              </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Log タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>列</th><th>意味</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Status</span></td>
+              <td>
+                <span class="chip applied">APPLIED</span> 差し込み成功、
+                <span class="chip exhausted">EXHAUSTED</span> CSVの行を使い切った、
+                <span class="chip diagnostic">DIAGNOSTIC</span> 情報ログ、
+                <span class="chip replaced">REPLACED</span> CSV Insertion Pointの差し込みなしでMatch &amp; Replace
+                および/またはTarget &amp; Replace with Decode &amp; Encodeがヒットした、のいずれかです。
+                Note欄にどの機能が何件ヒットしたかの内訳が表示されます。
+              </td></tr>
+            <tr><td><span class="k">Row#</span></td><td>使われたCSV行の「No」列の値（内部の通し番号ではありません）。</td></tr>
+            <tr><td><span class="k">Resp</span></td><td>レスポンスのHTTPステータスコード。届く前は空欄です。</td></tr>
+            <tr><td>Request / Response欄</td><td>実際に送信されたバイト列と、返ってきたレスポンスをそれぞれ確認できます。</td></tr>
+            <tr><td><span class="k">Show before Match &amp; Replace</span></td>
+              <td>
+                ONにすると、選択中の行のRequest/Response欄が置換前の内容に切り替わります。Match &amp; Replaceが
+                その側（リクエスト/レスポンス）に当たっていない行では、置換前後で同じ内容が表示されます。
+              </td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-label">ログ表示条件</span>
+        <p>
+          Match &amp; ReplaceおよびTarget &amp; Replace with Decode &amp; Encodeは、CSV Insertion Pointの差し込みが同じ送信で
+          発火しない限り、実際に何かがヒットした通信だけがLogタブに表示されます（マッチ／デコード対象なしだった
+          通信は記録されません）。armed targetのCSV差し込みが同じ送信で発火した場合は、他の機能がヒットしたか
+          どうかに関わらず、その送信は従来どおり記録され、ヒットした内容はNote欄に追記されます。
+        </p>
+      </div>
+
+      <h3>Errors タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td>一覧の行</td>
+              <td>
+                この拡張の内部コードで例外が発生するたびに1行追加されます。<span class="k">#</span> / 時刻 /
+                <span class="k">Source</span>（どの処理で起きたか。例:
+                <code>HttpListener.processHttpMessage (tool=Scanner)</code>）/ メッセージ、の列があります。
+              </td></tr>
+            <tr><td>詳細欄</td>
+              <td>行を選択すると、下部にメッセージとスタックトレース（取得できた場合）の全文が表示されます。</td></tr>
+            <tr><td><span class="k">Clear errors</span></td><td>一覧をすべて消去します。同時にタブ名も「Errors」（件数なし・通常色）に戻ります。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-label">タブ名で一目で分かる</span>
+        <p>
+          エラーが1件以上ある間、タブ名は赤字で「Errors (件数)」と表示されます。Scanner含むいずれかのBurpツールで
+          通信処理中に拡張側の例外が起きた場合（<code>HttpListener.processHttpMessage</code>）や、arm・再検出に
+          失敗した場合はここに記録されるため、タブを開かなくても異常にすぐ気付けます。
+        </p>
+      </div>
+
+      <h3>Match &amp; Replace タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Match &amp; Replace: Enabled</span></td>
+              <td>機能全体の有効/無効を切り替えるマスタースイッチです。</td></tr>
+            <tr><td>ツールフラグの一覧</td>
+              <td>Target &amp; List Mappingタブとは別の、Match &amp; Replace専用のツール選択です。ここで選んだツールを通る送受信だけが対象になります。</td></tr>
+            <tr><td>Method / Path / Headers / Body / All</td>
+              <td>置換をどのパケット部位に適用するかを選びます。リクエスト側・レスポンス側の両方のリストに共通の設定です。</td></tr>
+            <tr><td>Request replacements（左） / Response replacements（右）</td>
+              <td>
+                置換前後の文字列を一覧表示・編集する表です。<span class="k">Enabled</span>列のチェックが入っている行だけが判定対象になります。
+                <span class="k">Regex</span>列をONにすると、Before列はPythonの正規表現として、After列は<code>\1</code>等の後方参照付きの置換文字列として扱われます。
+                <span class="k">Add rule</span>で空行を追加、<span class="k">Remove selected</span>で選択行を削除、<span class="k">Load CSV...</span>で
+                <code>Before, After</code>形式のCSVを末尾に追加読み込みします。
+              </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= HOW IT WORKS ================= -->
+    <section class="doc-section" id="how-flow">
+      <div class="section-head">
+        <p class="section-eyebrow">How it works</p>
+        <h2>全体の仕組み</h2>
+        <p class="section-dek">送信ボタンを押してからログに記録されるまでに、拡張の内部で何が起きているか。</p>
+      </div>
+
+      <p>
+        この拡張はBurpの<code>IHttpListener</code>という仕組みを使って、Repeaterが実際に通信を送り出す
+        直前・直後の両方に割り込みます。送信直前に「今送ろうとしている生のバイト列」を受け取り、書き換えてから
+        送り出す、というのが基本の動きです。
+      </p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 880 380" role="img"
+             aria-label="RepeaterからCSVの1行を消費しつつリクエストが書き換えられ、対象サーバーに送られ、レスポンスとともにLogタブへ記録される5段階の流れ">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+            </marker>
+            <marker id="arrowAccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path>
+            </marker>
+          </defs>
+
+          <!-- Repeater -->
+          <rect x="30" y="40" width="150" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+          <text x="105" y="68" text-anchor="middle" class="lbl-jp" font-size="13" font-weight="700">Repeater</text>
+          <text x="105" y="87" text-anchor="middle" class="lbl-jp" font-size="11" opacity="0.7">送信ボタン</text>
+
+          <!-- CSV -->
+          <rect x="30" y="204" width="150" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+          <text x="105" y="232" text-anchor="middle" class="lbl-jp" font-size="13" font-weight="700">CSV</text>
+          <text x="105" y="251" text-anchor="middle" class="lbl-jp" font-size="11" opacity="0.7">ペイロード一覧</text>
+
+          <!-- Extension (center) -->
+          <rect x="290" y="70" width="270" height="170" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"></rect>
+          <text x="425" y="98" text-anchor="middle" class="lbl-jp" font-size="13.5" font-weight="700" fill="var(--accent-strong)">拡張機能（HttpListener）</text>
+          <line x1="310" y1="112" x2="540" y2="112" stroke="var(--accent)" stroke-width="1" opacity="0.35"></line>
+          <text x="425" y="136" text-anchor="middle" class="lbl-jp" font-size="12">① Insertion Pointを</text>
+          <text x="425" y="153" text-anchor="middle" class="lbl-jp" font-size="12">その場のバイト列に対して再検出</text>
+          <text x="425" y="182" text-anchor="middle" class="lbl-jp" font-size="12">② CSVの値をpathで対応付けて</text>
+          <text x="425" y="199" text-anchor="middle" class="lbl-jp" font-size="12">差し込み（オフセット計算）</text>
+          <text x="425" y="224" text-anchor="middle" font-size="10.5" class="c-dim lbl-jp" fill="currentColor" opacity="0.6">Content-Lengthも自動調整</text>
+
+          <!-- Server -->
+          <rect x="680" y="70" width="170" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+          <text x="765" y="98" text-anchor="middle" class="lbl-jp" font-size="13" font-weight="700">対象サーバー</text>
+          <text x="765" y="117" text-anchor="middle" font-size="11" opacity="0.7">テスト対象API</text>
+
+          <!-- Log -->
+          <rect x="290" y="300" width="270" height="66" rx="8" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+          <text x="425" y="328" text-anchor="middle" class="lbl-jp" font-size="13" font-weight="700">Log タブ</text>
+          <text x="425" y="347" text-anchor="middle" class="lbl-jp" font-size="11" opacity="0.7">Request / Responseを記録</text>
+
+          <!-- Arrows -->
+          <line x1="180" y1="80" x2="288" y2="120" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow)"></line>
+          <text x="205" y="72" class="lbl-jp" font-size="11">① 送信しようとした通信</text>
+
+          <line x1="180" y1="230" x2="288" y2="195" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow)"></line>
+          <text x="188" y="256" class="lbl-jp" font-size="11">② 次の1行を消費</text>
+
+          <line x1="560" y1="110" x2="678" y2="100" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent)"></line>
+          <text x="572" y="92" class="lbl-jp" font-size="11" fill="var(--accent-strong)">③ 書き換え後のリクエスト</text>
+
+          <line x1="678" y1="132" x2="560" y2="166" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arrow)"></line>
+          <text x="572" y="150" class="lbl-jp" font-size="11">④ レスポンス</text>
+
+          <line x1="425" y1="240" x2="425" y2="298" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow)"></line>
+          <text x="440" y="272" class="lbl-jp" font-size="11">⑤ 両方を記録</text>
+        </svg>
+        <figcaption>
+          Repeaterが送信しようとした通信を拡張が横取りし、CSVの次の1行を消費してInsertion Pointへ差し込んでから
+          サーバーへ送る。返ってきたレスポンスは、送ったリクエストの内容そのものを手がかりに元のログ行と結び付けられる。
+        </figcaption>
+      </figure>
+
+      <p>
+        ここで重要なのは、①の時点でBurpから渡される生のバイト列に対して、<strong>毎回その場でInsertion Pointを
+        検出し直している</strong>という点です。armした瞬間のリクエストのオフセット（何バイト目から何バイト目まで、
+        という位置情報）は一切使い回しません。理由は次の節で説明します。
+      </p>
+    </section>
+
+    <section class="doc-section" id="how-detect">
+      <div class="section-head">
+        <p class="section-eyebrow">How it works</p>
+        <h2>Insertion Pointの検出 — なぜ毎回検出し直すのか</h2>
+      </div>
+
+      <p>
+        Session Handling RuleのマクロでCSRFトークンなどが送信ごとに書き換えられると、そのトークンの長さが
+        1回ごとに変わることがあります。すると、それより後ろにあるすべての項目の「バイト何文字目」という位置は
+        毎回ズレます。そこでこの拡張は、位置ではなく<strong>構造上の場所（path）</strong>を頼りに項目を追跡します。
+      </p>
+      <ul>
+        <li><code>$.user.name</code> のようなJSONの場所</li>
+        <li><code>/root/user[1]/@id</code> のようなXMLの場所</li>
+        <li><code>header[X-CSRF-Token]</code> のようなヘッダー名</li>
+      </ul>
+      <p>
+        armした時点のpathの一覧と、送信直前に取り直したpathの一覧を突き合わせ、一致したものだけに値を差し込みます。
+        これにより、トークンの長さが変わってバイト位置がズレても、正しい場所に正しい値が入ります。
+      </p>
+
+      <h3>入れ子構造の再帰的な展開</h3>
+      <p>
+        JSON本文の中の、ある値がさらに「JSON文字列としてエンコードされたJSON」になっている場合、その中身も
+        再帰的に解析して個別のInsertion Pointにします。これがBurp標準のScanner機能と同じか、それ以上の粒度で
+        項目を見つけられる理由です。
+      </p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 880 300" role="img"
+             aria-label="JSON本文中のmeta項目がさらにJSON文字列を含んでおり、その中のnickname項目まで再帰的に解析されてInsertion Pointになる様子">
+          <rect x="20" y="20" width="500" height="120" rx="8" fill="var(--code-bg)"></rect>
+          <text x="40" y="46" class="mono" font-size="12.5" fill="var(--code-ink)">{</text>
+          <text x="56" y="68" class="mono" font-size="12.5" fill="var(--code-ink)">"name": <tspan fill="var(--code-accent)">"山田太郎"</tspan>,</text>
+          <text x="56" y="90" class="mono" font-size="12.5" fill="var(--code-ink)">"meta": <tspan fill="var(--code-accent)" text-decoration="underline">"{\"nickname\":\"taro\"}"</tspan></text>
+          <text x="40" y="112" class="mono" font-size="12.5" fill="var(--code-ink)">}</text>
+
+          <text x="230" y="135" class="lbl-jp" font-size="11" fill="var(--code-accent)">深さ0の葉: $.name / $.meta（文字列としてはここまで）</text>
+
+          <line x1="270" y1="146" x2="270" y2="196" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrowAccent)"></line>
+          <text x="286" y="175" class="lbl-jp" font-size="11.5" fill="var(--accent-strong)">meta の文字列の中身を、もう一度JSONとして解析</text>
+
+          <rect x="140" y="200" width="300" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.3"></rect>
+          <text x="160" y="228" class="mono" font-size="12.5">{</text>
+          <text x="176" y="250" class="mono" font-size="12.5">"nickname": <tspan fill="var(--accent-strong)" font-weight="700">"taro"</tspan></text>
+          <text x="160" y="262" class="mono" font-size="12.5">}</text>
+
+          <text x="460" y="242" class="lbl-jp" font-size="11.5" fill="var(--accent-strong)" font-weight="700">深さ1の葉:</text>
+          <text x="460" y="258" class="mono" font-size="11.5" fill="var(--accent-strong)" font-weight="700">$.meta{json}.nickname</text>
+        </svg>
+        <figcaption>
+          「meta」の値は文字列としては1個のInsertion Pointだが、その中身自体がJSONとして解析可能なため、
+          拡張はさらにその内部の <code>nickname</code> も個別のInsertion Point（<code>$.meta{json}.nickname</code>）として検出する。
+        </figcaption>
+      </figure>
+
+      <p>
+        同じ仕組みはXMLのテキスト・属性値の中に埋め込まれたJSON/XMLに対しても働きます。ネスト検出は既定で5段階まで
+        再帰します（壊れたJSON/XMLは無視して、その部分だけ検出0件になります — 拡張自体が落ちることはありません）。
+      </p>
+
+      <h3>「本文全体がJSON」以外の場所に埋め込まれた場合</h3>
+      <p>
+        再帰的な展開は、リクエスト本文がまるごとJSON/XMLのときだけでなく、
+        <strong>個別に取り出したパラメータの値そのものがJSON/XMLになっているケース</strong>にも同じように適用されます。
+        たとえば <code>x-www-form-urlencoded</code> のフォームの1フィールドがJSON文字列を持っている、
+        URLクエリパラメータやCookieの値がURLエンコードされたJSONになっている、カスタムヘッダーの値に生のJSONが
+        入っている、といった場合です。
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>値の置き場所</th><th>再帰展開する前の処理</th></tr></thead>
+          <tbody>
+            <tr><td>URLクエリパラメータ</td><td>URLデコードしてから中身を確認</td></tr>
+            <tr><td>Cookie</td><td>%XXエンコードのみ解除して確認（<code>+</code>はスペースに変換しない）</td></tr>
+            <tr><td>x-www-form-urlencodedの本文フィールド</td><td>URLデコードしてから中身を確認</td></tr>
+            <tr><td>ヘッダー値</td><td>デコードせずそのまま確認（ヘッダーはエンコードされないため）</td></tr>
+            <tr><td>multipartの単純フィールド</td><td>デコードせずそのまま確認</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        どの経路で見つかった値でも、JSON/XMLとして解析できればその内部もさらに個別のInsertion Pointとして検出します
+        （元の値がURLエンコードされていた場合は、デコード後の文字位置を元の生バイト列の位置へ正しく変換してから
+        差し込みを行うため、置き換え時のオフセットもズレません）。
+      </p>
+
+      <div class="callout update">
+        <span class="callout-label">Update</span>
+        <p>
+          以前のバージョンでは、この再帰展開が「本文全体がJSON/XMLのとき」にしか働かず、URLパラメータ・Cookie・
+          ヘッダー・<code>x-www-form-urlencoded</code>のフィールド・multipartの単純フィールドの値がJSON/XMLで
+          あっても、その中身は展開されず1個のフラットな項目としてしか扱われていませんでした。現在はこれらすべての
+          抽出済みパラメータ値を確認し、ネストしたJSON/XMLであれば必ず再帰的に展開して個別のInsertion Pointとして
+          識別するように修正しています。
+        </p>
+      </div>
+
+      <div class="callout update">
+        <span class="callout-label">Update</span>
+        <p>
+          もう1つ、本文中に日本語などの生UTF-8テキストとネストしたJSONが混在すると、その本文全体の検出自体が
+          失敗するバグがありました。原因はJython（Python 2系）特有の仕様で、JSON文字列中の
+          <code>\uXXXX</code>形式のエスケープをUnicode文字として扱う処理が、リクエストバイト列側の
+          「1文字＝1バイト」という前提と型（str）が食い違い、非ASCIIバイトを含む文字列を連結しようとした際に
+          <code>UnicodeDecodeError</code>で落ちていました。この手のバグはPython 3ベースのテスト環境では再現できず、
+          実機での動作報告によって発覚・修正しています。現在はエスケープされた文字を常にUTF-8バイト列として、
+          他の生バイトと同じ型で扱うように修正済みです。
+        </p>
+      </div>
+
+      <div class="callout update">
+        <span class="callout-label">Update</span>
+        <p>
+          上記の修正後も同種の<code>UnicodeDecodeError</code>が別の場所（パス生成処理）で再発しました。
+          原因は、Burpの<code>bytesToString()</code>の戻り値の型判定（<code>isinstance(s, unicode)</code>）が、
+          実際のJython実行環境で返ってくる値の型（java.lang.Stringを内部で保持する、str/unicodeどちらとも
+          断定できないラッパー的なオブジェクト）を正しく捕捉できていなかったことでした。型を判定してから
+          分岐する方式をやめ、常に<code>unicode(s).encode('latin-1')</code>で型に関係なく強制的に正規化する
+          方式に修正し、あわせて文字列結合を行う箇所にも同様の防御を二重で入れています。
+        </p>
+      </div>
+
+      <h3>壊れたJSONへの対応</h3>
+      <p>
+        実際のトラフィックでは、アプリ側のバグや多重エンコードの影響で、厳密には正しくないJSONに出会うことが
+        あります。この拡張は「Attempt lenient recovery for malformed nested JSON (experimental)」を
+        有効にすると、次の仕組みで可能な限り値を拾おうとします。
+      </p>
+      <ol>
+        <li><strong>厳密パース</strong> — 通常の再帰下降パーサーで正しく解析できれば、そのまま使用（既定の挙動）。</li>
+        <li>
+          <strong>再同期（resync）による寛容パース</strong> — コンマ抜けや余分な1文字など軽微な破損であれば、
+          次の妥当な区切り文字（<code>,</code> <code>}</code> <code>"</code> など）まで読み飛ばして復旧を試み、
+          木としての入れ子構造を保ったまま続行する。
+        </li>
+        <li>
+          <strong>総当たりパターン一致による補完</strong> — 1・2が成功したかどうかに関わらず、
+          テキスト全体に対して <code>"key":"value"</code> のようなパターンを正規表現で常に追加で走らせる。
+          バレ／エスケープいずれのクォートも区切りとして受け入れるため、片方だけ壊れているようなケースでも
+          個々の値を発見できる。すでに1・2で見つかっている範囲と重ならないものだけを追加するため、
+          正常に検出できた部分を上書きすることはない。
+        </li>
+      </ol>
+      <p>
+        <strong>なぜ2の成否に関わらず3を毎回走らせるのか:</strong> ある値の文字列としての境界自体が壊れていると、
+        2が「木としては一応正しく解析できた」場合でも、その途中にあったはずの値が丸ごと消えてしまうことがあります
+        （例: <code>"...":"「あるフィールドの値は本来ここで終わるはずが、1文字早く終わってしまい、その後に続く
+        はずだった複数のフィールドが行方不明になる」</code>）。3は境界の正しさに一切依存せずテキストをそのまま
+        走査するため、2がどう解釈しようと関係なく、埋もれた値を独立して発見できます。
+      </p>
+      <p>
+        2・3のいずれかで見つかったInsertion Pointは、Insertion Point一覧の「Type」列に
+        <code>(recovered)</code> と表示され、正常検出のものと区別できます。真の入れ子階層が分からない3由来の項目は、
+        パスが <code>{heuristic}[出現順番号].キー名</code> という形になります。
+      </p>
+      <p>
+        なお、2の「次のキーを探す」処理自体が、エスケープされたクォート（<code>\"</code>）を区切りとして
+        正しく扱えず、本来複数のフィールドだったものを1つの巨大な壊れたキー名として飲み込んでしまうことが
+        あります。このような「あきらかにキー名として不自然な（極端に長い、JSON構文記号を含む）」結果は
+        自動的に除外されるので、一覧に無意味なゴミ行が出ることはありません。
+      </p>
+
+      <div class="callout update">
+        <span class="callout-label">Update</span>
+        <p>
+          実際のSalesforce Auraリクエスト（エスケープの有無が本文中で一貫していない、根の深い破損）で検証・改善を
+          重ね、上記の設計（3を常時補完実行＋壊れたキーの自動除外）に落ち着きました。木構造としての正しさは
+          保証されませんが、「展開できず1個の値としてしか扱えない」状態よりは、個々のフィールドをCSVマッピングの
+          対象にできる方が実用上有用と判断しています。
+        </p>
+      </div>
+    </section>
+
+    <section class="doc-section" id="how-escape">
+      <div class="section-head">
+        <p class="section-eyebrow">How it works</p>
+        <h2>値の差し込み方（コンテキストに応じたエスケープ）</h2>
+      </div>
+      <p>
+        CSVの値をそのまま生のバイト列として差し込むと、置き先がJSON文字列の中なのかXML属性値の中なのかによって、
+        本来必要なエスケープが変わります。この拡張は、検出したInsertion Pointの種類に応じて既定のエスケープ方式を
+        自動選択します。
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>置き先の種類</th><th>既定の処理</th></tr></thead>
+          <tbody>
+            <tr><td>JSON文字列</td><td><code>"</code> や制御文字を <code>\"</code> 等にエスケープ</td></tr>
+            <tr><td>XMLテキスト／属性値</td><td><code>&amp; &lt; &gt;</code> 等を実体参照に変換</td></tr>
+            <tr><td>URLパラメータ／Cookie</td><td>URLエンコード</td></tr>
+            <tr><td>ヘッダー値</td><td>意図しないヘッダー分割を防ぐため、既定でCR/LFを除去</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        あえてコンテキストを壊すテスト（インジェクション確認など）をしたい場合は、Insertion Point一覧の
+        「Escape Mode」欄で <span class="k">Raw</span> などに個別に切り替えられます。
+      </p>
+      <div class="callout tip">
+        <span class="callout-label">日本語や絵文字を含む値について</span>
+        <p>
+          CSVから読み込んだ文字はUTF-8としてリクエスト本文に変換してから差し込まれます（Shift_JIS等が本文の
+          エンコーディングである場合は、Target画面の「Payload text encoding」で切り替えてください）。
+        </p>
+      </div>
+    </section>
+
+    <section class="doc-section" id="how-tool">
+      <div class="section-head">
+        <p class="section-eyebrow">How it works</p>
+        <h2>ツールフラグとマクロ対応</h2>
+      </div>
+      <p>
+        差し込みを適用するかどうかは、「その送信がどのツールから来たか」と「host/port/protocol/method/pathが
+        armした対象と完全に一致するか」の2つで判定します。Session Handling Ruleのマクロ経由の送信も対象に
+        含めたい場合は、そのマクロが実際にどのツールフラグとして扱われるかをTarget画面のチェックボックスで
+        有効にしてください。
+      </p>
+      <div class="callout warn">
+        <span class="callout-label">Burpの内部仕様は非公開</span>
+        <p>
+          マクロ内部のリクエストがどのツールフラグを持つかはBurpの公開ドキュメントに明記されていません。
+          「DIAGNOSTIC entries for non-enabled tools」を一時的にONにして送信すると、Logタブに実際に検出された
+          ツールフラグが表示されるので、それを見て該当するチェックボックスを有効にしてください。
+        </p>
+      </div>
+    </section>
+
+    <section class="doc-section" id="how-response">
+      <div class="section-head">
+        <p class="section-eyebrow">How it works</p>
+        <h2>リクエストとレスポンスの対応付け</h2>
+      </div>
+      <p>
+        Burpは1回の通信につき、送信直前と受信直後の2回、拡張にコールバックを呼びます。理屈の上では同じ
+        オブジェクトが渡されるはずですが、内部実装（Montoya化されたBurpコアの上のレガシー互換層）によっては、
+        呼び出しのたびに別のラッパーオブジェクトが渡されることがあります。
+      </p>
+      <p>
+        そのため、この拡張は<strong>オブジェクトの同一性ではなく、実際に送信されたリクエストのバイト内容</strong>
+        を手がかりに対応付けています。送信時に記録した内容と、レスポンス到着時に見えているリクエスト内容が
+        一致すれば、そのログ行にレスポンスを結び付けます。
+      </p>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="doc-section" id="faq">
+      <div class="section-head">
+        <p class="section-eyebrow">Troubleshooting</p>
+        <h2>よくある質問</h2>
+      </div>
+
+      <details class="faq">
+        <summary>拡張の読み込みでエラーが出る</summary>
+        <div class="faq-body">
+          <p>
+            スタックトレースの内容を確認してください。パス解決やimportに関するエラーが多いです。
+            <span class="k">Extender</span> → <span class="k">Extensions</span> → 拡張名 →
+            <span class="k">Errors</span> タブに詳細ログが出ます。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>コードを直したのにReloadしても動作が変わらない</summary>
+        <div class="faq-body">
+          <p>
+            Jythonは<code>.py</code>ファイルをコンパイルしたバイトコードキャッシュ（<code>&lt;モジュール名&gt;$py.class</code>）を
+            ソースと同じ場所に生成し、条件によってはソースを再コンパイルせずこのキャッシュを使い続けてしまうことが
+            あります。この拡張は起動のたびに<code>csvlistinput</code>パッケージ内の<code>$py.class</code>を
+            自動的に削除してから読み込むようにしているため通常は発生しませんが、それでも改善しない場合は
+            プロジェクトフォルダ内の<code>*$py.class</code>ファイルを手動ですべて削除してからReloadしてください。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Repeaterから送信しても、置き換えが適用されない</summary>
+        <div class="faq-body">
+          <p>まず次の3点を確認してください。</p>
+          <ul>
+            <li><span class="k">Active</span> にチェックが入っているか</li>
+            <li>Target情報欄で <span class="k">Repeater</span>（あるいは実際に使っているツール）にチェックが入っているか</li>
+            <li>送信先のhost/port/protocol/method/pathがarmした対象と完全に一致しているか</li>
+          </ul>
+          <p>一致しているのに動かない場合は、DIAGNOSTICログをONにして、実際に記録されるツールフラグを確認してください。</p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Logにレスポンスが表示されない</summary>
+        <div class="faq-body">
+          <p>
+            レスポンス側のコールバックがまだ届いていないだけの場合があります（通信が完了するまで空欄のままです）。
+            通信が完了しているのに出ない場合は、対象サーバーへの接続自体が失敗していないか確認してください。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>CSVを読み込んだのに、編集した値が反映されない</summary>
+        <div class="faq-body">
+          <p>
+            CSV欄の表は実データと直結しているため、セルを編集した内容はそのまま次回消費時に使われます。
+            編集中のセルがある状態で別のCSVを読み込むと、その編集は破棄されます（保存前に確定してください）。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>途中から特定の行だけ送り直したい</summary>
+        <div class="faq-body">
+          <p>
+            CSV欄の「Start row」に開始したい行番号（1始まり）を入力し、<span class="k">Set start row</span>を押してください。
+            ポインタがその行へ移動し、以後の <span class="k">Reset pointer</span> もその行に戻るようになります。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Match &amp; Replaceを有効にしたのに置換されない／Logに何も出ない</summary>
+        <div class="faq-body">
+          <p>次の3点を確認してください。</p>
+          <ul>
+            <li>タブ最上部の <span class="k">Match &amp; Replace: Enabled</span> がONになっているか</li>
+            <li>実際に使っているツール（Repeaterなど）のチェックがタブ上部で入っているか — これはTarget &amp; List Mappingタブのツールフラグとは別設定です</li>
+            <li>置換したい行の <span class="k">Enabled</span> チェックが入っているか、対象のパケット部位（Method/Path/Headers/Body）が有効になっているか</li>
+          </ul>
+          <p>
+            Logタブは<strong>実際にルールがヒットした通信だけ</strong>を表示する仕様です。設定は正しいのにログに何も
+            出ない場合は、Before文字列（または正規表現）がそもそも通信内容にマッチしていない可能性が高いです。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>armed targetのCSV差し込みとMatch &amp; Replaceを同時に使うとどうなる？</summary>
+        <div class="faq-body">
+          <p>
+            同じ送信で両方が発火した場合、Match &amp; Replaceが先に適用され、その結果に対してCSV Insertion Pointの
+            検出・差し込みが行われます。Logタブの行は1つにまとまり、実際に送信されたバイト列（両方の変更を含む）は
+            そのままRequest欄で確認できます。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Target &amp; Replace with Decode &amp; Encodeを有効にしたのに書き換わらない</summary>
+        <div class="faq-body">
+          <p>次の点を確認してください。</p>
+          <ul>
+            <li>タブ最上部の <span class="k">Target &amp; Replace with Decode &amp; Encode: Enabled</span> がONになっているか</li>
+            <li>実際に使っているツールのチェックがタブ上部で入っているか — これはTarget &amp; List Mappingのツールフラグとは別設定です</li>
+            <li>書き換えたい行の <span class="k">Enabled</span> にチェックが入っているか</li>
+            <li>送信先のhost/port/protocol/method/pathが、armした対象と完全に一致しているか（この機能もTarget &amp; List Mappingと同じ対象にしか適用されません）</li>
+            <li><span class="k">Codec</span> の選択が実際の値のエンコード方式と合っているか（合っていないとデコードに失敗し、その行はスキップされます）</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Codecの選択を間違えるとどうなる？</summary>
+        <div class="faq-body">
+          <p>
+            例えば実際にはBase64ではない値に対して <span class="k">Codec</span> を<span class="k">Base64</span>に
+            設定すると、デコードに失敗してその行の置換だけがスキップされます（拡張はクラッシュせず、他の有効な行
+            の処理は続行されます）。値が実際にはエンコードされていない場合は <span class="k">None</span> を選んで
+            ください。行を選択した際に画面下部へ表示される <span class="k">Decoded Value</span> プレビューで、
+            送信前にCodecが合っているか確認できます。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Target &amp; List MappingとTarget &amp; Replace with Decode &amp; Encode、同じリクエストを両方にarmできる？</summary>
+        <div class="faq-body">
+          <p>
+            できます。この2つの機能は完全に独立した別々の対象を持っているため、同じリクエストを右クリックして
+            <span class="k">Send to Target &amp; List Mapping</span> と
+            <span class="k">Send to Target &amp; Replace with Decode &amp; Encode</span> の両方を選べば、同じ通信に対して
+            両方の機能を同時に使えます。もちろん、まったく別々のリクエストをそれぞれの機能に割り当てることも
+            できます。
+          </p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>Scannerを実行したら動作がおかしい気がする。どこを見ればいい？</summary>
+        <div class="faq-body">
+          <p>
+            まず <span class="k">Errors</span> タブを確認してください。Scanner含むいずれかのBurpツールでこの
+            拡張が通信を処理する過程で例外が発生した場合、必ずこのタブに記録されます（エラーが1件以上あると
+            タブ名が赤字で「Errors (件数)」に変わります）。行を選択するとエラーメッセージとスタックトレースの
+            詳細が確認できます。
+          </p>
+          <p>
+            拡張のいずれの機能もデフォルトではScanner（<span class="k">TOOL_SCANNER</span>）を有効化していません
+            — 影響を受けている場合は、各機能のツールフラグ設定でScannerが誤って有効になっていないか確認して
+            ください。
+          </p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================= LIMITATIONS ================= -->
+    <section class="doc-section" id="limits">
+      <div class="section-head">
+        <p class="section-eyebrow">Scope</p>
+        <h2>制限事項</h2>
+      </div>
+      <ul>
+        <li>Target &amp; List Mapping、Target &amp; Replace with Decode &amp; Encodeそれぞれについて、同時にarmできる対象は1つだけです（例えばTarget &amp; List Mapping単体で2つ以上の対象を並行してテストすることはできません）。この2つの機能は互いに独立しており、別々の対象をそれぞれarmできます。</li>
+        <li>Base64やURLエンコードされた中に埋め込まれたJSON/XMLは、Insertion Pointの自動検出では個別の項目に展開されません（Target &amp; Replace with Decode &amp; Encodeで、そのInsertion Point全体をデコード対象として手動指定することは可能です）。</li>
+        <li>同じ要素内でテキストと子要素が混在するXML（mixed content）は、テキスト部分ごとに別のInsertion Pointとして扱われます。</li>
+        <li>CSVの行を使い切った後は、既定では先頭に戻らず未置換のまま送信されます（<span class="k">Reset pointer</span>で明示的に戻す必要があります）。</li>
+        <li>祖先・子孫関係にあるInsertion Point（入れ子のJSONとその外側）は同時にマッピングできません。</li>
+        <li>Match &amp; Replaceは<span class="k">Transfer-Encoding: chunked</span>のレスポンスに対して、Content-Lengthの自動調整を行いません（そのヘッダー自体が無いため）。chunkの境界自体を書き換える機能ではありません。</li>
+        <li>Match &amp; Replace・Target &amp; Replace with Decode &amp; Encodeの正規表現はPythonの<code>re</code>モジュール準拠です（後方参照は<code>\1</code>形式）。不正な正規表現を入力した行は無視され、拡張はクラッシュしません。</li>
+        <li>Target &amp; Replace with Decode &amp; EncodeのHTML Entityエンコード（再エンコード時）は<code>&amp;&lt;&gt;"'</code>の5文字のみを再エスケープします。デコード時に解釈した名前付き実体・数値文字参照すべてを同じ形式で書き戻すわけではありません。</li>
+      </ul>
+    </section>
+
+    <!-- ================= GLOSSARY ================= -->
+    <section class="doc-section" id="glossary">
+      <div class="section-head">
+        <p class="section-eyebrow">Glossary</p>
+        <h2>用語集</h2>
+      </div>
+      <dl class="glossary">
+        <div class="gterm">
+          <dt>Insertion Point</dt>
+          <dd>リクエストの中で、値を差し込める1か所。URLパラメータ、Cookie、ヘッダー、JSON/XML本文中の各値などが該当します。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Arm / armed target</dt>
+          <dd>「この通信をテストの対象にする」と拡張に登録すること。右クリックメニューから行います。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Match &amp; Replace</dt>
+          <dd>armとは無関係に、選択したツールを通る全トラフィックへ文字列置換（プレーン一致 or 正規表現）を適用する機能。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Target &amp; Replace with Decode &amp; Encode</dt>
+          <dd>Target &amp; List Mappingとは別に自分自身でarmした対象の特定のInsertion Pointについて、値をデコード → 置換 → 再エンコードしてから送信する機能。エンコードされたパラメータの中身だけを書き換えたいときに使う。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Errors タブ</dt>
+          <dd>Scanner含むいずれかのBurpツールでの通信処理中や、arm・再検出時に拡張内部で発生した例外を一覧表示するタブ。エラーがあるとタブ名が赤字で件数表示に変わる。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Codec</dt>
+          <dd>Target &amp; Replace with Decode &amp; Encodeで、Insertion Pointの値をどう デコード/再エンコードするかの方式（None/URL/Base64/Hex/HTML Entity/Unicode \uXXXX/ROT13）。</dd>
+        </div>
+        <div class="gterm">
+          <dt>Path</dt>
+          <dd>
+            Insertion Pointの構造上の場所を表す文字列。例: <code>$.user.name</code>、
+            <code>/root/user[1]/@id</code>。バイト位置ではなく、この文字列を手がかりに送信のたびに項目を追跡します。
+          </dd>
+        </div>
+        <div class="gterm">
+          <dt>toolFlag（ツールフラグ）</dt>
+          <dd>Burpがどのツール（Repeater、Proxyなど）から送信されたかを表す内部の値。差し込みを適用するかどうかの判定に使います。</dd>
+        </div>
+        <div class="gterm">
+          <dt>DIAGNOSTIC</dt>
+          <dd>置き換えは適用されなかったが、host/pathが対象と一致した送信を記録した情報ログ。ツールフラグの調査に使います。</dd>
+        </div>
+      </dl>
+    </section>
+
+    <footer class="doc-footer">
+      CSV List Input — Burp Suite Jython拡張 利用マニュアル
+    </footer>
+  </main>
+</div>
