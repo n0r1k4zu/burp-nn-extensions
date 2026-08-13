@@ -421,6 +421,7 @@
         <a href="#match-replace">Match &amp; Replace（置換）</a>
         <a href="#decode">Decode（デコード）</a>
         <a href="#color-snapshots">Color Snapshots（色のバックアップ/リストア）</a>
+        <a href="#history-search">History Search（ワード検索）</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
       <li class="toc-group">
@@ -909,6 +910,69 @@
       </div>
     </section>
 
+    <!-- ================= HISTORY SEARCH ================= -->
+    <section class="doc-section" id="history-search">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>History Search（ワード検索）</h2>
+        <p class="section-dek">Proxy history全体から特定のワードを探し、ヒット箇所の前後を一覧表示するタブです。</p>
+      </div>
+
+      <p>
+        CSV Insertion Point・Color Snapshotsとは独立した機能です。Proxy historyにある全パケットの
+        <strong>リクエスト・レスポンスの生バイト</strong>を対象に、指定したワードを大文字小文字を区別せず検索し、
+        ヒットした箇所ごとに前後の文字列を切り出して一覧表示します。
+      </p>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>検索ワードと前後の文字数を指定する</h4>
+          <p>
+            <span class="k">Search word</span> に検索したい文字列を入力します。<span class="k">Chars before</span>
+            / <span class="k">Chars after</span> で、ヒット箇所の前・後それぞれ何文字を切り出すかを個別に指定できます
+            （既定はどちらも30文字）。
+          </p>
+        </li>
+        <li class="step">
+          <h4><span class="k">Search</span> を押す</h4>
+          <p>
+            Proxy history全件（リクエスト・レスポンスの両方）を対象に検索します。結果は
+            <span class="k">List No</span>（結果内の通し番号）/ <span class="k">Packet No</span>（検索時点の
+            Proxy history内での通し番号）/ <span class="k">Before</span>（前方の切り出し）/
+            <span class="k">Match</span>（実際にヒットした文字列。元のバイト列そのままの大文字小文字）/
+            <span class="k">After</span>（後方の切り出し）の一覧表になります。
+          </p>
+          <p class="step-note">
+            <strong>同じパケット内に複数ヒットがあれば、その数だけ行が並びます。</strong>
+            ヒットは左から右へ重複しないように数えます（例: 検索ワード "aa" に対して "aaaa" は2件ヒット）。
+          </p>
+        </li>
+        <li class="step">
+          <h4>結果行を選択してパケットの中身を確認する</h4>
+          <p>
+            一覧から行を選択すると、下部にそのパケットのリクエスト/レスポンスがそのままプレビュー表示されます。
+            前後の切り出しだけでは文脈が分かりにくい場合、ここでBurp標準のメッセージビューア内検索（虫眼鏡アイコン）
+            を使って該当箇所を直接探せます。
+          </p>
+        </li>
+        <li class="step">
+          <h4><span class="k">Clear</span> でリセットする</h4>
+          <p>
+            検索ワード・前後の文字数指定（既定値に戻る）・結果一覧・プレビューをまとめてリセットします。
+          </p>
+        </li>
+      </ol>
+
+      <div class="callout tip">
+        <span class="callout-label">検索対象</span>
+        <p>
+          パケットごとに、まずリクエスト側の全ヒット、続いてレスポンス側の全ヒットの順で行が追加されます。
+          結果は検索を実行した時点のProxy historyのスナップショットで、その後にhistoryへ増えた通信は
+          反映されません（もう一度 <span class="k">Search</span> を押せば最新の状態で検索し直せます）。
+        </p>
+      </div>
+    </section>
+
     <!-- ================= UI REFERENCE ================= -->
     <section class="doc-section" id="ui-reference">
       <div class="section-head">
@@ -1018,6 +1082,25 @@
               <td>選択した1件を履歴から削除します（Proxy history側の色そのものには影響しません）。</td></tr>
             <tr><td><span class="k">Clear all colors</span></td>
               <td>選択に関係なく、Proxy history上の全パケットの色を一括で無色に戻します。確認ダイアログが出ます（元に戻せません）。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>History Search タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Search word</span></td><td>検索したい文字列。大文字小文字は区別されません。</td></tr>
+            <tr><td><span class="k">Chars before</span> / <span class="k">Chars after</span></td>
+              <td>ヒット箇所の前・後それぞれ何文字を切り出すか（既定30文字、個別に指定可能）。</td></tr>
+            <tr><td><span class="k">Search</span></td><td>Proxy history全件（リクエスト・レスポンス両方）を検索します。</td></tr>
+            <tr><td>結果一覧の列</td>
+              <td><span class="k">List No</span>（結果内の通し番号）/ <span class="k">Packet No</span>（検索時点のProxy history内の通し番号）/
+                <span class="k">Before</span> / <span class="k">Match</span> / <span class="k">After</span>。
+                同じパケット内の複数ヒットはそれぞれ別の行になります。</td></tr>
+            <tr><td>結果行の選択</td><td>下部にそのパケットのリクエスト/レスポンスがプレビュー表示されます。</td></tr>
+            <tr><td><span class="k">Clear</span></td><td>検索ワード・前後の文字数（既定値に戻る）・結果一覧をまとめてリセットします。</td></tr>
           </tbody>
         </table>
       </div>

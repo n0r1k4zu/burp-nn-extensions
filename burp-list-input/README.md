@@ -17,6 +17,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **Target & Replace with Decode & Encode** — Target & List Mappingとは別に右クリックでarmした対象について、特定のInsertion Pointの値を書き換える機能です。値がURL/Base64/Hex/HTMLエンティティ/Unicodeエスケープ/ROT13でエンコードされていても、①デコード → ②指定した文字列（プレーン or 正規表現）で置換 → ③同じ方式で再エンコード、という流れを送信のたびに自動で行ってから送信します。エンコードされたパラメータの中身だけを書き換えたい場合に使います。Insertion Point一覧で行を選択すると、画面下部にOriginal Value（元の値）と、選択中のCodecでデコードした後の値がその場でプレビュー表示されます。実行結果は他の機能と同じくLogタブに記録されます。
 - **Errors タブ** — Scanner含むいずれかのBurpツールでの送受信処理中に拡張内部でエラーが起きた場合や、arm・再検出に失敗した場合に、その内容（メッセージ・スタックトレース）を一覧表示します。エラーが1件でもあるとタブ名が赤字で「Errors (件数)」に変わるため、Burp上での動作がおかしいときにすぐ気付けます。
 - **Color Snapshots** — Proxy historyの全パケットの色（`setHighlight`。無色も含む）をコメント付きでスナップショットとして丸ごとバックアップし、履歴から選んでリストアできます。全パケットの色を一括で無色に戻す**Clear all colors**もあります。CSV/Match & Replace機能とは独立しており、手動で付けた色分けも対象です。
+- **History Search** — 指定したワードでProxy history全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索し、ヒットした前後を指定文字数（既定30文字）だけ切り出して一覧表示します。同じパケット内に複数ヒットがあれば、それぞれ別の行として表示されます。行を選択すると、該当パケットのリクエスト/レスポンスをその場でプレビューできます。
 
 ## 必要環境
 
@@ -73,6 +74,15 @@ Proxy historyの色分け状態をまるごと退避しておきたい場合:
 
 > ⚠️ リストア・Clear all colorsはどちらも元に戻せません。現在の色分けを失いたくない場合は、実行前に現在の状態もスナップショットしておいてください。スナップショットはメモリ上のみの保持で、拡張のリロード/アンロードで消えます。
 
+Proxy history全体から特定のワードを検索したい場合:
+
+1. **History Search** タブの **Search word** にワードを入力する
+2. **Chars before** / **Chars after** で、ヒット箇所の前後それぞれ何文字を切り出すかを指定する（既定はどちらも30文字）
+3. **Search** を押すと、Proxy history全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索する
+4. 結果は一覧表（List No / Packet No / Before / Match / After）に、ヒットごとに1行ずつ表示される（同じパケット内に複数ヒットがあればその数だけ行が並ぶ）
+5. 行を選択すると、下部にそのパケットのリクエスト/レスポンスがプレビュー表示される（該当箇所はBurp標準のメッセージビューア内検索で探せます）
+6. **Clear** で検索語・文字数指定・結果一覧をまとめてリセットできる
+
 詳細な手順・画面の見方・動作原理・トラブルシューティングは [docs/manual.html](docs/manual.html) にまとまっています。
 
 ## ディレクトリ構成
@@ -102,8 +112,9 @@ csvlistinput/               # 拡張の実装本体 -- csv_list_input.py と同�
   decode_replace_settings.py            # Target & Replace with Decode & Encode: 有効/無効・対象ツール・Insertion Point毎のルール保持
   color_snapshot_store.py                # Color Snapshots: スナップショット履歴の保持
   color_snapshot_engine.py                # Color Snapshots: Proxy historyの色の読み取り/書き戻し
+  word_search_engine.py                    # History Search: Proxy historyの生バイトに対するワード検索・前後切り出し
   utils.py                       # バイト列/文字列境界の処理・エスケープ
-  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Color Snapshots / Decode / Errors タブ）
+  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Color Snapshots / History Search / Decode / Errors タブ）
 docs/manual.html              # 利用マニュアル（HTML）
 testdata/                      # 動作確認用のサンプルリクエスト・CSV
 ```
