@@ -89,12 +89,13 @@ class _SelectionListener(ListSelectionListener):
 
 
 class WordSearchPanel(JPanel):
-    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None):
+    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None, on_decode=None):
         JPanel.__init__(self, BorderLayout())
         self.callbacks = callbacks
         self.helpers = helpers
         self.log_fn = log_fn
         self.error_fn = error_fn
+        self.on_decode = on_decode
 
         top = JPanel(FlowLayout(FlowLayout.LEFT))
         top.add(JLabel("Search word:"))
@@ -118,6 +119,13 @@ class WordSearchPanel(JPanel):
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.table.getSelectionModel().addListSelectionListener(_SelectionListener(self))
 
+        table_panel = JPanel(BorderLayout())
+        table_panel.add(JScrollPane(self.table), BorderLayout.CENTER)
+        below_list = JPanel(FlowLayout(FlowLayout.LEFT))
+        self.send_to_decode_button = JButton("Send selected row to Decode", actionPerformed=self._on_send_to_decode)
+        below_list.add(self.send_to_decode_button)
+        table_panel.add(below_list, BorderLayout.SOUTH)
+
         self.controller = _EditorController()
         self.request_editor = callbacks.createMessageEditor(self.controller, False)
         self.response_editor = callbacks.createMessageEditor(self.controller, False)
@@ -125,7 +133,7 @@ class WordSearchPanel(JPanel):
                                      self.request_editor.getComponent(), self.response_editor.getComponent())
         messages_split.setResizeWeight(0.5)
 
-        split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(self.table), messages_split)
+        split = JSplitPane(JSplitPane.VERTICAL_SPLIT, table_panel, messages_split)
         split.setResizeWeight(0.5)
         self.add(split, BorderLayout.CENTER)
 
@@ -163,6 +171,19 @@ class WordSearchPanel(JPanel):
 
     def _on_selection(self, row):
         self._show_hit(self.table_model.hit_at(row))
+
+    def _on_send_to_decode(self, event):
+        view_row = self.table.getSelectedRow()
+        if view_row < 0:
+            self.status_label.setText("Select a result row first.")
+            return
+        hit = self.table_model.hit_at(self.table.convertRowIndexToModel(view_row))
+        if hit is None:
+            return
+        text = hit["before"] + hit["match"] + hit["after"]
+        if self.on_decode:
+            self.on_decode(text)
+        self.status_label.setText("Sent the selected row's text to the Decode tab.")
 
     def _show_hit(self, hit):
         self.controller.current_hit = hit

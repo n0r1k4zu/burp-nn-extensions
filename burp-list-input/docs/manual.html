@@ -957,6 +957,15 @@
           </p>
         </li>
         <li class="step">
+          <h4>選択した行をDecodeタブへ送る</h4>
+          <p>
+            結果一覧のすぐ下にある <span class="k">Send selected row to Decode</span> を押すと、選択中の行の表示内容
+            （<span class="k">Before</span> + <span class="k">Match</span> + <span class="k">After</span> を結合した
+            もの）が <a href="#decode">Decode</a> タブに送られ、URL/Base64/Hex/HTMLエンティティ/Unicodeエスケープ/
+            ROT13/JWTなど複数の形式で同時にデコード・エンコードして確認できます。
+          </p>
+        </li>
+        <li class="step">
           <h4><span class="k">Clear</span> でリセットする</h4>
           <p>
             検索ワード・前後の文字数指定（既定値に戻る）・結果一覧・プレビューをまとめてリセットします。
@@ -1102,6 +1111,8 @@
                 <span class="k">Before</span> / <span class="k">Match</span> / <span class="k">After</span>。
                 同じパケット内の複数ヒットはそれぞれ別の行になります。</td></tr>
             <tr><td>結果行の選択</td><td>下部にそのパケットのリクエスト/レスポンスがプレビュー表示されます。</td></tr>
+            <tr><td><span class="k">Send selected row to Decode</span></td>
+              <td>選択中の行のBefore + Match + Afterを結合したテキストを<a href="#decode">Decode</a>タブへ送ります。</td></tr>
             <tr><td><span class="k">Clear</span></td><td>検索ワード・前後の文字数（既定値に戻る）・結果一覧をまとめてリセットします。</td></tr>
           </tbody>
         </table>
