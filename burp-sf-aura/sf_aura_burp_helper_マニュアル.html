@@ -107,7 +107,11 @@
     </ol>
   </li>
   <li><a href="#numbering">採番 タブ</a></li>
-  <li><a href="#color">集約色 タブ／Aura集約の根拠</a></li>
+  <li><a href="#color">集約色 タブ／Aura集約の根拠
+    <ol>
+      <li><a href="#color-snapshot">色情報スナップショット（バックアップ / リストア）</a></li>
+    </ol>
+  </li>
   <li><a href="#auraaudit">Aura診断 タブ（能動送信・要認可）
     <ol>
       <li><a href="#auraaudit-target">① ターゲット設定</a></li>
@@ -361,6 +365,18 @@ reqJson/filter,POST,V-002</code></pre>
 <p><strong>同一AggKeyであっても、history上で隣接している（連続している）範囲だけを1つの集約グループとみなします。</strong> 間に別のAggKeyを持つAura SPA通信が1件でも挟まると、そこでグループが区切られます。</p>
 <p>これは、同じテスト手続きを時間を空けて何度も繰り返すと同一AggKeyが再度出現するため、隣接性の条件を入れないと「1回目のテスト」と「2回目のテスト」が誤って同じ集約グループに混ざってしまうためです。フォーム入力テストを1回実施した後、別の画面を操作してから同じフォームを再度テストした場合、1回目と2回目は<strong>別々の集約グループ</strong>として扱われます（間に他の通信を挟まず連続してAura通信を繰り返した場合のみ、1つのグループになります）。</p>
 </div>
+
+<h3 id="color-snapshot">8.3 色情報スナップショット（バックアップ / リストア）</h3>
+<p>[集約色]タブの<strong>下半分</strong>にある、<strong>Historyの色分け状態そのものを丸ごとバックアップ・リストアできる機能</strong>です。予約色の適用/クリアとは独立していて、ユーザー自身が手動で付けた色も含めて対象になります。</p>
+<div class="step"><span class="n">1</span><strong>[現在の色情報をスナップショット...]</strong> を押すと、コメント入力ダイアログが出ます（空欄でも可）。OKを押すと、その時点でHistoryに存在する<strong>全パケットの色（無色も含む）</strong>が1件のスナップショットとして記録されます</div>
+<div class="step"><span class="n">2</span>履歴は表（No / 日時 / コメント / 色あり件数の全件数）に一覧表示され、何度でも取得できます</div>
+<div class="step"><span class="n">3</span>表からスナップショットを1件選択し、<strong>[選択したスナップショットをリストア]</strong> を押すと、そのスナップショット取得時点に存在したパケットの色が、当時の状態（無色だったパケットは無色に戻る）に一括で上書きされます。<strong>スナップショット取得後に増えた通信には触れません</strong></div>
+<div class="step"><span class="n">4</span>不要になったスナップショットは、選択して <strong>[選択したスナップショットを削除]</strong> で履歴から削除できます</div>
+<div class="step"><span class="n">5</span>選択に関係なく、<strong>[全パケットの色を一括クリア]</strong> を押すと、Historyの全パケットの色を現在の色に関わらず一括で無色に戻せます</div>
+<div class="callout tip">
+<strong>リストア・一括クリアはどちらも元に戻せない操作です。</strong> 現在の色分け状態を失いたくない場合は、実行の前に現在の状態もスナップショットしておいてください。
+</div>
+<div class="why">スナップショットは拡張の実行中のみメモリ上に保持されます（ファイルへの保存は行いません）。Burpの拡張をアンロード/リロードすると、それまでのスナップショット履歴は失われます。</div>
 
 <h2 id="auraaudit">9. Aura診断 タブ（能動送信・要認可）</h2>
 <div class="callout hot">

@@ -51,6 +51,7 @@ import json
 import csv
 import io
 import hashlib
+import time
 
 try:
     # Python 2 / Jython
@@ -1440,6 +1441,10 @@ if ON_JYTHON:
             self.and_or_mode_response = "AND"
             self.reserved_color = "gray"
 
+            self.color_snapshots = []     # 色情報スナップショット履歴（新しい順）。各要素は
+                                           # {"no", "timestamp", "comment", "colors": {identity: color_or_None}, "total", "colored_count"}
+            self._color_snapshot_seq = 0  # スナップショットNoの採番用（削除してもNoは再利用しない）
+
             self.index_by_identity = {}   # identity -> PacketInfo
             self.agg_groups = {}          # agg_key -> [PacketInfo,...] (No順)
 
@@ -2646,8 +2651,8 @@ if ON_JYTHON:
 
         # --- 集約色タブ ---
         def _build_color_panel(self):
-            panel = JPanel()
-            panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
+            top = JPanel()
+            top.setLayout(BoxLayout(top, BoxLayout.Y_AXIS))
 
             row1 = JPanel(FlowLayout(FlowLayout.LEFT))
             row1.add(JLabel(u"予約色（ご自身の色分けでは使わない色を選んでください）:"))
@@ -2655,14 +2660,14 @@ if ON_JYTHON:
             self.color_combo.setSelectedItem(self.reserved_color)
             self.color_combo.addActionListener(self._on_color_changed)
             row1.add(self.color_combo)
-            panel.add(row1)
+            top.add(row1)
 
             row2 = JPanel(FlowLayout(FlowLayout.LEFT))
             btn_apply = JButton(u"集約対象に予約色を適用（オンデマンド）", actionPerformed=self._on_apply_agg_color)
             btn_clear = JButton(u"予約色のみクリア", actionPerformed=self._on_clear_agg_color)
             row2.add(btn_apply)
             row2.add(btn_clear)
-            panel.add(row2)
+            top.add(row2)
 
             note = JTextArea(
                 u"注記:\n"
@@ -2674,8 +2679,214 @@ if ON_JYTHON:
                 u"・自分の色分け作業と衝突しないよう、予約色は他の用途で使っていない色を選んでください。")
             note.setEditable(False)
             note.setOpaque(False)
-            panel.add(note)
-            return panel
+            top.add(note)
+
+            split = JSplitPane(JSplitPane.VERTICAL_SPLIT, top, self._build_color_snapshot_section())
+            split.setResizeWeight(0.35)  # 下半分（スナップショット）を広めに確保
+            return split
+
+        # --- 集約色タブ（下半分）: 色情報スナップショット（バックアップ / リストア） ---
+        def _build_color_snapshot_section(self):
+            """History上の全パケットの現在の色（setHighlight）状態を、コメント付きで
+            まるごとスナップショットとして保存し、後から選んでリストアできるようにする。
+            集約色の「予約色」機能とは独立しており、ユーザーが手動で付けた色も含めた
+            現在の色分け状態全体のバックアップ/復元を目的とする。"""
+            box = JPanel(BorderLayout())
+            box.setBorder(BorderFactory.createTitledBorder(u"色情報スナップショット（バックアップ / リストア）"))
+
+            self.color_snapshot_table_model = DefaultTableModel(
+                [], [u"No", u"日時", u"コメント", u"色あり件数/全件数"])
+            self.color_snapshot_table = JTable(self.color_snapshot_table_model)
+            self.color_snapshot_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+            self.color_snapshot_table.setAutoCreateRowSorter(True)
+            box.add(JScrollPane(self.color_snapshot_table, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+                                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED), BorderLayout.CENTER)
+
+            btn_row = JPanel(FlowLayout(FlowLayout.LEFT))
+            btn_take = JButton(u"現在の色情報をスナップショット...", actionPerformed=self._on_take_color_snapshot)
+            btn_restore = JButton(u"選択したスナップショットをリストア", actionPerformed=self._on_restore_color_snapshot)
+            btn_delete = JButton(u"選択したスナップショットを削除", actionPerformed=self._on_delete_color_snapshot)
+            btn_clear_all = JButton(u"全パケットの色を一括クリア", actionPerformed=self._on_clear_all_colors)
+            btn_row.add(btn_take)
+            btn_row.add(btn_restore)
+            btn_row.add(btn_delete)
+            btn_row.add(btn_clear_all)
+            box.add(btn_row, BorderLayout.NORTH)
+
+            snap_note = JTextArea(
+                u"・「スナップショット」は、取得した時点で History に存在する全パケットの色（無色も含む）を"
+                u"丸ごと記録します。取得のたびにコメントを付けて履歴として残せます。\n"
+                u"・「リストア」は、選択したスナップショット取得時点に存在したパケットだけを、その時点の色に"
+                u"上書きします（スナップショット取得後に増えた通信には触れません）。\n"
+                u"・「全パケットの色を一括クリア」は、選択に関係なく History 上の全パケットの色を、現在の色に"
+                u"関わらず一括で無色に戻します。\n"
+                u"・リストア・一括クリアはどちらも元に戻せません（必要なら先に現在の状態もスナップショットして"
+                u"ください）。")
+            snap_note.setEditable(False)
+            snap_note.setOpaque(False)
+            snap_note.setLineWrap(True)
+            snap_note.setWrapStyleWord(True)
+            box.add(snap_note, BorderLayout.SOUTH)
+
+            return box
+
+        def _identity_of(self, item):
+            req = item.getRequest()
+            svc = item.getHttpService()
+            req_str = self._helpers.bytesToString(req) if req is not None else ""
+            host = svc.getHost() if svc else ""
+            port = svc.getPort() if svc else 0
+            proto = svc.getProtocol() if svc else ""
+            return (host, port, proto, req_str)
+
+        def _on_take_color_snapshot(self, event):
+            comment = JOptionPane.showInputDialog(
+                self.main_panel,
+                u"このスナップショットのコメント（任意。空欄でも取得できます）:",
+                u"色情報スナップショットの取得",
+                JOptionPane.PLAIN_MESSAGE)
+            if comment is None:
+                self._log(u"色情報スナップショットの取得をキャンセルしました。")
+                return
+            import threading
+            t = threading.Thread(target=self._take_color_snapshot_worker, args=(comment,))
+            t.daemon = True
+            t.start()
+
+        def _take_color_snapshot_worker(self, comment):
+            history = self._callbacks.getProxyHistory()
+            colors = {}
+            total = 0
+            colored_count = 0
+            for item in history:
+                try:
+                    key = self._identity_of(item)
+                    color = item.getHighlight()
+                    colors[key] = color
+                    total += 1
+                    if color:
+                        colored_count += 1
+                except Exception as e:
+                    self._log(u"スナップショット取得エラー: %s" % str(e))
+            self._color_snapshot_seq += 1
+            snapshot = {
+                "no": self._color_snapshot_seq,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "comment": comment or u"",
+                "colors": colors,
+                "total": total,
+                "colored_count": colored_count,
+            }
+            self.color_snapshots.insert(0, snapshot)
+            self._refresh_color_snapshot_table()
+            self._log(u"色情報のスナップショット No.%d を取得しました（%d件中%d件に色あり） コメント: %s"
+                      % (snapshot["no"], total, colored_count, comment or u"(なし)"))
+
+        def _refresh_color_snapshot_table(self):
+            model = self.color_snapshot_table_model
+
+            def do_update():
+                model.setRowCount(0)
+                for snap in self.color_snapshots:
+                    model.addRow([snap["no"], snap["timestamp"], snap["comment"],
+                                  u"%d / %d" % (snap["colored_count"], snap["total"])])
+            SwingUtilities.invokeLater(do_update)
+
+        def _get_selected_color_snapshot(self):
+            view_row = self.color_snapshot_table.getSelectedRow()
+            if view_row < 0:
+                self._log(u"スナップショットを一覧から選択してください。")
+                return None
+            model_row = self.color_snapshot_table.convertRowIndexToModel(view_row)
+            if model_row < 0 or model_row >= len(self.color_snapshots):
+                return None
+            return self.color_snapshots[model_row]
+
+        def _on_restore_color_snapshot(self, event):
+            snapshot = self._get_selected_color_snapshot()
+            if snapshot is None:
+                return
+            ret = JOptionPane.showConfirmDialog(
+                self.main_panel,
+                u"スナップショット No.%d（%s / コメント: %s）をリストアします。\n"
+                u"取得時点に存在した全パケット（%d件）の色を、その時点の状態（無色を含む）に上書きします。\n"
+                u"取得後に増えた通信には触れません。この操作は元に戻せません。\n\n"
+                u"実行しますか？"
+                % (snapshot["no"], snapshot["timestamp"], snapshot["comment"] or u"(なし)", snapshot["total"]),
+                u"色情報スナップショットのリストア確認",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE)
+            if ret != JOptionPane.YES_OPTION:
+                self._log(u"色情報スナップショットのリストアをキャンセルしました。")
+                return
+            import threading
+            t = threading.Thread(target=self._restore_color_snapshot_worker, args=(snapshot,))
+            t.daemon = True
+            t.start()
+
+        def _restore_color_snapshot_worker(self, snapshot):
+            history = self._callbacks.getProxyHistory()
+            colors = snapshot["colors"]
+            restored = 0
+            skipped = 0
+            for item in history:
+                try:
+                    key = self._identity_of(item)
+                    if key in colors:
+                        item.setHighlight(colors[key])
+                        restored += 1
+                    else:
+                        skipped += 1
+                except Exception as e:
+                    self._log(u"色リストアエラー: %s" % str(e))
+            self._log(u"色情報スナップショット No.%d（%s）をリストアしました: %d件反映 / %d件は対象外"
+                      u"（スナップショット取得後に追加された通信）"
+                      % (snapshot["no"], snapshot["comment"] or u"(なし)", restored, skipped))
+
+        def _on_delete_color_snapshot(self, event):
+            snapshot = self._get_selected_color_snapshot()
+            if snapshot is None:
+                return
+            ret = JOptionPane.showConfirmDialog(
+                self.main_panel,
+                u"スナップショット No.%d（%s / コメント: %s）を履歴から削除します。よろしいですか？"
+                % (snapshot["no"], snapshot["timestamp"], snapshot["comment"] or u"(なし)"),
+                u"色情報スナップショットの削除確認",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE)
+            if ret != JOptionPane.YES_OPTION:
+                return
+            self.color_snapshots.remove(snapshot)
+            self._refresh_color_snapshot_table()
+            self._log(u"色情報スナップショット No.%d を削除しました。" % snapshot["no"])
+
+        def _on_clear_all_colors(self, event):
+            ret = JOptionPane.showConfirmDialog(
+                self.main_panel,
+                u"History上の全パケットの色を、現在の色に関わらず一括で無色に戻します。\n"
+                u"この操作は元に戻せません（必要なら先に現在の状態もスナップショットしてください）。\n\n"
+                u"実行しますか？",
+                u"全パケットの色の一括クリア確認",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE)
+            if ret != JOptionPane.YES_OPTION:
+                self._log(u"全パケットの色の一括クリアをキャンセルしました。")
+                return
+            import threading
+            t = threading.Thread(target=self._clear_all_colors_worker)
+            t.daemon = True
+            t.start()
+
+        def _clear_all_colors_worker(self):
+            history = self._callbacks.getProxyHistory()
+            cleared = 0
+            for item in history:
+                try:
+                    item.setHighlight(None)
+                    cleared += 1
+                except Exception as e:
+                    self._log(u"色一括クリアエラー: %s" % str(e))
+            self._log(u"全パケットの色を一括クリアしました: %d 件" % cleared)
 
         def _on_color_changed(self, event):
             self.reserved_color = str(self.color_combo.getSelectedItem())
