@@ -15,39 +15,11 @@ from javax.swing.table import AbstractTableModel
 
 from burp import IMessageEditorController
 
+from csvlistinput.proxy_history_lookup import find_packet_no
+
 COLUMNS = ["#", "Packet No", "Time", "Tool", "Status", "Row#", "Resp", "Host/Path", "Note"]
 
 _EMPTY_BYTES = jarray.zeros(0, 'b')
-
-
-def _find_packet_no(callbacks, helpers, http_service, request_bytes):
-    """Best-effort 1-based position of (http_service, request_bytes) within
-    Burp's Proxy History, so a Log row can be cross-referenced with the
-    same "Packet No" concept used by the History Search tab. Returns -1
-    if it isn't there at all -- most commonly because the send only ever
-    went through Repeater, which doesn't add entries to Proxy History."""
-    if http_service is None or request_bytes is None:
-        return -1
-    try:
-        target_text = helpers.bytesToString(request_bytes)
-        target_host = http_service.getHost()
-        target_port = http_service.getPort()
-        target_proto = http_service.getProtocol()
-    except Exception:
-        return -1
-    no = 0
-    for item in callbacks.getProxyHistory():
-        no += 1
-        try:
-            svc = item.getHttpService()
-            if svc.getHost() != target_host or svc.getPort() != target_port or svc.getProtocol() != target_proto:
-                continue
-            if helpers.bytesToString(item.getRequest()) != target_text:
-                continue
-        except Exception:
-            continue
-        return no
-    return -1
 
 
 class LogTableModel(AbstractTableModel):
@@ -126,7 +98,7 @@ class LogTableModel(AbstractTableModel):
         # IHttpListener path in http_listener.py -- only actually looking
         # at the Log tab pays for it.
         if e.packet_no is None:
-            e.packet_no = _find_packet_no(self.callbacks, self.helpers, e.http_service, e.request_bytes_after)
+            e.packet_no = find_packet_no(self.callbacks, self.helpers, e.http_service, e.request_bytes_after)
         return e.packet_no if e.packet_no != -1 else "-"
 
 

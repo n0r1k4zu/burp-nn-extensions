@@ -96,6 +96,9 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         from csvlistinput.decode_replace_settings import DecodeReplaceSettings
         from csvlistinput.error_store import ErrorStore
         from csvlistinput.http_listener import HttpListener
+        from csvlistinput.live_word_watch_listener import LiveWordWatchListener
+        from csvlistinput.live_word_watch_settings import LiveWordWatchSettings
+        from csvlistinput.live_word_watch_store import LiveWordWatchStore
         from csvlistinput.log_store import LogStore
         from csvlistinput.replace_rule_store import ReplaceRuleStore
         from csvlistinput.replace_settings import ReplaceSettings
@@ -111,17 +114,22 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         self.decode_replace_settings = DecodeReplaceSettings()
         self.error_store = ErrorStore()
         self.color_snapshot_store = ColorSnapshotStore()
+        self.live_word_watch_settings = LiveWordWatchSettings()
+        self.live_word_watch_store = LiveWordWatchStore()
 
         self.main_tab = MainTab(callbacks, self.helpers, self.armed_target, self.csv_store, self.log_store,
                                  self.replace_settings, self.request_replace_store, self.response_replace_store,
                                  self.decode_replace_settings, self.decode_replace_target, self.error_store,
-                                 self.color_snapshot_store)
+                                 self.color_snapshot_store, self.live_word_watch_settings, self.live_word_watch_store)
 
         self.http_listener = HttpListener(callbacks, self.helpers, self.armed_target,
                                            self.csv_store, self.log_store,
                                            self.replace_settings, self.request_replace_store,
                                            self.response_replace_store, self.decode_replace_settings,
                                            self.decode_replace_target, self.error_store)
+        self.live_word_watch_listener = LiveWordWatchListener(
+            self.helpers, self.live_word_watch_settings, self.live_word_watch_store,
+            error_fn=self.main_tab.log_error)
         self.context_menu_factory = ContextMenuFactory(
             self.helpers, self.armed_target, self.decode_replace_target,
             self.request_replace_store, self.response_replace_store,
@@ -129,6 +137,7 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
             on_decode=self.main_tab.show_decode, log_fn=self.main_tab.log, error_fn=self.main_tab.log_error)
 
         callbacks.registerHttpListener(self.http_listener)
+        callbacks.registerHttpListener(self.live_word_watch_listener)
         callbacks.registerContextMenuFactory(self.context_menu_factory)
         callbacks.addSuiteTab(self.main_tab)
         callbacks.registerExtensionStateListener(self)

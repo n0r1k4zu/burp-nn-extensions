@@ -35,6 +35,15 @@ def _hits_in_text(text, word_lower, before_chars, after_chars):
     return hits
 
 
+def hits_in_text(text, word, before_chars, after_chars):
+    """Public, single-text entry point (search() below is the whole-Proxy-
+    History sweep the History Search tab uses; this is the same matching
+    logic against one already-in-hand piece of text, reused by Live Word
+    Watch's IHttpListener to test each request/response as it happens).
+    Returns [(before, match, after), ...]."""
+    return _hits_in_text(text, (word or "").lower(), before_chars, after_chars)
+
+
 def search(callbacks, helpers, word, before_chars, after_chars):
     """Returns a list of hit dicts, one per occurrence, in Proxy history
     order (request occurrences before response occurrences within the

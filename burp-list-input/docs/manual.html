@@ -422,6 +422,7 @@
         <a href="#decode">Decode（デコード）</a>
         <a href="#color-snapshots">Color Snapshots（色のバックアップ/リストア）</a>
         <a href="#history-search">History Search（ワード検索）</a>
+        <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
       <li class="toc-group">
@@ -990,6 +991,84 @@
       </div>
     </section>
 
+    <!-- ================= LIVE WORD WATCH ================= -->
+    <section class="doc-section" id="live-word-watch">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Live Word Watch（リアルタイム監視）</h2>
+        <p class="section-dek">History Searchと同じ結果表示で、既存historyをまとめて検索する代わりにリアルタイムの通信を監視するタブです。</p>
+      </div>
+
+      <p>
+        <a href="#history-search">History Search</a> が「今あるProxy history」をまとめて検索するのに対し、
+        こちらは<strong>これから流れる通信</strong>を監視し、指定したワードがヒットした瞬間に1行ずつ結果へ
+        追加していきます。armは不要で、<a href="#match-replace">Match &amp; Replace</a>と同じように
+        「Enabled」と対象ツールフラグだけで動作します。結果一覧・行選択時のプレビュー・その場デコードは
+        History Searchと同じ形（<span class="k">List No</span> / <span class="k">Packet No</span> /
+        <span class="k">Req/Resp</span> / <span class="k">Before</span> / <span class="k">Match</span> /
+        <span class="k">After</span>）です。
+      </p>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>検索ワードと監視対象ツールを設定する</h4>
+          <p>
+            <span class="k">Search word</span> に検索したい文字列を入力し、必要なら
+            <span class="k">Chars before</span> / <span class="k">Chars after</span>
+            （既定はどちらも30文字）も調整します。<span class="k">Tool flags to watch</span> で監視したい
+            ツール（既定はRepeaterのみ）にチェックを入れます。
+          </p>
+        </li>
+        <li class="step">
+          <h4><span class="k">Live Word Watch: Enabled</span> をONにする</h4>
+          <p>
+            ONにした瞬間から、チェックした対象ツールを通る通信のリクエスト・レスポンス（生バイト）に対して、
+            大文字小文字を区別せずワードの一致を監視します。ヒットするたびに、結果一覧へ自動で行が追加され、
+            同じパケット内に複数ヒットがあればその数だけ行が並びます。
+          </p>
+          <p class="step-note">
+            <span class="k">Search word</span>・<span class="k">Chars before</span>・
+            <span class="k">Chars after</span>・監視対象ツールは、Enabled中でも編集できます。変更は
+            <strong>次に処理される通信から</strong>即座に反映されます（Match &amp; Replaceのルール編集と同じ
+            考え方で、いったん停止する必要はありません）。
+          </p>
+        </li>
+        <li class="step">
+          <h4>結果行を選択して確認する</h4>
+          <p>
+            一覧から行を選択すると、下部にそのパケットのリクエスト/レスポンスがプレビュー表示されます。
+            さらにその下の <span class="k">Decode</span> プルダウン（既定はURL Decode）で方式を選ぶと、
+            選択中の行のBefore/Match/Afterそれぞれへその方式を適用した結果がその場で表示されます
+            （History Searchタブと同じ操作感です）。
+          </p>
+        </li>
+        <li class="step">
+          <h4><span class="k">Clear</span> で結果一覧をリセットする</h4>
+          <p>
+            結果一覧・プレビュー・デコード表示だけをクリアします。<span class="k">Enabled</span>の状態や
+            検索ワード等の設定はそのまま保持されます。
+          </p>
+        </li>
+      </ol>
+
+      <div class="callout tip">
+        <span class="callout-label">Packet No について</span>
+        <p>
+          <a href="#history-search">History Search</a>タブの同名列と同じ考え方で、その通信がBurpのProxy
+          History上で何番目かを表します。Repeater等、Proxyツールを経由しない通信では見つからず
+          <code>-</code> と表示されます（<a href="#ui-reference">Logタブ</a>のPacket No列と同じ制約です）。
+        </p>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-label">結果はメモリ上のみの保持</span>
+        <p>
+          監視結果は拡張のセッション状態として保持され、ファイルへの保存は行いません。Burpで拡張を
+          リロード/アンロードすると、それまでの結果は失われます。
+        </p>
+      </div>
+    </section>
+
     <!-- ================= UI REFERENCE ================= -->
     <section class="doc-section" id="ui-reference">
       <div class="section-head">
@@ -1131,6 +1210,28 @@
                 プルダウン右側にその場で表示します（行の選択やプルダウンの変更のたびに再計算）。</td></tr>
             <tr><td><span class="k">Clear</span></td>
               <td>結果一覧・プレビュー・デコード表示だけをクリアします。Search word・Chars before・Chars afterの入力値は保持されます。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Live Word Watch タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Live Word Watch: Enabled</span></td>
+              <td>機能全体の有効/無効を切り替えるマスタースイッチです。</td></tr>
+            <tr><td><span class="k">Search word</span> / <span class="k">Chars before</span> / <span class="k">Chars after</span></td>
+              <td>History Searchタブと同じ意味の設定です。Enabled中でも編集でき、次に処理される通信から反映されます。</td></tr>
+            <tr><td><span class="k">Tool flags to watch</span></td>
+              <td>監視対象のBurpツール（既定はRepeaterのみ）。Match &amp; Replaceタブのツール選択とは独立した、この機能専用の設定です。</td></tr>
+            <tr><td>結果一覧の列</td>
+              <td>History Searchタブと同じ<span class="k">List No</span> / <span class="k">Packet No</span> / <span class="k">Req/Resp</span> /
+                <span class="k">Before</span> / <span class="k">Match</span> / <span class="k">After</span>。ヒットのたびに自動で行が追加されます。</td></tr>
+            <tr><td>結果行の選択 / <span class="k">Decode</span> プルダウン</td>
+              <td>History Searchタブと同じく、下部にリクエスト/レスポンスのプレビューが表示され、Decodeプルダウンでその場デコードができます。</td></tr>
+            <tr><td><span class="k">Clear</span></td>
+              <td>結果一覧・プレビュー・デコード表示だけをクリアします。Enabled状態や各設定値は保持されます。</td></tr>
           </tbody>
         </table>
       </div>

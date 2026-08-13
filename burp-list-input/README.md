@@ -18,6 +18,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **Errors タブ** — Scanner含むいずれかのBurpツールでの送受信処理中に拡張内部でエラーが起きた場合や、arm・再検出に失敗した場合に、その内容（メッセージ・スタックトレース）を一覧表示します。エラーが1件でもあるとタブ名が赤字で「Errors (件数)」に変わるため、Burp上での動作がおかしいときにすぐ気付けます。
 - **Color Snapshots** — Proxy historyの全パケットの色（`setHighlight`。無色も含む）をコメント付きでスナップショットとして丸ごとバックアップし、履歴から選んでリストアできます。全パケットの色を一括で無色に戻す**Clear all colors**もあります。CSV/Match & Replace機能とは独立しており、手動で付けた色分けも対象です。
 - **History Search** — 指定したワードでProxy history全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索し、ヒットした前後を指定文字数（既定30文字）だけ切り出して一覧表示します。同じパケット内に複数ヒットがあれば、それぞれ別の行として表示されます。行を選択すると、該当パケットのリクエスト/レスポンスをその場でプレビューでき、リスト下部のプルダウン（既定URL Decode）で選んだ方式を選択中の行のBefore/Match/Afterへその場で適用して確認できます。
+- **Live Word Watch** — History Searchと同じ形式（List No / Packet No / Req/Resp / Before / Match / After、選択行のプレビュー、Decodeプルダウンでのその場デコード）で、既存のhistoryをまとめて検索するのではなく、**選択したツールを通るリアルタイムの通信**を監視し、指定したワードがヒットした瞬間に1行ずつ追加していきます。armは不要で、Match & Replaceと同様に「Enabled」と対象ツールフラグで動作します。
 
 ## 必要環境
 
@@ -84,6 +85,16 @@ Proxy history全体から特定のワードを検索したい場合:
 6. リストのすぐ下にある **Decode** プルダウン（既定はURL Decode。Base64/Hex/HTML Entity/Unicode/ROT13/JWTなど代表的な方式から選択可能）で方式を選ぶと、その右側に選択中の行のBefore/Match/Afterそれぞれへその方式を適用した結果がその場で表示される（プルダウンを変更するたびに再計算されます）
 7. **Clear** を押すと結果一覧だけがクリアされる（**Search word**・**Chars before**・**Chars after**の入力値はそのまま保持されます）
 
+リアルタイムの通信を監視して、ワードがヒットした瞬間に確認したい場合:
+
+1. **Live Word Watch** タブの **Search word** にワードを入力し、必要なら **Chars before** / **Chars after** も調整する（既定はどちらも30文字）
+2. **Tool flags to watch** で監視対象のツール（既定はRepeaterのみ）にチェックを入れる
+3. **Live Word Watch: Enabled** をONにする
+4. 対象ツールを通る通信でワードがヒットするたびに、結果一覧（History Searchと同じ List No / Packet No / Req/Resp / Before / Match / After 形式）に自動で行が追加されていく
+5. 行を選択するとリクエスト/レスポンスのプレビューと、下部のDecodeプルダウンによるその場デコードが利用できる（History Searchと同じ操作感）
+6. **Search word**・**Chars before**・**Chars after**・監視対象ツールはEnabled中でも編集でき、次に処理される通信から即座に反映される（Match & Replaceのルール編集と同じ考え方）
+7. **Clear** を押すと結果一覧だけがクリアされる（設定値は保持されます）
+
 詳細な手順・画面の見方・動作原理・トラブルシューティングは [docs/manual.html](docs/manual.html) にまとまっています。
 
 ## ディレクトリ構成
@@ -113,9 +124,13 @@ csvlistinput/               # 拡張の実装本体 -- csv_list_input.py と同�
   decode_replace_settings.py            # Target & Replace with Decode & Encode: 有効/無効・対象ツール・Insertion Point毎のルール保持
   color_snapshot_store.py                # Color Snapshots: スナップショット履歴の保持
   color_snapshot_engine.py                # Color Snapshots: Proxy historyの色の読み取り/書き戻し
-  word_search_engine.py                    # History Search: Proxy historyの生バイトに対するワード検索・前後切り出し
+  word_search_engine.py                    # History Search: Proxy historyの生バイトに対するワード検索・前後切り出し（Live Word Watchとも共有）
+  proxy_history_lookup.py                   # Log / Live Word Watch共通: (http_service, request)からProxy History上の位置を逆引き
+  live_word_watch_settings.py                # Live Word Watch: 有効/無効・検索ワード・前後文字数・対象ツール
+  live_word_watch_store.py                    # Live Word Watch: ヒット履歴の保持
+  live_word_watch_listener.py                  # Live Word Watch: IHttpListener実装（ライブ通信の監視・ヒット検出）
   utils.py                       # バイト列/文字列境界の処理・エスケープ
-  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Color Snapshots / History Search / Decode / Errors タブ）
+  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Color Snapshots / History Search / Live Word Watch / Decode / Errors タブ）
 docs/manual.html              # 利用マニュアル（HTML）
 testdata/                      # 動作確認用のサンプルリクエスト・CSV
 ```
