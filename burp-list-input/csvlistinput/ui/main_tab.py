@@ -19,6 +19,7 @@ from csvlistinput.ui.errors_panel import ErrorsPanel
 from csvlistinput.ui.insertion_point_panel import InsertionPointPanel
 from csvlistinput.ui.live_word_watch_panel import LiveWordWatchPanel
 from csvlistinput.ui.log_panel import LogPanel
+from csvlistinput.ui.parameters_panel import ParametersPanel
 from csvlistinput.ui.replace_panel import ReplacePanel
 from csvlistinput.ui.target_info_panel import TargetInfoPanel
 from csvlistinput.ui.word_search_panel import WordSearchPanel
@@ -50,6 +51,7 @@ class MainTab(ITab):
         self.word_search_panel = WordSearchPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.live_word_watch_panel = LiveWordWatchPanel(callbacks, helpers, live_word_watch_settings,
                                                            live_word_watch_store, error_fn=self.log_error)
+        self.parameters_panel = ParametersPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.errors_panel = ErrorsPanel(error_store)
 
         mapping_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, self.insertion_point_panel, self.csv_panel)
@@ -68,6 +70,7 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Color Snapshots", self.color_snapshot_panel)
         self.tabbed_pane.addTab("History Search", self.word_search_panel)
         self.tabbed_pane.addTab("Live Word Watch", self.live_word_watch_panel)
+        self.tabbed_pane.addTab("Parameters", self.parameters_panel)
         self.tabbed_pane.addTab("Decode", self.decode_panel)
         self.errors_tab_index = self.tabbed_pane.getTabCount()
         self.tabbed_pane.addTab("Errors", self.errors_panel)
@@ -135,7 +138,7 @@ class MainTab(ITab):
             self.tabbed_pane.setForegroundAt(self.errors_tab_index, None)
 
     def getTabCaption(self):
-        return "CSV List Input"
+        return "MyTools"
 
     def getUiComponent(self):
         return self.tabbed_pane

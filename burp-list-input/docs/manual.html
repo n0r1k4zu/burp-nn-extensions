@@ -1,4 +1,4 @@
-<title>CSV List Input 利用マニュアル</title>
+<title>MyTools 利用マニュアル</title>
 <style>
   :root {
     --paper: #eef0f3;
@@ -404,7 +404,7 @@
   <nav class="sidebar" aria-label="目次">
     <div class="sidebar-brand">
       <span class="mark">jython</span>
-      <span class="name">CSV List Input</span>
+      <span class="name">MyTools</span>
     </div>
     <p class="sidebar-sub">Burp Suite 拡張 利用マニュアル</p>
 
@@ -423,6 +423,7 @@
         <a href="#color-snapshots">Color Snapshots（色のバックアップ/リストア）</a>
         <a href="#history-search">History Search（ワード検索）</a>
         <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
+        <a href="#parameters">Parameters（パラメータ棚卸し）</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
       <li class="toc-group">
@@ -445,7 +446,7 @@
   <main>
     <header class="doc-header">
       <p class="doc-eyebrow">User Manual — 日本語版</p>
-      <h1 class="doc-title">CSV List Input 利用マニュアル</h1>
+      <h1 class="doc-title">MyTools 利用マニュアル</h1>
       <p class="doc-lede">
         Repeaterで送るリクエストの複数の項目（名前・電話番号・性別など）に、CSVで用意した大量のテストデータを
         1送信ごとに自動で差し込んでいくためのBurp Suite拡張です。加えて、armした対象とは無関係に動く
@@ -507,7 +508,7 @@
           Extension typeを <span class="k">Python</span> にし、<code>csv_list_input.py</code> を選択します。
         </li>
         <li>
-          読み込みに成功すると、Burpのメインウィンドウに <span class="k">CSV List Input</span> タブが追加されます。
+          読み込みに成功すると、Burpのメインウィンドウに <span class="k">MyTools</span> タブが追加されます。
         </li>
       </ol>
 
@@ -550,7 +551,7 @@
         <li class="step">
           <h4>検出されたInsertion Pointを確認する</h4>
           <p>
-            <span class="k">CSV List Input</span> タブ →
+            <span class="k">MyTools</span> タブ →
             <span class="k">Target &amp; List Mapping</span> を開くと、自動検出された書き換え可能な項目が
             一覧表示されます。URLパラメータ、Cookie、ヘッダー、JSON/XML本文の各項目（入れ子のものも含む）が対象です。
           </p>
@@ -631,7 +632,8 @@
             一覧から行を選択すると、画面下部に <span class="k">Original Value (full)</span>
             （そのInsertion Pointの現在の値）が表示されます。値が何らかの方式でエンコードされている場合は
             <span class="k">Codec</span> 列でその方式（None / URL / Base64 / Hex / HTML Entity /
-            Unicode <code>\uXXXX</code> / ROT13）を選んでください。選ぶと同時に、画面下部の
+            Unicode <code>\uXXXX</code> / ROT13）を選んでください。<code>URL → Base64</code>のような2段Codecも選べ、
+            左から外側→内側へデコードし、逆順に再エンコードします。選ぶと同時に、画面下部の
             <span class="k">Decoded Value (using selected Codec)</span> 欄にデコード結果がその場でプレビュー
             表示されるので、正しいCodecを選べているか（意味の通る値になっているか）をすぐ確認できます。
             エンコードされていない値であれば <span class="k">None</span> のままで構いません。
@@ -790,7 +792,7 @@
         <li class="step">
           <h4>右側で結果を確認する</h4>
           <p>
-            右側には次の変換結果が常に一覧表示されます（左側の文字列を変えるたびに再計算されます）。
+            右側には有効にした変換結果が一覧表示されます（左側の文字列を変えるたびに再計算されます）。初期状態ではURL Decodeのみ有効です。
           </p>
           <ul>
             <li>URL Decode / URL Encode</li>
@@ -809,8 +811,7 @@
         <li class="step">
           <h4>表示する変換を手動で絞り込む</h4>
           <p>
-            タブ最上部に変換ごとのチェックボックスが並んでおり、初期状態は全部ONです（＝どれが当てはまるか
-            お任せで一覧表示）。特定の変換だけ見たい場合はチェックを外す/入れることで手動切り替えできます。
+            タブ最上部に変換ごとのチェックボックスが並んでおり、初期状態はURL DecodeのみONです。特定の変換だけ見たい場合はチェックを外す/入れることで手動切り替えできます。
             <span class="k">All</span> / <span class="k">None</span> ボタンで一括切り替えも可能です。
             チェックを変えるとその場で右側の一覧が再計算されます。
           </p>
@@ -931,7 +932,8 @@
           <p>
             <span class="k">Search word</span> に検索したい文字列を入力します。<span class="k">Chars before</span>
             / <span class="k">Chars after</span> で、ヒット箇所の前・後それぞれ何文字を切り出すかを個別に指定できます
-            （既定はどちらも30文字）。
+            （既定はどちらも30文字）。<span class="k">Packet No range</span>の開始・終了を指定すれば、その範囲だけを検索できます（空欄は全件）。
+            <code>hoge &amp; piyo</code> は同一Packet No内のAND、<code>hoge | piyo</code> はORです。記号を文字として検索する場合はWindowsで<code>\&amp;</code>/<code>\|</code>/<code>\\</code>、日本語Macで<code>¥&amp;</code>/<code>¥|</code>/<code>¥¥</code>を使います（演算子の混在は不可）。
           </p>
         </li>
         <li class="step">
@@ -960,7 +962,7 @@
         <li class="step">
           <h4>選択した行をその場でデコードして確認する</h4>
           <p>
-            結果一覧のすぐ下、左側の <span class="k">Decode</span> プルダウン（既定は
+            結果一覧のすぐ下、左側の <span class="k">Decode</span> プルダウン（<span class="k">None</span>（変換なし）または既定の
             <span class="k">URL Decode</span>）で方式を選ぶと、その右側に選択中の行の
             <span class="k">Before</span> / <span class="k">Match</span> / <span class="k">After</span> それぞれへ
             その方式を適用した結果が表示されます。プルダウンを変更するたび、または別の行を選択するたびに
@@ -989,6 +991,16 @@
           反映されません（もう一度 <span class="k">Search</span> を押せば最新の状態で検索し直せます）。
         </p>
       </div>
+    </section>
+
+    <section class="doc-section" id="parameters">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Parameters（パラメータ棚卸し）</h2>
+        <p class="section-dek">指定したHTTP History範囲のリクエストから、構造化されたパラメータ一覧を作成します。</p>
+      </div>
+      <p><span class="k">Range...</span>から開始・終了Packet Noを設定し（既定は全HTTP History）、<span class="k">Build parameter list</span>を押します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。値は表示せず、構造パスごとに重複を統合します。</p>
+      <p>一覧は <span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> です。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
     </section>
 
     <!-- ================= LIVE WORD WATCH ================= -->
@@ -1266,6 +1278,19 @@
               <td>History Searchタブと同じく、下部にリクエスト/レスポンスのプレビューが表示され、Decodeプルダウンでその場デコードができます。</td></tr>
             <tr><td><span class="k">Clear</span></td>
               <td>結果一覧・プレビュー・デコード表示だけをクリアします。Enabled状態や各設定値は保持されます。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Parameters タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Range...</span></td><td>開始・終了Packet Noを指定します。空欄はそれぞれ先頭・末尾で、既定は全HTTP Historyです。</td></tr>
+            <tr><td><span class="k">Build parameter list</span></td><td>指定範囲のリクエストをTarget &amp; List Mappingと同じパーサーで解析し、構造パスを重複なく集計します。</td></tr>
+            <tr><td>一覧の列</td><td><span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span>。</td></tr>
+            <tr><td>赤 / 黄の行</td><td>赤は認可・アカウント・金銭関連、黄はトークン・識別子・PII候補です。脆弱性の検出結果ではなく、診断上の優先確認用の目印です。</td></tr>
           </tbody>
         </table>
       </div>
@@ -1878,7 +1903,7 @@
     </section>
 
     <footer class="doc-footer">
-      CSV List Input — Burp Suite Jython拡張 利用マニュアル
+      MyTools — Burp Suite Jython拡張 利用マニュアル
     </footer>
   </main>
 </div>

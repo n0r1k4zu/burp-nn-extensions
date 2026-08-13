@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(THIS_DIR))
 
 from csvlistinput import word_search_engine
 from csvlistinput import codec_engine, decode_replace_engine
+from csvlistinput import parameter_inventory_engine
 from csvlistinput.decode_replace_settings import DecodeReplaceRule
 from csvlistinput.replace_engine import _apply_rules_to_text
 from csvlistinput.replace_rule_store import ReplaceRule
@@ -114,6 +115,41 @@ class WordSearchEngineTest(unittest.TestCase):
 
         self.assertEqual(1, count)
         self.assertEqual("before changed", codec_engine.base64_decode(codec_engine.url_decode(replaced)))
+
+    def test_parameter_risk_tiers_include_authorization_and_money_fields(self):
+        self.assertEqual('high', parameter_inventory_engine.risk_level('$.accountId'))
+        self.assertEqual('high', parameter_inventory_engine.risk_level('body[amount]'))
+        self.assertEqual('medium', parameter_inventory_engine.risk_level('header[X-Request-Id]'))
+        self.assertIsNone(parameter_inventory_engine.risk_level('$.displayTheme'))
+
+    def test_parameter_inventory_deduplicates_paths_and_obeys_packet_range(self):
+        class Item(object):
+            def __init__(self, request):
+                self.request = request
+
+            def getRequest(self):
+                return self.request
+
+            def getHttpService(self):
+                return None
+
+        class Callbacks(object):
+            def getProxyHistory(self):
+                return [Item('one'), Item('two'), Item('three')]
+
+        class Point(object):
+            def __init__(self, path):
+                self.path = path
+
+        def detector(_helpers, request, _service):
+            return [Point('$.userId'), Point('$.amount')] if request == 'two' else [Point('$.userId')]
+
+        rows = parameter_inventory_engine.collect(Callbacks(), object(), 2, 3, detector=detector)
+
+        self.assertEqual(['$.amount', '$.userId'], [row['path'] for row in rows])
+        user_id = next(row for row in rows if row['path'] == '$.userId')
+        self.assertEqual(2, user_id['count'])
+        self.assertEqual([2, 3], user_id['packet_nos'])
 
 
 if __name__ == "__main__":

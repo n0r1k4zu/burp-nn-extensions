@@ -1,4 +1,4 @@
-# CSV List Input
+# MyTools
 
 Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複数の項目（URL/Cookie/ヘッダー/JSON・XML本文中の値。入れ子構造も再帰的に展開）に、CSVで用意したテストデータを送信のたびに自動で差し込みます。名前・電話番号・性別などを受け付ける登録APIに、大量のテストデータを1件ずつ流し込むようなテストを想定しています。
 
@@ -18,6 +18,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **Errors タブ** — Scanner含むいずれかのBurpツールでの送受信処理中に拡張内部でエラーが起きた場合や、arm・再検出に失敗した場合に、その内容（メッセージ・スタックトレース）を一覧表示します。エラーが1件でもあるとタブ名が赤字で「Errors (件数)」に変わるため、Burp上での動作がおかしいときにすぐ気付けます。
 - **Color Snapshots** — Proxy historyの全パケットの色（`setHighlight`。無色も含む）をコメント付きでスナップショットとして丸ごとバックアップし、履歴から選んでリストアできます。全パケットの色を一括で無色に戻す**Clear all colors**もあります。CSV/Match & Replace機能とは独立しており、手動で付けた色分けも対象です。
 - **History Search** — 指定したワードでHTTP History全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索し、ヒットした前後を指定文字数（既定30文字）だけ切り出して一覧表示します。`hoge & piyo`で同じPacket Noに両方ある通信、`hoge | piyo`でどちらかがある通信を検索できます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします（`&`と`|`の混在は不可）。Packet Noの開始・終了を指定すれば、その範囲だけを検索できます（空欄なら全件）。同じパケット内に複数ヒットがあれば、それぞれ別の行として表示されます。Before / Match / Afterはセル単位で選択でき、右クリックからコピーできます。行を選択すると、該当パケットのリクエスト/レスポンスをその場でプレビューでき、リスト下部のプルダウン（既定URL Decode、Noneも選択可）で選んだ方式を選択中の行のBefore/Match/Afterへその場で適用して確認できます。
+- **Parameters** — Proxy HTTP Historyのリクエストを、Target & List Mappingと同じJSON/XML・ネスト値対応パーサーで解析し、構造パスごとに重複なく一覧化します。`Range...`からPacket No範囲を指定でき、出現回数と出現Packet No群を確認できます。アカウント・権限・金銭関連の候補は赤、トークン・識別子・PII候補は黄で強調します（診断時の優先確認用であり、脆弱性の検出結果ではありません）。
 - **Live Word Watch** — History Searchと同じ形式（List No / Packet No / Req/Resp / Before / Match / After、選択行のプレビュー、Decodeプルダウンでのその場デコード）で、既存のhistoryをまとめて検索するのではなく、**選択したツールを通るリアルタイムの通信**を監視し、指定したワードがヒットした瞬間に1行ずつ追加していきます。History Searchと同じく、`&`による同一Packet No内のAND検索、`|`によるOR検索を使えます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします。Before / Match / Afterはセル単位で選択し、右クリックからコピーできます。DecodeはNone（変換なし）も選択可能です。armは不要で、Match & Replaceと同様に「Enabled」と対象ツールフラグで動作します。**Scope only**での絞り込み、1通信あたり200件のヒット上限、5MB超の本文のスキップにより、Burp全体への負荷を抑えています。
 
 ## 必要環境
@@ -30,7 +31,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 1. Burp Suiteの **Extender > Options > Python Environment** で `jython-standalone.jar` を指定する
 2. **Extender > Extensions > Add** で Extension type を `Python` にし、このリポジトリの `csv_list_input.py` を選択する
    - `csvlistinput/` フォルダは `csv_list_input.py` と**同じ場所に置いたまま**にしてください。拡張はこのフォルダをパッケージとしてimportするため、`csv_list_input.py` 単体では動作しません。
-3. 読み込みに成功すると、Burpのメインウィンドウに **CSV List Input** タブが追加されます
+3. 読み込みに成功すると、Burpのメインウィンドウに **MyTools** タブが追加されます
 
 ## 使い方（概要）
 
@@ -47,7 +48,7 @@ Target & List MappingとTarget & Replace with Decode & Encodeは、**それぞ�
 
 1. 対象リクエストを右クリックし、**Send to Target & Replace with Decode & Encode** でarmする（Target & List Mappingとは独立した別の対象として設定されます）
 2. **Target & Replace with Decode & Encode** タブで、書き換えたいInsertion Pointの行を選択する。画面下部にOriginal Value（元の値）が表示される
-3. その値がエンコードされている場合は **Codec**（None/URL/Base64/Hex/HTML Entity/Unicode \uXXXX/ROT13）を選ぶ。選ぶと同時に画面下部のDecoded Value欄にデコード結果がプレビュー表示されるので、正しいCodecを選べているか確認できる
+3. その値がエンコードされている場合は **Codec**（None/URL/Base64/Hex/HTML Entity/Unicode \uXXXX/ROT13、または`URL → Base64`のような2段Codec）を選ぶ。2段Codecは左から外側→内側へデコードし、逆順で再エンコードする。選ぶと同時に画面下部のDecoded Value欄にデコード結果がプレビュー表示されるので、正しいCodecを選べているか確認できる
 4. **Enabled** にチェックを入れ、**Find**（プレーン文字列 or 正規表現、**Regex**チェックで切替）と **Replace With** を入力する
 5. タブ最上部の **Target & Replace with Decode & Encode: Enabled** をONにし、対象ツールにチェックを入れる
 6. 送信すると、値をデコード → 置換 → 同じ方式で再エンコードしてから送信される。結果は **Log** タブで確認できる
@@ -79,11 +80,18 @@ Proxy history全体から特定のワードを検索したい場合:
 
 1. **History Search** タブの **Search word** にワードを入力する
 2. **Chars before** / **Chars after** で、ヒット箇所の前後それぞれ何文字を切り出すかを指定する（既定はどちらも30文字）
-3. **Search** を押すと、Proxy history全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索する
-4. 結果は一覧表（List No / Packet No / Req/Resp / Before / Match / After）に、ヒットごとに1行ずつ表示される（同じパケット内に複数ヒットがあればその数だけ行が並ぶ。Req/Respはそのヒットがリクエスト側・レスポンス側どちらで見つかったかを表す）
-5. 行を選択すると、下部にそのパケットのリクエスト/レスポンスがプレビュー表示される（該当箇所はBurp標準のメッセージビューア内検索で探せます）
-6. リストのすぐ下にある **Decode** プルダウン（既定はURL Decode。Base64/Hex/HTML Entity/Unicode/ROT13/JWTなど代表的な方式から選択可能）で方式を選ぶと、その右側に選択中の行のBefore/Match/Afterそれぞれへその方式を適用した結果がその場で表示される（プルダウンを変更するたびに再計算されます）
-7. **Clear** を押すと結果一覧だけがクリアされる（**Search word**・**Chars before**・**Chars after**の入力値はそのまま保持されます）
+3. 必要ならPacket Noの開始・終了を指定する（空欄は全件）。`hoge & piyo`で同一Packet No内のAND、`hoge | piyo`でOR。記号を文字として探す場合はWindowsで`\&`/`\|`/`\\`、日本語Macで`¥&`/`¥|`/`¥¥`を使う
+4. **Search** を押すと、指定範囲のProxy history（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索する
+5. 結果は一覧表（List No / Packet No / Req/Resp / Before / Match / After）に、ヒットごとに1行ずつ表示される。Before / Match / Afterはセル単位で選択でき、右クリックの**Copy selected cell**でコピーできる
+6. 行を選択すると、下部にそのパケットのリクエスト/レスポンスがプレビュー表示される（該当箇所はBurp標準のメッセージビューア内検索で探せます）
+7. リストのすぐ下にある **Decode** プルダウン（`None`またはURL Decode等）で方式を選ぶと、その右側に選択中の行のBefore/Match/Afterそれぞれへその方式を適用した結果がその場で表示される
+8. **Clear** を押すと結果一覧だけがクリアされる（**Search word**・**Chars before**・**Chars after**の入力値はそのまま保持されます）
+
+Proxy historyのリクエストパラメータを集計したい場合:
+
+1. **Parameters** タブの **Range...** から対象Packet No範囲を設定する（既定は全HTTP History）
+2. **Build parameter list** を押す
+3. 構造パス、出現回数、出現Packet No群を確認する。赤は認可・アカウント・金銭関連、黄は識別子・トークン・PII候補で、診断の優先確認用の目印です
 
 リアルタイムの通信を監視して、ワードがヒットした瞬間に確認したい場合:
 

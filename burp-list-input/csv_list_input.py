@@ -19,7 +19,7 @@ import sys
 
 from burp import IBurpExtender, IExtensionStateListener
 
-EXTENSION_NAME = "CSV List Input"
+EXTENSION_NAME = "MyTools"
 
 # Last-resort manual override: if neither __file__ nor sys.argv[0] resolve
 # to this file's real location (see _get_extension_dir), set this to the
