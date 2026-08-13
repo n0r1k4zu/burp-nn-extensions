@@ -28,6 +28,16 @@ from csvlistinput.live_word_watch_store import LiveWordHit
 # are simply not reported.
 _MAX_HITS_PER_MESSAGE = 200
 
+# Every request/response through an enabled tool gets fully converted to
+# a Jython string and lowercased before it's searched -- cheap for
+# ordinary API traffic, but a real cost when a large video/image/JS
+# bundle/download flows through (e.g. Proxy enabled while browsing
+# normally). Bodies over this size are skipped entirely rather than
+# scanned, so one big response can't add meaningful latency to Burp's
+# own traffic-handling thread. 5 MB comfortably covers normal
+# request/response bodies without touching genuinely large payloads.
+_MAX_SCAN_BYTES = 5 * 1024 * 1024
+
 
 def _tool_label(tool_flag):
     for flag, label in TOOL_FLAG_LABELS:
@@ -37,7 +47,8 @@ def _tool_label(tool_flag):
 
 
 class LiveWordWatchListener(IHttpListener):
-    def __init__(self, helpers, settings, store, error_fn=None):
+    def __init__(self, callbacks, helpers, settings, store, error_fn=None):
+        self.callbacks = callbacks
         self.helpers = helpers
         self.settings = settings
         self.store = store
@@ -51,14 +62,31 @@ class LiveWordWatchListener(IHttpListener):
                 return
             side = "Request" if messageIsRequest else "Response"
             raw_bytes = messageInfo.getRequest() if messageIsRequest else messageInfo.getResponse()
+            # Cheapest checks first: a None/oversized body never needs a
+            # scope lookup (which itself parses the request), and an
+            # out-of-scope message never needs the actual body scan.
+            if raw_bytes is None or len(raw_bytes) > _MAX_SCAN_BYTES:
+                return
+            if self.settings.scope_only and not self._in_scope(messageInfo):
+                return
             self._scan(toolFlag, messageInfo, side, raw_bytes)
         except Exception as e:
             if self.error_fn:
                 self.error_fn("LiveWordWatchListener.processHttpMessage (tool=%s)" % _tool_label(toolFlag), str(e))
 
+    def _in_scope(self, messageInfo):
+        # Checked before any body conversion -- cuts out third-party/
+        # tracker/CDN noise that Proxy otherwise captures during ordinary
+        # browsing, which is usually most of the traffic volume by byte
+        # count (ads, analytics, fonts, images) and the biggest
+        # contributor to sustained CPU cost when scope isn't restricted.
+        try:
+            url = self.helpers.analyzeRequest(messageInfo).getUrl()
+            return self.callbacks.isInScope(url)
+        except Exception:
+            return True  # fail open -- don't silently drop traffic over a parse error
+
     def _scan(self, toolFlag, messageInfo, side, raw_bytes):
-        if raw_bytes is None:
-            return
         text = self.helpers.bytesToString(raw_bytes)
         hits = word_search_engine.hits_in_text(text, self.settings.word, self.settings.before_chars,
                                                  self.settings.after_chars)

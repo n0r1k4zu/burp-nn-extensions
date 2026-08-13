@@ -17,3 +17,9 @@ class LiveWordWatchSettings(object):
         self.before_chars = 30
         self.after_chars = 30
         self.enabled_tool_flags = set(DEFAULT_ENABLED_TOOL_FLAGS)
+        # Off by default (Burp's Target Scope may not be configured, and
+        # silently scanning nothing would be confusing) -- restricts
+        # watching to in-scope traffic, which matters most when Proxy is
+        # among the enabled tool flags and general browsing traffic
+        # (trackers/CDNs/ads) would otherwise all be scanned too.
+        self.scope_only = False

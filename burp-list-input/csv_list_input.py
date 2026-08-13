@@ -128,7 +128,7 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
                                            self.response_replace_store, self.decode_replace_settings,
                                            self.decode_replace_target, self.error_store)
         self.live_word_watch_listener = LiveWordWatchListener(
-            self.helpers, self.live_word_watch_settings, self.live_word_watch_store,
+            callbacks, self.helpers, self.live_word_watch_settings, self.live_word_watch_store,
             error_fn=self.main_tab.log_error)
         self.context_menu_factory = ContextMenuFactory(
             self.helpers, self.armed_target, self.decode_replace_target,

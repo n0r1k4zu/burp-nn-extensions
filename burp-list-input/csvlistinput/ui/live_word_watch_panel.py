@@ -181,6 +181,9 @@ class LiveWordWatchPanel(JPanel):
         self.enabled_checkbox = JCheckBox("Live Word Watch: Enabled", settings.enabled,
                                            actionPerformed=self._on_enabled_toggle)
         enable_row.add(self.enabled_checkbox)
+        self.scope_only_checkbox = JCheckBox("Scope only", settings.scope_only,
+                                              actionPerformed=self._on_scope_only_toggle)
+        enable_row.add(self.scope_only_checkbox)
         top.add(enable_row)
 
         word_row = JPanel(FlowLayout(FlowLayout.LEFT))
@@ -269,6 +272,9 @@ class LiveWordWatchPanel(JPanel):
         self.settings.enabled = self.enabled_checkbox.isSelected()
         self.status_label.setText("Watching for \"%s\"..." % self.settings.word if self.settings.enabled
                                    else "Stopped.")
+
+    def _on_scope_only_toggle(self, event):
+        self.settings.scope_only = self.scope_only_checkbox.isSelected()
 
     def _on_word_changed(self):
         self.settings.word = self.word_field.getText()

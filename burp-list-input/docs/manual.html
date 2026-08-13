@@ -1018,6 +1018,12 @@
             （既定はどちらも30文字）も調整します。<span class="k">Tool flags to watch</span> で監視したい
             ツール（既定はRepeaterのみ）にチェックを入れます。
           </p>
+          <p class="step-note">
+            <strong>Proxyツールを対象に含める場合は <span class="k">Scope only</span> のONを強く推奨します</strong>
+            （事前にBurpの Target &gt; Scope で対象ホストを設定しておいてください）。ONにすると、本文の変換・
+            検索処理より前の段階でScope外の通信を除外します。詳しくは後述の「Burp全体の負荷について」を
+            参照してください。
+          </p>
         </li>
         <li class="step">
           <h4><span class="k">Live Word Watch: Enabled</span> をONにする</h4>
@@ -1028,9 +1034,9 @@
           </p>
           <p class="step-note">
             <span class="k">Search word</span>・<span class="k">Chars before</span>・
-            <span class="k">Chars after</span>・監視対象ツールは、Enabled中でも編集できます。変更は
-            <strong>次に処理される通信から</strong>即座に反映されます（Match &amp; Replaceのルール編集と同じ
-            考え方で、いったん停止する必要はありません）。
+            <span class="k">Chars after</span>・監視対象ツール・<span class="k">Scope only</span>は、
+            Enabled中でも編集できます。変更は<strong>次に処理される通信から</strong>即座に反映されます
+            （Match &amp; Replaceのルール編集と同じ考え方で、いったん停止する必要はありません）。
           </p>
         </li>
         <li class="step">
@@ -1061,12 +1067,27 @@
       </div>
 
       <div class="callout warn">
-        <span class="callout-label">1通信あたりのヒット数の上限</span>
+        <span class="callout-label">Burp全体の負荷について（3段構えの保護）</span>
         <p>
-          短い/よくある文字列（例: 1文字の <code>e</code> 等）をワードに指定すると、大きなレスポンス
-          1件だけで数千〜数万件ヒットすることがあります。これによってBurp全体がフリーズするのを防ぐため、
-          <strong>1通信あたりのヒット数は200件までに制限しています</strong>（超えた分は記録されません）。
-          実用上は、ある程度絞り込んだ具体的な文字列をワードに指定することを推奨します。
+          対象ツールを通る<strong>すべて</strong>のリクエスト・レスポンスは、ヒットの有無に関わらず一度は
+          文字列化・検索処理の対象になります。特に<strong>Proxyツールを対象にしたまま通常のブラウジングを
+          行うと、広告・トラッキング・CDN等を含む大量の通信すべてがこの処理を通ることになり</strong>、
+          Burp全体（このタブだけではありません）の動作が重くなることがあります。これを避けるため、
+          次の3つの制限・機能を組み合わせています。
+        </p>
+        <ul>
+          <li><strong><span class="k">Scope only</span></strong> — ONにすると、Scope外の通信を本文の変換・
+            検索より<em>前</em>の段階でスキップします。ブラウジング中に発生する無関係な通信の大半を
+            ここで除外できるため、最も効果の大きい対策です。</li>
+          <li><strong>本文サイズの上限（5MB）</strong> — 5MBを超えるリクエスト/レスポンス本文は検索対象外
+            です。動画・大きな画像・ダウンロード等をそのまま文字列変換・検索してしまうコストを避けます。</li>
+          <li><strong>1通信あたりのヒット数の上限（200件）</strong> — 短い/よくある文字列（例: 1文字の
+            <code>e</code> 等）をワードに指定すると、大きなレスポンス1件だけで数千〜数万件ヒットすることが
+            あります。1通信あたりのヒット数を200件までに制限し、超えた分は記録しません。</li>
+        </ul>
+        <p>
+          実用上は、<span class="k">Scope only</span>を有効にしたうえで、ある程度絞り込んだ具体的な文字列を
+          ワードに指定することを推奨します。
         </p>
       </div>
 
@@ -1231,6 +1252,9 @@
           <tbody>
             <tr><td><span class="k">Live Word Watch: Enabled</span></td>
               <td>機能全体の有効/無効を切り替えるマスタースイッチです。</td></tr>
+            <tr><td><span class="k">Scope only</span></td>
+              <td>ONにすると、Burpの Target &gt; Scope で対象と判定された通信のみを検索対象にします（既定はOFF）。
+                Proxyツールを監視対象にする場合は、Burp全体の負荷を抑えるためONを強く推奨します。</td></tr>
             <tr><td><span class="k">Search word</span> / <span class="k">Chars before</span> / <span class="k">Chars after</span></td>
               <td>History Searchタブと同じ意味の設定です。Enabled中でも編集でき、次に処理される通信から反映されます。</td></tr>
             <tr><td><span class="k">Tool flags to watch</span></td>
