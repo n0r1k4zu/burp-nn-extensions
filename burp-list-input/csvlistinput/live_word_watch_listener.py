@@ -88,12 +88,13 @@ class LiveWordWatchListener(IHttpListener):
 
     def _scan(self, toolFlag, messageInfo, side, raw_bytes):
         text = self.helpers.bytesToString(raw_bytes)
+        # The cap must be passed into the search itself.  Truncating a fully
+        # built result list afterwards still lets a common one-character word
+        # allocate millions of hit tuples on Burp's HTTP thread.
         hits = word_search_engine.hits_in_text(text, self.settings.word, self.settings.before_chars,
-                                                 self.settings.after_chars)
+                                                 self.settings.after_chars, _MAX_HITS_PER_MESSAGE)
         if not hits:
             return
-        if len(hits) > _MAX_HITS_PER_MESSAGE:
-            hits = hits[:_MAX_HITS_PER_MESSAGE]
         request_bytes = messageInfo.getRequest()
         response_bytes = messageInfo.getResponse() if side == "Response" else None
         http_service = messageInfo.getHttpService()

@@ -4,9 +4,11 @@ for a literal word and list every occurrence with surrounding context,
 independent of the CSV/Match & Replace/Color Snapshots features."""
 
 import jarray
-from java.awt import BorderLayout, FlowLayout
-from javax.swing import (JButton, JComboBox, JLabel, JPanel, JScrollPane, JSpinner, JSplitPane, JTable, JTextField,
-                          ListSelectionModel, SpinnerNumberModel, SwingUtilities)
+from java.awt import BorderLayout, FlowLayout, Toolkit
+from java.awt.event import MouseAdapter
+from java.awt.datatransfer import StringSelection
+from javax.swing import (JButton, JComboBox, JLabel, JMenuItem, JPanel, JPopupMenu, JScrollPane, JSpinner,
+                          JSplitPane, JTable, JTextField, ListSelectionModel, SpinnerNumberModel, SwingUtilities)
 from javax.swing.event import ListSelectionListener
 from javax.swing.table import AbstractTableModel
 
@@ -22,9 +24,12 @@ _DEFAULT_CONTEXT_CHARS = 30
 # Encode counterparts, not relevant to previewing already-captured traffic).
 _DECODE_LABELS = [label for label in decode_engine.TRANSFORM_LABELS if "Decode" in label or label == "ROT13"]
 _DEFAULT_DECODE_LABEL = "URL Decode"
+_NONE_DECODE_LABEL = "None"
 
 
 def _decode_preview(text, label):
+    if label == _NONE_DECODE_LABEL:
+        return text
     result = decode_engine.run_all(text, enabled_labels=[label])[0]
     return result.text if result.ok() else "(%s)" % result.error
 
@@ -98,6 +103,30 @@ class _SelectionListener(ListSelectionListener):
         self.panel._on_selection(model_row)
 
 
+class _TablePopupListener(MouseAdapter):
+    """Select the clicked result cell, then expose an explicit copy action.
+    JTable's row selection alone makes the Before/Match/After values hard
+    to copy independently, especially in Burp's embedded Swing UI."""
+    def __init__(self, panel):
+        self.panel = panel
+
+    def mousePressed(self, event):
+        self._show_if_popup(event)
+
+    def mouseReleased(self, event):
+        self._show_if_popup(event)
+
+    def _show_if_popup(self, event):
+        if not event.isPopupTrigger():
+            return
+        row = self.panel.table.rowAtPoint(event.getPoint())
+        col = self.panel.table.columnAtPoint(event.getPoint())
+        if row < 0 or col < 0:
+            return
+        self.panel.table.changeSelection(row, col, False, False)
+        self.panel.copy_popup.show(self.panel.table, event.getX(), event.getY())
+
+
 class WordSearchPanel(JPanel):
     def __init__(self, callbacks, helpers, log_fn=None, error_fn=None):
         JPanel.__init__(self, BorderLayout())
@@ -116,6 +145,14 @@ class WordSearchPanel(JPanel):
         top.add(JLabel("Chars after:"))
         self.after_spinner = JSpinner(SpinnerNumberModel(_DEFAULT_CONTEXT_CHARS, 0, 100000, 1))
         top.add(self.after_spinner)
+        top.add(JLabel("Packet No range:"))
+        self.start_packet_field = JTextField(6)
+        self.start_packet_field.setToolTipText("Start packet number (blank: first packet)")
+        top.add(self.start_packet_field)
+        top.add(JLabel("to"))
+        self.end_packet_field = JTextField(6)
+        self.end_packet_field.setToolTipText("End packet number (blank: last packet)")
+        top.add(self.end_packet_field)
         self.search_button = JButton("Search", actionPerformed=self._on_search)
         top.add(self.search_button)
         self.clear_button = JButton("Clear", actionPerformed=self._on_clear)
@@ -125,8 +162,14 @@ class WordSearchPanel(JPanel):
         self.table_model = WordSearchTableModel()
         self.table = JTable(self.table_model)
         self.table.setAutoCreateRowSorter(True)
+        # Make Before / Match / After individually selectable, so their
+        # values can be copied without selecting an entire result row.
+        self.table.setCellSelectionEnabled(True)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.table.getSelectionModel().addListSelectionListener(_SelectionListener(self))
+        self.copy_popup = JPopupMenu()
+        self.copy_popup.add(JMenuItem("Copy selected cell", actionPerformed=self._copy_selected_cell))
+        self.table.addMouseListener(_TablePopupListener(self))
 
         table_panel = JPanel(BorderLayout())
         table_panel.add(JScrollPane(self.table), BorderLayout.CENTER)
@@ -134,7 +177,7 @@ class WordSearchPanel(JPanel):
         below_list = JPanel(BorderLayout())
         decode_option = JPanel(FlowLayout(FlowLayout.LEFT))
         decode_option.add(JLabel("Decode:"))
-        self.decode_combo = JComboBox(_DECODE_LABELS)
+        self.decode_combo = JComboBox([_NONE_DECODE_LABEL] + _DECODE_LABELS)
         self.decode_combo.setSelectedItem(_DEFAULT_DECODE_LABEL)
         self.decode_combo.addActionListener(self._on_decode_option_changed)
         decode_option.add(self.decode_combo)
@@ -181,7 +224,17 @@ class WordSearchPanel(JPanel):
         before_chars = int(self.before_spinner.getValue())
         after_chars = int(self.after_spinner.getValue())
         try:
-            hits = word_search_engine.search(self.callbacks, self.helpers, word, before_chars, after_chars)
+            start_packet_no = self._packet_no_or_none(self.start_packet_field.getText(), "start")
+            end_packet_no = self._packet_no_or_none(self.end_packet_field.getText(), "end")
+            if (start_packet_no is not None and end_packet_no is not None
+                    and start_packet_no > end_packet_no):
+                raise ValueError("Start Packet No must not exceed End Packet No.")
+        except ValueError as e:
+            self.status_label.setText(str(e))
+            return
+        try:
+            hits = word_search_engine.search(self.callbacks, self.helpers, word, before_chars, after_chars,
+                                             start_packet_no, end_packet_no)
         except Exception as e:
             self.status_label.setText("Search failed: %s" % e)
             if self.error_fn:
@@ -190,10 +243,29 @@ class WordSearchPanel(JPanel):
         self.table_model.set_hits(hits)
         self._show_hit(None)
         self._update_decode_preview(None)
-        self.status_label.setText("%d hit(s) found for \"%s\"." % (len(hits), word))
+        range_text = self._range_display(start_packet_no, end_packet_no)
+        self.status_label.setText("%d hit(s) found for \"%s\" in %s." % (len(hits), word, range_text))
         if self.log_fn:
-            self.log_fn("History Search: %d hit(s) found for \"%s\" (before=%d, after=%d)" % (
-                len(hits), word, before_chars, after_chars))
+            self.log_fn("History Search: %d hit(s) found for \"%s\" (%s, before=%d, after=%d)" % (
+                len(hits), word, range_text, before_chars, after_chars))
+
+    def _packet_no_or_none(self, text, boundary_name):
+        value = str(text).strip()
+        if not value:
+            return None
+        try:
+            packet_no = int(value)
+        except ValueError:
+            raise ValueError("%s Packet No must be a positive integer." % boundary_name.capitalize())
+        if packet_no < 1:
+            raise ValueError("%s Packet No must be a positive integer." % boundary_name.capitalize())
+        return packet_no
+
+    def _range_display(self, start_packet_no, end_packet_no):
+        if start_packet_no is None and end_packet_no is None:
+            return "all HTTP History"
+        return "Packet No %s to %s" % (start_packet_no if start_packet_no is not None else "first",
+                                        end_packet_no if end_packet_no is not None else "last")
 
     def _on_clear(self, event):
         self.table_model.set_hits([])
@@ -212,6 +284,20 @@ class WordSearchPanel(JPanel):
             self._update_decode_preview(None)
             return
         self._update_decode_preview(self.table_model.hit_at(self.table.convertRowIndexToModel(view_row)))
+
+    def _copy_selected_cell(self, event):
+        row = self.table.getSelectedRow()
+        col = self.table.getSelectedColumn()
+        if row < 0 or col < 0:
+            return
+        value = self.table.getValueAt(row, col)
+        if value is None:
+            return
+        try:
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(str(value)), None)
+            self.status_label.setText("Copied selected cell.")
+        except Exception as e:
+            self.status_label.setText("Copy failed: %s" % e)
 
     def _update_decode_preview(self, hit):
         if hit is None:

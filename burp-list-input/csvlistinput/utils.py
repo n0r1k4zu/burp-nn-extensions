@@ -14,6 +14,17 @@ import re
 
 from csvlistinput.constants import EscapeMode, InsertionPointType
 
+# In the Burp runtime (Jython 2), ``str`` is the raw byte-string type and
+# ``unicode`` is text typed into Swing controls / decoded from CSV files.
+# Keeping the distinction explicit prevents Python 2 from attempting an
+# implicit ASCII decode when a byte buffer is compared with a Unicode rule.
+try:
+    _BYTESTRING_TYPE = str
+    _UNICODE_TYPE = unicode
+except NameError:  # Allows the pure-Python regression tests to run on Python 3.
+    _BYTESTRING_TYPE = bytes
+    _UNICODE_TYPE = str
+
 CONTENT_LENGTH_RE = re.compile(r'(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$')
 
 NAMED_XML_ENTITIES = {
@@ -197,7 +208,16 @@ def to_bytestring_space(text, encoding='utf-8'):
     """
     if text is None:
         return text
-    return text.encode(encoding).decode('latin-1')
+    # A buffer-derived value is already in byte-string space.  Re-encoding
+    # it would either alter its bytes or make Jython implicitly decode it as
+    # ASCII, which fails for UTF-8 bytes such as 0xe3.
+    if isinstance(text, _BYTESTRING_TYPE):
+        return text
+    # Rule/CSV/Swing text is Unicode.  Encode it directly to a *byte* str;
+    # do not decode it back to Unicode with Latin-1.  The latter creates a
+    # mixed str/unicode comparison in Match & Replace and triggers an
+    # implicit ASCII decode of the packet buffer.
+    return _UNICODE_TYPE(text).encode(encoding)
 
 
 def from_bytestring_space(bytestring_text, encoding='utf-8'):

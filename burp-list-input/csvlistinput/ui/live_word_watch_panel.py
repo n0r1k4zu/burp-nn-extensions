@@ -7,11 +7,12 @@ Req/Resp / Before / Match / After), same row-preview and inline-decode
 UI as the History Search tab."""
 
 import jarray
-from java.awt import BorderLayout, FlowLayout, GridLayout
-from java.awt.event import ActionListener
-from javax.swing import (BoxLayout, JButton, JCheckBox, JComboBox, JLabel, JPanel, JScrollPane, JSpinner,
-                          JSplitPane, JTable, JTextField, ListSelectionModel, SpinnerNumberModel,
-                          SwingUtilities)
+from java.awt import BorderLayout, FlowLayout, GridLayout, Toolkit
+from java.awt.datatransfer import StringSelection
+from java.awt.event import ActionListener, MouseAdapter
+from javax.swing import (BoxLayout, JButton, JCheckBox, JComboBox, JLabel, JMenuItem, JPanel, JPopupMenu,
+                          JScrollPane, JSpinner, JSplitPane, JTable, JTextField, ListSelectionModel,
+                          SpinnerNumberModel, SwingUtilities)
 from javax.swing.event import ChangeListener, DocumentListener, ListSelectionListener
 from javax.swing.table import AbstractTableModel
 
@@ -29,9 +30,12 @@ _EMPTY_BYTES = jarray.zeros(0, 'b')
 # from there, since the two tabs are independent Swing components.
 _DECODE_LABELS = [label for label in decode_engine.TRANSFORM_LABELS if "Decode" in label or label == "ROT13"]
 _DEFAULT_DECODE_LABEL = "URL Decode"
+_NONE_DECODE_LABEL = "None"
 
 
 def _decode_preview(text, label):
+    if label == _NONE_DECODE_LABEL:
+        return text
     result = decode_engine.run_all(text, enabled_labels=[label])[0]
     return result.text if result.ok() else "(%s)" % result.error
 
@@ -120,6 +124,28 @@ class _SelectionListener(ListSelectionListener):
             return
         model_row = self.panel.table.convertRowIndexToModel(row)
         self.panel._on_selection(model_row)
+
+
+class _TablePopupListener(MouseAdapter):
+    """Select the clicked cell and provide a reliable per-value copy action."""
+    def __init__(self, panel):
+        self.panel = panel
+
+    def mousePressed(self, event):
+        self._show_if_popup(event)
+
+    def mouseReleased(self, event):
+        self._show_if_popup(event)
+
+    def _show_if_popup(self, event):
+        if not event.isPopupTrigger():
+            return
+        row = self.panel.table.rowAtPoint(event.getPoint())
+        col = self.panel.table.columnAtPoint(event.getPoint())
+        if row < 0 or col < 0:
+            return
+        self.panel.table.changeSelection(row, col, False, False)
+        self.panel.copy_popup.show(self.panel.table, event.getX(), event.getY())
 
 
 class _WordFieldListener(DocumentListener):
@@ -218,8 +244,12 @@ class LiveWordWatchPanel(JPanel):
         self.table_model = LiveWordWatchTableModel(store, callbacks, helpers)
         self.table = JTable(self.table_model)
         self.table.setAutoCreateRowSorter(True)
+        self.table.setCellSelectionEnabled(True)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.table.getSelectionModel().addListSelectionListener(_SelectionListener(self))
+        self.copy_popup = JPopupMenu()
+        self.copy_popup.add(JMenuItem("Copy selected cell", actionPerformed=self._copy_selected_cell))
+        self.table.addMouseListener(_TablePopupListener(self))
 
         table_panel = JPanel(BorderLayout())
         table_panel.add(JScrollPane(self.table), BorderLayout.CENTER)
@@ -227,7 +257,7 @@ class LiveWordWatchPanel(JPanel):
         below_list = JPanel(BorderLayout())
         decode_option = JPanel(FlowLayout(FlowLayout.LEFT))
         decode_option.add(JLabel("Decode:"))
-        self.decode_combo = JComboBox(_DECODE_LABELS)
+        self.decode_combo = JComboBox([_NONE_DECODE_LABEL] + _DECODE_LABELS)
         self.decode_combo.setSelectedItem(_DEFAULT_DECODE_LABEL)
         self.decode_combo.addActionListener(self._on_decode_option_changed)
         decode_option.add(self.decode_combo)
@@ -326,6 +356,20 @@ class LiveWordWatchPanel(JPanel):
             self._update_decode_preview(None)
             return
         self._update_decode_preview(self.table_model.hit_at(self.table.convertRowIndexToModel(view_row)))
+
+    def _copy_selected_cell(self, event):
+        row = self.table.getSelectedRow()
+        col = self.table.getSelectedColumn()
+        if row < 0 or col < 0:
+            return
+        value = self.table.getValueAt(row, col)
+        if value is None:
+            return
+        try:
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(str(value)), None)
+            self.status_label.setText("Copied selected cell.")
+        except Exception as e:
+            self.status_label.setText("Copy failed: %s" % e)
 
     def _update_decode_preview(self, hit):
         if hit is None:
