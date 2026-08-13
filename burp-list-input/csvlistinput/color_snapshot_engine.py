@@ -38,6 +38,20 @@ def take_snapshot(callbacks, helpers):
     return colors, total, colored_count
 
 
+def clear_all(callbacks):
+    """Clears setHighlight() on every item currently in the Proxy history
+    (regardless of what color, if any, it currently has). Returns
+    cleared_count."""
+    cleared = 0
+    for item in callbacks.getProxyHistory():
+        try:
+            item.setHighlight(None)
+            cleared += 1
+        except Exception:
+            continue
+    return cleared
+
+
 def restore_snapshot(callbacks, helpers, colors):
     """Sets setHighlight() back to the recorded value for every Proxy
     history item whose identity is present in `colors` (including

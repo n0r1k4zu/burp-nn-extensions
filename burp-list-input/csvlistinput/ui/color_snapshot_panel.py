@@ -72,6 +72,8 @@ class ColorSnapshotPanel(JPanel):
         top.add(self.restore_button)
         self.delete_button = JButton("Delete selected", actionPerformed=self._on_delete)
         top.add(self.delete_button)
+        self.clear_all_button = JButton("Clear all colors", actionPerformed=self._on_clear_all)
+        top.add(self.clear_all_button)
         self.add(top, BorderLayout.NORTH)
 
         self.table_model = ColorSnapshotTableModel(color_snapshot_store)
@@ -82,7 +84,8 @@ class ColorSnapshotPanel(JPanel):
 
         self.status_label = JLabel(
             "Take snapshot records every Proxy history packet's current highlight color "
-            "(including packets with no color); Restore selected overwrites them back to that state.")
+            "(including packets with no color); Restore selected overwrites them back to that state; "
+            "Clear all colors resets every packet to no color.")
         self.add(self.status_label, BorderLayout.SOUTH)
 
         color_snapshot_store.add_listener(self._on_new_entry)
@@ -156,3 +159,24 @@ class ColorSnapshotPanel(JPanel):
             return
         self.store.remove(entry)
         self.status_label.setText("Snapshot #%d deleted." % entry.seq_id)
+
+    def _on_clear_all(self, event):
+        ret = JOptionPane.showConfirmDialog(
+            self,
+            "Clear the highlight color of every packet currently in the Proxy history?\n\n"
+            "This sets every packet's color to none, regardless of its current color. This cannot "
+            "be undone -- take a snapshot first if you want to be able to get the current colors back.",
+            "Clear All Colors",
+            JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE)
+        if ret != JOptionPane.YES_OPTION:
+            return
+        try:
+            cleared = color_snapshot_engine.clear_all(self.callbacks)
+        except Exception as e:
+            self.status_label.setText("Clear failed: %s" % e)
+            if self.error_fn:
+                self.error_fn("Color Snapshots", "Failed to clear all colors: %s" % e)
+            return
+        self.status_label.setText("Cleared the color of %d packet(s)." % cleared)
+        if self.log_fn:
+            self.log_fn("Color Snapshots: cleared the color of %d packet(s)." % cleared)
