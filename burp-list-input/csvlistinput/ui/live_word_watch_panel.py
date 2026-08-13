@@ -166,6 +166,13 @@ class LiveWordWatchPanel(JPanel):
         self.settings = settings
         self.store = store
         self.error_fn = error_fn
+        # Coalesces bursts of hits (e.g. a common search word matching
+        # many times in one large response) into a single EDT refresh
+        # instead of one invokeLater() per hit -- a burst of thousands of
+        # individually-queued refreshes was enough to flood the EDT and
+        # freeze the whole Burp UI (not just this tab), since Swing's
+        # event queue is shared application-wide.
+        self._refresh_pending = False
 
         top = JPanel()
         top.setLayout(BoxLayout(top, BoxLayout.Y_AXIS))
@@ -282,7 +289,18 @@ class LiveWordWatchPanel(JPanel):
         self.store.clear()
 
     def _on_new_hit(self, hit):
-        SwingUtilities.invokeLater(self.table_model.refresh)
+        # Called from the IHttpListener network thread, potentially many
+        # times in a tight loop for one message -- only schedule an EDT
+        # refresh if one isn't already pending, so a burst collapses into
+        # a single repaint instead of flooding the EDT (see __init__).
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
+        SwingUtilities.invokeLater(self._do_refresh)
+
+    def _do_refresh(self):
+        self._refresh_pending = False
+        self.table_model.refresh()
 
     def _on_cleared(self):
         def do_clear():

@@ -18,6 +18,16 @@ from csvlistinput import word_search_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
 from csvlistinput.live_word_watch_store import LiveWordHit
 
+# A short/common search word against a large response (or just an
+# ordinary page/script under Proxy) can match hundreds of thousands of
+# times in a single message. Without a cap, one such message builds an
+# enormous hit list and hammers the store/EDT synchronously on Burp's own
+# network thread -- this is what actually froze the whole Burp UI (not
+# just this tab) before this cap existed. 200 is already far more than
+# anyone reads from one message; the rest of that message's occurrences
+# are simply not reported.
+_MAX_HITS_PER_MESSAGE = 200
+
 
 def _tool_label(tool_flag):
     for flag, label in TOOL_FLAG_LABELS:
@@ -54,6 +64,8 @@ class LiveWordWatchListener(IHttpListener):
                                                  self.settings.after_chars)
         if not hits:
             return
+        if len(hits) > _MAX_HITS_PER_MESSAGE:
+            hits = hits[:_MAX_HITS_PER_MESSAGE]
         request_bytes = messageInfo.getRequest()
         response_bytes = messageInfo.getResponse() if side == "Response" else None
         http_service = messageInfo.getHttpService()
