@@ -14,7 +14,7 @@ from burp import IMessageEditorController
 
 from csvlistinput import word_search_engine
 
-COLUMNS = ["List No", "Packet No", "Before", "Match", "After"]
+COLUMNS = ["List No", "Packet No", "Req/Resp", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
 _DEFAULT_CONTEXT_CHARS = 30
 
@@ -49,10 +49,12 @@ class WordSearchTableModel(AbstractTableModel):
         if col == 1:
             return h["packet_no"]
         if col == 2:
-            return h["before"]
+            return h["side"]
         if col == 3:
-            return h["match"]
+            return h["before"]
         if col == 4:
+            return h["match"]
+        if col == 5:
             return h["after"]
         return None
 
