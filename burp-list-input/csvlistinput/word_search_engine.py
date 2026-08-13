@@ -8,6 +8,65 @@ not how it's presented.
 """
 
 
+def parse_search_query(query):
+    """Parse a literal-word query into ``(terms, operator)``.
+
+    ``&`` requires every term and ``|`` accepts any term.  Only one operator
+    kind is allowed per query so there is no surprising implicit precedence.
+    Escape ``&``, ``|`` and ``\\`` with a backslash when they are literal
+    search characters (for example ``error\\|warning`` searches for the
+    literal text ``error|warning``).  The Japanese yen sign (``¥``), which
+    is commonly entered from a Japanese Mac keyboard, is accepted as the
+    same escape prefix.
+    """
+    terms = []
+    chars = []
+    operator = None
+    escaped = False
+    escape_prefix = None
+    for char in query or "":
+        if escaped:
+            if char in "&|\\¥":
+                chars.append(char)
+            else:
+                chars.append(escape_prefix)
+                chars.append(char)
+            escaped = False
+            escape_prefix = None
+            continue
+        if char in "\\¥":
+            escaped = True
+            escape_prefix = char
+        elif char in "&|":
+            term = "".join(chars).strip()
+            if not term:
+                raise ValueError("Each search term must be non-empty.")
+            if operator is not None and operator != char:
+                raise ValueError("Do not mix '&' and '|'; run separate searches instead.")
+            terms.append(term)
+            chars = []
+            operator = char
+        else:
+            chars.append(char)
+    if escaped:
+        chars.append(escape_prefix)
+    term = "".join(chars).strip()
+    if not term:
+        raise ValueError("Each search term must be non-empty.")
+    terms.append(term)
+
+    # Repeating a term cannot change AND/OR semantics, and avoiding duplicate
+    # terms prevents duplicate result rows for queries such as ``foo | foo``.
+    unique_terms = []
+    seen = set()
+    for term in terms:
+        lowered = term.lower()
+        if lowered not in seen:
+            seen.add(lowered)
+            unique_terms.append(term)
+    return unique_terms, operator
+
+
 def _find_all_spans(haystack_lower, needle_lower, max_spans=None):
     """Returns non-overlapping occurrence spans, optionally stopping after
     ``max_spans``.  Applying the limit while scanning is important for live
@@ -48,7 +107,61 @@ def hits_in_text(text, word, before_chars, after_chars, max_hits=None):
     Returns [(before, match, after), ...].  When ``max_hits`` is supplied,
     scanning stops as soon as that many matches have been found rather than
     constructing a full result list and truncating it afterwards."""
-    return _hits_in_text(text, (word or "").lower(), before_chars, after_chars, max_hits)
+    terms, operator = parse_search_query(word)
+    return hits_in_text_for_terms(text, terms, operator, before_chars, after_chars, max_hits)
+
+
+def hits_in_text_for_terms(text, terms, operator, before_chars, after_chars, max_hits=None):
+    """Return hits in one message for a parsed query.
+
+    For an AND query every term must be present in this text.  History Search
+    uses ``hits_in_packet_for_terms`` below instead, allowing its AND terms to
+    be split between a request and its response in the same Packet No.
+    """
+    text_lower = (text or "").lower()
+    term_hits = []
+    all_terms_found = True
+    for term_index, term in enumerate(terms):
+        # The live watcher supplies a cap.  Bound each term's span list as
+        # well, otherwise a common first term can still allocate millions of
+        # spans before the combined result list is truncated.
+        spans = _find_all_spans(text_lower, term.lower(), max_hits)
+        if not spans:
+            all_terms_found = False
+            continue
+        for start, end in spans:
+            term_hits.append((start, term_index,
+                              (text[max(0, start - before_chars):start], text[start:end],
+                               text[end:end + after_chars])))
+    if operator == '&' and not all_terms_found:
+        return []
+    term_hits.sort(key=lambda item: (item[0], item[1]))
+    hits = [item[2] for item in term_hits]
+    return hits[:max_hits] if max_hits is not None else hits
+
+
+def hits_in_packet_for_terms(request_text, response_text, terms, operator,
+                             before_chars, after_chars, max_hits=None):
+    """Return ``[(side, before, match, after), ...]`` for one transaction.
+
+    An AND expression qualifies when every term appears somewhere in the
+    request/response pair represented by the same Packet No.  Results include
+    all matching terms so the user can inspect why the packet qualified.
+    """
+    sides = (("Request", request_text or ""), ("Response", response_text or ""))
+    packet_lower = "\n".join(text.lower() for _side, text in sides)
+    present = [term.lower() in packet_lower for term in terms]
+    if operator == '&' and not all(present):
+        return []
+    if operator == '|' and not any(present):
+        return []
+
+    results = []
+    for side, text in sides:
+        for before, match, after in hits_in_text_for_terms(
+                text, terms, '|', before_chars, after_chars, max_hits):
+            results.append((side, before, match, after))
+    return results[:max_hits] if max_hits is not None else results
 
 
 def search(callbacks, helpers, word, before_chars, after_chars,
@@ -62,10 +175,8 @@ def search(callbacks, helpers, word, before_chars, after_chars,
     even if Proxy history changes afterwards.  ``start_packet_no`` and
     ``end_packet_no`` are inclusive 1-based Proxy History positions; an
     omitted boundary leaves that end of the history unbounded."""
-    word_lower = (word or "").lower()
     results = []
-    if not word_lower:
-        return results
+    terms, operator = parse_search_query(word)
     packet_no = 0
     for item in callbacks.getProxyHistory():
         packet_no += 1
@@ -78,11 +189,11 @@ def search(callbacks, helpers, word, before_chars, after_chars,
         http_service = item.getHttpService()
         request_text = helpers.bytesToString(request_bytes) if request_bytes is not None else ""
         response_text = helpers.bytesToString(response_bytes) if response_bytes is not None else ""
-        for side, text in (("Request", request_text), ("Response", response_text)):
-            for before, match, after in _hits_in_text(text, word_lower, before_chars, after_chars):
-                results.append({
-                    "packet_no": packet_no, "side": side, "before": before, "match": match, "after": after,
-                    "request_bytes": request_bytes, "response_bytes": response_bytes,
-                    "http_service": http_service,
-                })
+        for side, before, match, after in hits_in_packet_for_terms(
+                request_text, response_text, terms, operator, before_chars, after_chars):
+            results.append({
+                "packet_no": packet_no, "side": side, "before": before, "match": match, "after": after,
+                "request_bytes": request_bytes, "response_bytes": response_bytes,
+                "http_service": http_service,
+            })
     return results

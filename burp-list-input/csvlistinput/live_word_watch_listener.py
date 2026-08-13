@@ -53,12 +53,24 @@ class LiveWordWatchListener(IHttpListener):
         self.settings = settings
         self.store = store
         self.error_fn = error_fn
+        self._last_query_error = None
 
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
         try:
             if not self.settings.enabled or not self.settings.word:
                 return
             if toolFlag not in self.settings.enabled_tool_flags:
+                return
+            try:
+                terms, operator = word_search_engine.parse_search_query(self.settings.word)
+                self._last_query_error = None
+            except ValueError as e:
+                # Do not flood the Errors tab once per message while the
+                # user is still editing an invalid expression.
+                message = str(e)
+                if self.error_fn and message != self._last_query_error:
+                    self.error_fn("Live Word Watch query", message)
+                self._last_query_error = message
                 return
             side = "Request" if messageIsRequest else "Response"
             raw_bytes = messageInfo.getRequest() if messageIsRequest else messageInfo.getResponse()
@@ -69,7 +81,13 @@ class LiveWordWatchListener(IHttpListener):
                 return
             if self.settings.scope_only and not self._in_scope(messageInfo):
                 return
-            self._scan(toolFlag, messageInfo, side, raw_bytes)
+            if operator == '&':
+                # Search the complete request/response pair so AND terms can
+                # be split across both sides of the same Packet No.
+                if not messageIsRequest:
+                    self._scan_packet(toolFlag, messageInfo, terms, operator)
+            else:
+                self._scan(toolFlag, messageInfo, side, raw_bytes, terms, operator)
         except Exception as e:
             if self.error_fn:
                 self.error_fn("LiveWordWatchListener.processHttpMessage (tool=%s)" % _tool_label(toolFlag), str(e))
@@ -86,18 +104,33 @@ class LiveWordWatchListener(IHttpListener):
         except Exception:
             return True  # fail open -- don't silently drop traffic over a parse error
 
-    def _scan(self, toolFlag, messageInfo, side, raw_bytes):
+    def _scan(self, toolFlag, messageInfo, side, raw_bytes, terms, operator):
         text = self.helpers.bytesToString(raw_bytes)
         # The cap must be passed into the search itself.  Truncating a fully
         # built result list afterwards still lets a common one-character word
         # allocate millions of hit tuples on Burp's HTTP thread.
-        hits = word_search_engine.hits_in_text(text, self.settings.word, self.settings.before_chars,
-                                                 self.settings.after_chars, _MAX_HITS_PER_MESSAGE)
+        hits = word_search_engine.hits_in_text_for_terms(
+            text, terms, operator, self.settings.before_chars, self.settings.after_chars, _MAX_HITS_PER_MESSAGE)
         if not hits:
             return
         request_bytes = messageInfo.getRequest()
         response_bytes = messageInfo.getResponse() if side == "Response" else None
-        http_service = messageInfo.getHttpService()
+        self._append_hits(toolFlag, side, hits, request_bytes, response_bytes, messageInfo.getHttpService())
+
+    def _scan_packet(self, toolFlag, messageInfo, terms, operator):
+        request_bytes = messageInfo.getRequest()
+        response_bytes = messageInfo.getResponse()
+        if (request_bytes is None or response_bytes is None
+                or len(request_bytes) > _MAX_SCAN_BYTES or len(response_bytes) > _MAX_SCAN_BYTES):
+            return
+        hits = word_search_engine.hits_in_packet_for_terms(
+            self.helpers.bytesToString(request_bytes), self.helpers.bytesToString(response_bytes),
+            terms, operator, self.settings.before_chars, self.settings.after_chars, _MAX_HITS_PER_MESSAGE)
+        for side, before, match, after in hits:
+            self._append_hits(toolFlag, side, [(before, match, after)], request_bytes,
+                              response_bytes, messageInfo.getHttpService())
+
+    def _append_hits(self, toolFlag, side, hits, request_bytes, response_bytes, http_service):
         tool_label = _tool_label(toolFlag)
         for before, match, after in hits:
             hit = LiveWordHit()

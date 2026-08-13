@@ -42,6 +42,38 @@ class WordSearchEngineTest(unittest.TestCase):
         self.assertEqual(1, len(hits))
         self.assertEqual(2, hits[0]["packet_no"])
 
+    def test_and_query_matches_terms_across_one_packet_request_and_response(self):
+        hits = word_search_engine.hits_in_packet_for_terms(
+            "request has hoge", "response has piyo", ["hoge", "piyo"], "&", 0, 0)
+
+        self.assertEqual([("Request", "", "hoge", ""), ("Response", "", "piyo", "")], hits)
+
+    def test_or_query_returns_each_matching_term(self):
+        hits = word_search_engine.hits_in_text("hoge ufu", "hoge | piyo | ufu", 0, 0)
+
+        self.assertEqual([("", "hoge", ""), ("", "ufu", "")], hits)
+
+    def test_query_operators_can_be_escaped(self):
+        terms, operator = word_search_engine.parse_search_query(r"hoge\&piyo | ufu\|bar | slash\\value")
+
+        self.assertEqual(["hoge&piyo", "ufu|bar", "slash\\value"], terms)
+        self.assertEqual("|", operator)
+
+    def test_japanese_mac_yen_sign_can_escape_operators(self):
+        terms, operator = word_search_engine.parse_search_query(u"hoge¥&piyo | ufu¥|bar | slash¥¥value")
+
+        self.assertEqual(["hoge&piyo", "ufu|bar", u"slash¥value"], terms)
+        self.assertEqual("|", operator)
+
+    def test_mixed_query_operators_are_rejected(self):
+        with self.assertRaises(ValueError):
+            word_search_engine.parse_search_query("hoge & piyo | ufu")
+
+    def test_limited_multi_word_search_does_not_build_every_common_word_hit(self):
+        hits = word_search_engine.hits_in_text("a" * 100000, "a | aa", 0, 0, max_hits=200)
+
+        self.assertEqual(200, len(hits))
+
     def test_max_hits_stops_at_the_requested_limit(self):
         # A very large real response containing a common word used to build
         # every match before Live Word Watch sliced the list down to 200.
