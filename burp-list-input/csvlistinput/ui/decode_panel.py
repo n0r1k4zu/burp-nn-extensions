@@ -152,7 +152,9 @@ class DecodePanel(JPanel):
         self._current_results = []
         self._source_matches = []
         self._source_match_index = -1
-        self.enabled_transforms = set(decode_engine.TRANSFORM_LABELS)  # default: try everything
+        # Start focused on the common case.  The All button still enables
+        # every transform when a broader inspection is wanted.
+        self.enabled_transforms = set(["URL Decode"])
 
         self.add(self._build_transform_toggle_row(), BorderLayout.NORTH)
 
@@ -185,7 +187,7 @@ class DecodePanel(JPanel):
     def _build_transform_toggle_row(self):
         outer = JPanel(BorderLayout())
         header = JPanel(FlowLayout(FlowLayout.LEFT))
-        header.add(JLabel("Transforms to show (default: all -- untick to hand-pick which ones run):"))
+        header.add(JLabel("Transforms to show (default: URL Decode only -- tick others as needed):"))
         header.add(JButton("All", actionPerformed=self._on_select_all_transforms))
         header.add(JButton("None", actionPerformed=self._on_select_none_transforms))
         outer.add(header, BorderLayout.NORTH)
@@ -193,7 +195,7 @@ class DecodePanel(JPanel):
         checks_row = JPanel(FlowLayout(FlowLayout.LEFT))
         self.transform_checkboxes = {}
         for label in decode_engine.TRANSFORM_LABELS:
-            cb = JCheckBox(label, True)
+            cb = JCheckBox(label, label == "URL Decode")
             cb.addActionListener(_TransformToggleListener(self, label, cb))
             checks_row.add(cb)
             self.transform_checkboxes[label] = cb

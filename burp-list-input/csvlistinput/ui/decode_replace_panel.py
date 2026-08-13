@@ -232,8 +232,7 @@ class DecodeReplacePanel(JPanel):
         self.original_value_detail.setText(original)
         self.original_value_detail.setCaretPosition(0)
         try:
-            decode_fn = codec_engine.CODEC_PAIRS[rule.codec][0]
-            decoded = decode_fn(original)
+            decoded = codec_engine.decode_value(rule.codec, original)
             self.decoded_value_detail.setText(decoded)
         except Exception as e:
             self.decoded_value_detail.setText(u"(decode failed with Codec=%s: %s)" % (rule.codec, e))

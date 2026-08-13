@@ -32,6 +32,24 @@ except NameError:
 _HEX_DIGITS = '0123456789abcdefABCDEF'
 
 
+def _as_binary(s):
+    """Adapt byte-string-space values for CPython test execution.
+
+    Jython's ``str`` already is the byte type used throughout this module.
+    CPython 3 distinguishes ``str`` and ``bytes``, so use Latin-1 as the
+    identity mapping only at the base64 library boundary.
+    """
+    if isinstance(s, bytes):
+        return s
+    return s.encode('latin-1')
+
+
+def _from_binary(raw):
+    if isinstance(raw, bytes):
+        return raw.decode('latin-1')
+    return raw
+
+
 def _codepoint_to_bytestring(codepoint):
     """ASCII passes through as a single byte; anything above gets folded
     to its UTF-8 byte sequence (each resulting byte becomes one
@@ -91,11 +109,11 @@ def base64_decode(s):
     # SKIPPED_DECODE_ERROR instead of splicing nonsense into the request.
     if not _BASE64_CHARS_RE.match(normalized):
         raise ValueError("not valid Base64 (contains non-Base64 characters)")
-    return base64.b64decode(normalized)
+    return _from_binary(base64.b64decode(_as_binary(normalized)))
 
 
 def base64_encode(s):
-    return base64.b64encode(s)
+    return _from_binary(base64.b64encode(_as_binary(s)))
 
 
 def hex_decode(s):
@@ -203,7 +221,44 @@ CODEC_PAIRS = {
     "ROT13": (rot13, rot13),
 }
 
-# Exposed so the UI can build the Codec combo box without duplicating
-# this list; order matters for display, hence a separate list rather
-# than relying on dict key order.
-CODEC_NAMES = ["None", "URL", "Base64", "Hex", "HTML Entity", "Unicode \\uXXXX", "ROT13"]
+# A two-layer entry is written "outer → inner": decoding runs from left
+# to right, while encoding runs in reverse.  Thus "URL → Base64" handles
+# a value that was Base64-encoded first and URL-encoded afterwards.
+_SINGLE_CODEC_NAMES = ["None", "URL", "Base64", "Hex", "HTML Entity", "Unicode \\uXXXX", "ROT13"]
+_NESTABLE_CODEC_NAMES = [name for name in _SINGLE_CODEC_NAMES if name != "None"]
+_NESTED_SEPARATOR = u" → "
+
+# Exposed so the UI can build the Codec combo box without duplicating this
+# list.  Include all ordered two-layer combinations, including repeated
+# encodings such as URL → URL.
+CODEC_NAMES = list(_SINGLE_CODEC_NAMES)
+CODEC_NAMES.extend([outer + _NESTED_SEPARATOR + inner
+                    for outer in _NESTABLE_CODEC_NAMES for inner in _NESTABLE_CODEC_NAMES])
+
+
+def codec_steps(codec_name):
+    """Return the decode steps for a configured Codec display name.
+
+    A KeyError deliberately signals a stale/invalid saved rule to the caller
+    as a decode failure rather than silently applying a different transform.
+    """
+    if codec_name in CODEC_PAIRS:
+        return [codec_name]
+    parts = codec_name.split(_NESTED_SEPARATOR)
+    if len(parts) != 2 or any(part not in _NESTABLE_CODEC_NAMES for part in parts):
+        raise KeyError(codec_name)
+    return parts
+
+
+def decode_value(codec_name, value):
+    """Decode one or two layers, from the outermost layer inward."""
+    for step in codec_steps(codec_name):
+        value = CODEC_PAIRS[step][0](value)
+    return value
+
+
+def encode_value(codec_name, value):
+    """Re-encode one or two layers, from the innermost layer outward."""
+    for step in reversed(codec_steps(codec_name)):
+        value = CODEC_PAIRS[step][1](value)
+    return value

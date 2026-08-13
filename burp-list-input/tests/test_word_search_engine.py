@@ -9,6 +9,8 @@ THIS_DIR = os.path.dirname(__file__)
 sys.path.insert(0, os.path.dirname(THIS_DIR))
 
 from csvlistinput import word_search_engine
+from csvlistinput import codec_engine, decode_replace_engine
+from csvlistinput.decode_replace_settings import DecodeReplaceRule
 from csvlistinput.replace_engine import _apply_rules_to_text
 from csvlistinput.replace_rule_store import ReplaceRule
 
@@ -100,6 +102,18 @@ class WordSearchEngineTest(unittest.TestCase):
 
         self.assertEqual(1, count)
         self.assertEqual(u"before 置換 after".encode("utf-8"), replaced)
+
+    def test_nested_codec_decodes_outer_first_and_reencodes_in_reverse(self):
+        raw = codec_engine.url_encode(codec_engine.base64_encode("before value"))
+        rule = DecodeReplaceRule()
+        rule.codec = u"URL → Base64"
+        rule.find = u"value"
+        rule.replace_with = u"changed"
+
+        replaced, count = decode_replace_engine.apply_rule(raw, rule)
+
+        self.assertEqual(1, count)
+        self.assertEqual("before changed", codec_engine.base64_decode(codec_engine.url_decode(replaced)))
 
 
 if __name__ == "__main__":
