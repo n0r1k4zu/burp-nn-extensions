@@ -1062,6 +1062,14 @@
                 および/またはTarget &amp; Replace with Decode &amp; Encodeがヒットした、のいずれかです。
                 Note欄にどの機能が何件ヒットしたかの内訳が表示されます。
               </td></tr>
+            <tr><td><span class="k">Packet No</span></td>
+              <td>
+                その送信がBurpの<strong>Proxy History上で何番目か</strong>（1始まり）。History Searchタブの
+                同名の列と同じ考え方で、Proxy Historyから見つからない場合は <code>-</code> と表示されます
+                （Repeater等、Proxyツールを経由しない送信では見つからないのが通常です）。行が初めて画面に
+                表示されたタイミングで検索し、その結果をキャッシュします（送信の都度Proxy History全体を
+                走査すると送信自体が遅くなるため、あえて表示時まで遅延させています）。
+              </td></tr>
             <tr><td><span class="k">Row#</span></td><td>使われたCSV行の「No」列の値（内部の通し番号ではありません）。</td></tr>
             <tr><td><span class="k">Resp</span></td><td>レスポンスのHTTPステータスコード。届く前は空欄です。</td></tr>
             <tr><td>Request / Response欄</td><td>実際に送信されたバイト列と、返ってきたレスポンスをそれぞれ確認できます。</td></tr>

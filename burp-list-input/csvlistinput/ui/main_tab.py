@@ -33,7 +33,7 @@ class MainTab(ITab):
         self.log_store = log_store
         self.error_store = error_store
 
-        self.log_panel = LogPanel(callbacks, log_store)
+        self.log_panel = LogPanel(callbacks, helpers, log_store)
         self.insertion_point_panel = InsertionPointPanel(armed_target, csv_store)
         self.target_info_panel = TargetInfoPanel(armed_target, helpers, on_change=self.refresh,
                                                    log_fn=self.log, error_fn=self.log_error)

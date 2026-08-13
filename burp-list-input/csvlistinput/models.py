@@ -119,6 +119,12 @@ class LogEntry(object):
         # transaction (nothing to compare against).
         self.request_bytes_before = None
         self.response_bytes_before = None
+        # Lazily resolved, cached 1-based position of this transaction
+        # within Burp's Proxy History (see log_panel.py's "Packet No"
+        # column) -- None means "not looked up yet", -1 means "looked up,
+        # not found there" (e.g. a Repeater-only send never went through
+        # the Proxy listener).
+        self.packet_no = None
 
     def status_summary(self):
         if not self.per_point_results:

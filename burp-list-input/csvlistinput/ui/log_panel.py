@@ -15,15 +15,47 @@ from javax.swing.table import AbstractTableModel
 
 from burp import IMessageEditorController
 
-COLUMNS = ["#", "Time", "Tool", "Status", "Row#", "Resp", "Host/Path", "Note"]
+COLUMNS = ["#", "Packet No", "Time", "Tool", "Status", "Row#", "Resp", "Host/Path", "Note"]
 
 _EMPTY_BYTES = jarray.zeros(0, 'b')
 
 
+def _find_packet_no(callbacks, helpers, http_service, request_bytes):
+    """Best-effort 1-based position of (http_service, request_bytes) within
+    Burp's Proxy History, so a Log row can be cross-referenced with the
+    same "Packet No" concept used by the History Search tab. Returns -1
+    if it isn't there at all -- most commonly because the send only ever
+    went through Repeater, which doesn't add entries to Proxy History."""
+    if http_service is None or request_bytes is None:
+        return -1
+    try:
+        target_text = helpers.bytesToString(request_bytes)
+        target_host = http_service.getHost()
+        target_port = http_service.getPort()
+        target_proto = http_service.getProtocol()
+    except Exception:
+        return -1
+    no = 0
+    for item in callbacks.getProxyHistory():
+        no += 1
+        try:
+            svc = item.getHttpService()
+            if svc.getHost() != target_host or svc.getPort() != target_port or svc.getProtocol() != target_proto:
+                continue
+            if helpers.bytesToString(item.getRequest()) != target_text:
+                continue
+        except Exception:
+            continue
+        return no
+    return -1
+
+
 class LogTableModel(AbstractTableModel):
-    def __init__(self, log_store):
+    def __init__(self, log_store, callbacks, helpers):
         AbstractTableModel.__init__(self)
         self.log_store = log_store
+        self.callbacks = callbacks
+        self.helpers = helpers
         self._cache = []
 
     def refresh(self):
@@ -71,20 +103,31 @@ class LogTableModel(AbstractTableModel):
         if col == 0:
             return e.seq_id
         if col == 1:
-            return time.strftime("%H:%M:%S", time.localtime(e.timestamp)) if e.timestamp else ""
+            return self._packet_no_display(e)
         if col == 2:
-            return e.tool_label
+            return time.strftime("%H:%M:%S", time.localtime(e.timestamp)) if e.timestamp else ""
         if col == 3:
-            return e.status_summary()
+            return e.tool_label
         if col == 4:
-            return e.csv_row_no if e.csv_row_no is not None else ""
+            return e.status_summary()
         if col == 5:
-            return e.response_status if e.response_status is not None else ""
+            return e.csv_row_no if e.csv_row_no is not None else ""
         if col == 6:
-            return e.connection_display or ""
+            return e.response_status if e.response_status is not None else ""
         if col == 7:
+            return e.connection_display or ""
+        if col == 8:
             return e.note or ""
         return None
+
+    def _packet_no_display(self, e):
+        # Resolved lazily (and cached on the entry) rather than at send
+        # time, so this never adds a Proxy-History scan to the hot
+        # IHttpListener path in http_listener.py -- only actually looking
+        # at the Log tab pays for it.
+        if e.packet_no is None:
+            e.packet_no = _find_packet_no(self.callbacks, self.helpers, e.http_service, e.request_bytes_after)
+        return e.packet_no if e.packet_no != -1 else "-"
 
 
 class _EditorController(IMessageEditorController):
@@ -117,7 +160,7 @@ class _SelectionListener(ListSelectionListener):
 
 
 class LogPanel(JPanel):
-    def __init__(self, callbacks, log_store):
+    def __init__(self, callbacks, helpers, log_store):
         JPanel.__init__(self, BorderLayout())
         self.callbacks = callbacks
         self.log_store = log_store
@@ -125,7 +168,7 @@ class LogPanel(JPanel):
         self.request_editor = callbacks.createMessageEditor(self.controller, False)
         self.response_editor = callbacks.createMessageEditor(self.controller, False)
 
-        self.table_model = LogTableModel(log_store)
+        self.table_model = LogTableModel(log_store, callbacks, helpers)
         self.table = JTable(self.table_model)
         self.table.setAutoCreateRowSorter(True)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
