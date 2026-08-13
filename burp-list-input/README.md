@@ -16,6 +16,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **Decode** — 右クリックで選択した文字列（またはタブ内に直接貼り付けた文字列）を、URL/Base64/Hex/HTMLエンティティ/Unicodeエスケープ/ROT13/JWTなど複数の形式で同時にデコード・エンコードして一覧表示します。Burp標準のDecoderのような細長い1件ずつのチェーン操作ではなく、画面幅いっぱいに自動改行しながら全結果を並べて見られます。タブ上部のチェックボックスでどの変換を表示するか手動で絞り込めます（初期状態は全部ON＝お任せ）。左側（元データ）・右側（デコード結果）それぞれに検索欄があり、左側は一致箇所のハイライト＋前後移動、右側は各変換結果内のハイライトに加えて一致しない変換を自動的に非表示にします。左右どちらのテキストを選択して右クリックしても、Match & ReplaceのRequest/Before・Response/Beforeへ追加できます。
 - **Target & Replace with Decode & Encode** — Target & List Mappingとは別に右クリックでarmした対象について、特定のInsertion Pointの値を書き換える機能です。値がURL/Base64/Hex/HTMLエンティティ/Unicodeエスケープ/ROT13でエンコードされていても、①デコード → ②指定した文字列（プレーン or 正規表現）で置換 → ③同じ方式で再エンコード、という流れを送信のたびに自動で行ってから送信します。エンコードされたパラメータの中身だけを書き換えたい場合に使います。Insertion Point一覧で行を選択すると、画面下部にOriginal Value（元の値）と、選択中のCodecでデコードした後の値がその場でプレビュー表示されます。実行結果は他の機能と同じくLogタブに記録されます。
 - **Errors タブ** — Scanner含むいずれかのBurpツールでの送受信処理中に拡張内部でエラーが起きた場合や、arm・再検出に失敗した場合に、その内容（メッセージ・スタックトレース）を一覧表示します。エラーが1件でもあるとタブ名が赤字で「Errors (件数)」に変わるため、Burp上での動作がおかしいときにすぐ気付けます。
+- **Color Snapshots** — Proxy historyの全パケットの色（`setHighlight`。無色も含む）をコメント付きでスナップショットとして丸ごとバックアップし、履歴から選んでリストアできます。CSV/Match & Replace機能とは独立しており、手動で付けた色分けも対象です。
 
 ## 必要環境
 
@@ -62,6 +63,15 @@ Repeater・Proxy・Logタブなどのリクエスト/レスポンス表示欄で
 
 拡張内部でエラーが起きた場合（Scannerなどのトラフィック処理中の例外、arm・再検出の失敗など）は **Errors** タブに自動で記録されます。1件でもあるとタブ名が赤字で「Errors (件数)」に変わるので、Burp上での動作がおかしいときはまずこのタブを確認してください。行を選択するとエラーメッセージとスタックトレースの詳細が下部に表示されます。
 
+Proxy historyの色分け状態をまるごと退避しておきたい場合:
+
+1. **Color Snapshots** タブでコメント（任意）を入力し、**Take snapshot** を押す。その時点でProxy historyにある全パケットの色（無色も含む）が1件のスナップショットとして記録される
+2. 何度でも取得でき、一覧表に（No / 日時 / コメント / 色あり件数）として積み上がる
+3. 一覧からスナップショットを選択し、**Restore selected** を押す（確認ダイアログが出ます）と、そのスナップショット取得時点に存在したパケットの色が当時の状態に一括で戻る（取得後に増えた通信には触れない）
+4. 不要なスナップショットは選択して **Delete selected** で履歴から削除できる
+
+> ⚠️ リストアは元に戻せません。現在の色分けを失いたくない場合は、リストア前に現在の状態もスナップショットしておいてください。スナップショットはメモリ上のみの保持で、拡張のリロード/アンロードで消えます。
+
 詳細な手順・画面の見方・動作原理・トラブルシューティングは [docs/manual.html](docs/manual.html) にまとまっています。
 
 ## ディレクトリ構成
@@ -89,8 +99,10 @@ csvlistinput/               # 拡張の実装本体 -- csv_list_input.py と同�
   codec_engine.py                     # Target & Replace with Decode & Encode用のバイト列ネイティブなencode/decode対
   decode_replace_engine.py             # Target & Replace with Decode & Encode: デコード→置換→再エンコードの適用ロジック
   decode_replace_settings.py            # Target & Replace with Decode & Encode: 有効/無効・対象ツール・Insertion Point毎のルール保持
+  color_snapshot_store.py                # Color Snapshots: スナップショット履歴の保持
+  color_snapshot_engine.py                # Color Snapshots: Proxy historyの色の読み取り/書き戻し
   utils.py                       # バイト列/文字列境界の処理・エスケープ
-  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Decode / Errors タブ）
+  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Color Snapshots / Decode / Errors タブ）
 docs/manual.html              # 利用マニュアル（HTML）
 testdata/                      # 動作確認用のサンプルリクエスト・CSV
 ```

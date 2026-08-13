@@ -11,6 +11,7 @@ from burp import ITab
 
 from csvlistinput.constants import SendStatus
 from csvlistinput.models import LogEntry
+from csvlistinput.ui.color_snapshot_panel import ColorSnapshotPanel
 from csvlistinput.ui.csv_panel import CsvPanel
 from csvlistinput.ui.decode_panel import DecodePanel
 from csvlistinput.ui.decode_replace_panel import DecodeReplacePanel
@@ -24,7 +25,7 @@ from csvlistinput.ui.target_info_panel import TargetInfoPanel
 class MainTab(ITab):
     def __init__(self, callbacks, helpers, armed_target, csv_store, log_store,
                  replace_settings, request_replace_store, response_replace_store,
-                 decode_replace_settings, decode_replace_target, error_store):
+                 decode_replace_settings, decode_replace_target, error_store, color_snapshot_store):
         self.callbacks = callbacks
         self.armed_target = armed_target
         self.csv_store = csv_store
@@ -41,6 +42,8 @@ class MainTab(ITab):
                                          on_replace_added=self.refresh, log_fn=self.log)
         self.decode_replace_panel = DecodeReplacePanel(decode_replace_target, decode_replace_settings, helpers,
                                                          log_fn=self.log, error_fn=self.log_error)
+        self.color_snapshot_panel = ColorSnapshotPanel(callbacks, helpers, color_snapshot_store,
+                                                          log_fn=self.log, error_fn=self.log_error)
         self.errors_panel = ErrorsPanel(error_store)
 
         mapping_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, self.insertion_point_panel, self.csv_panel)
@@ -56,6 +59,7 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Target & Replace with Decode & Encode", self.decode_replace_panel)
         self.tabbed_pane.addTab("Match & Replace", self.replace_panel)
         self.tabbed_pane.addTab("Log", self.log_panel)
+        self.tabbed_pane.addTab("Color Snapshots", self.color_snapshot_panel)
         self.tabbed_pane.addTab("Decode", self.decode_panel)
         self.errors_tab_index = self.tabbed_pane.getTabCount()
         self.tabbed_pane.addTab("Errors", self.errors_panel)

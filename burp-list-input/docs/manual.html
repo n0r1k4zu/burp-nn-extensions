@@ -420,6 +420,7 @@
         <a href="#decode-replace">Target &amp; Replace with Decode &amp; Encode</a>
         <a href="#match-replace">Match &amp; Replace（置換）</a>
         <a href="#decode">Decode（デコード）</a>
+        <a href="#color-snapshots">Color Snapshots（色のバックアップ/リストア）</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
       <li class="toc-group">
@@ -839,6 +840,64 @@
       </ol>
     </section>
 
+    <!-- ================= COLOR SNAPSHOTS ================= -->
+    <section class="doc-section" id="color-snapshots">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Color Snapshots（色のバックアップ / リストア）</h2>
+        <p class="section-dek">Proxy history上のパケットの色（setHighlight）を丸ごとバックアップし、あとから選んでリストアできるタブです。</p>
+      </div>
+
+      <p>
+        CSV Insertion PointやMatch &amp; Replaceとは完全に独立した機能です。手動で付けた色分けも含めて、
+        ある時点のProxy history全体の色の状態を「スナップショット」として何度でも保存でき、あとから
+        1件選んでその状態に戻すことができます。
+      </p>
+
+      <ol class="steps">
+        <li class="step">
+          <h4>スナップショットを取得する</h4>
+          <p>
+            <span class="k">Color Snapshots</span> タブで <span class="k">Comment</span> 欄に任意のメモを入力し
+            （空欄でも可）、<span class="k">Take snapshot</span> を押します。その時点でProxy historyに存在する
+            <strong>全パケットの色（無色も含む）</strong>が1件のスナップショットとして記録されます。
+          </p>
+          <p class="step-note">
+            何度でも取得できます。一覧表に <span class="k">#</span> / 日時 / コメント / 色ありパケット数の全件数
+            が積み上がっていきます。
+          </p>
+        </li>
+        <li class="step">
+          <h4>リストアする</h4>
+          <p>
+            一覧からスナップショットを1件選択し、<span class="k">Restore selected</span> を押します。確認
+            ダイアログの内容を確認して実行すると、<strong>そのスナップショット取得時点に存在したパケット</strong>
+            の色が、当時の状態（無色だったパケットは無色に戻る）へ一括で上書きされます。
+          </p>
+          <p class="step-note">
+            スナップショット取得後にProxy historyへ増えた通信には触れません。この操作は元に戻せないため、
+            現在の色分けを残しておきたい場合は、リストアの前に現在の状態もスナップショットしておいてください。
+          </p>
+        </li>
+        <li class="step">
+          <h4>不要なスナップショットを削除する</h4>
+          <p>
+            一覧から選択し、<span class="k">Delete selected</span> を押すと履歴から削除されます（Proxy history側の
+            色には影響しません。あくまでこの拡張が持っている記録を消すだけです）。
+          </p>
+        </li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="callout-label">メモリ上のみの保持</span>
+        <p>
+          スナップショットはこの拡張のセッション状態（CSVの読み込み内容・Match &amp; Replaceのルール等と同様）
+          として保持され、ファイルへの保存は行いません。Burpで拡張をリロード/アンロードすると、それまでの
+          スナップショット履歴は失われます。
+        </p>
+      </div>
+    </section>
+
     <!-- ================= UI REFERENCE ================= -->
     <section class="doc-section" id="ui-reference">
       <div class="section-head">
@@ -931,6 +990,23 @@
           通信は記録されません）。armed targetのCSV差し込みが同じ送信で発火した場合は、他の機能がヒットしたか
           どうかに関わらず、その送信は従来どおり記録され、ヒットした内容はNote欄に追記されます。
         </p>
+      </div>
+
+      <h3>Color Snapshots タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Comment</span> / <span class="k">Take snapshot</span></td>
+              <td>入力したコメント（任意）付きで、その時点のProxy history全パケットの色を1件のスナップショットとして記録します。</td></tr>
+            <tr><td>一覧の行</td>
+              <td><span class="k">#</span> / 日時 / コメント / <span class="k">Colored / Total</span>（色ありパケット数 / 全パケット数）が新しい順に並びます。</td></tr>
+            <tr><td><span class="k">Restore selected</span></td>
+              <td>選択した1件を取得時点の色の状態に戻します。取得後に増えた通信には触れません。確認ダイアログが出ます（元に戻せません）。</td></tr>
+            <tr><td><span class="k">Delete selected</span></td>
+              <td>選択した1件を履歴から削除します（Proxy history側の色そのものには影響しません）。</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <h3>Errors タブ</h3>

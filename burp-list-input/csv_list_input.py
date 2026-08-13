@@ -90,6 +90,7 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         _purge_module_cache()
 
         from csvlistinput.armed_target import ArmedTarget
+        from csvlistinput.color_snapshot_store import ColorSnapshotStore
         from csvlistinput.context_menu import ContextMenuFactory
         from csvlistinput.csv_payload_store import CsvPayloadStore
         from csvlistinput.decode_replace_settings import DecodeReplaceSettings
@@ -109,10 +110,12 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         self.response_replace_store = ReplaceRuleStore()
         self.decode_replace_settings = DecodeReplaceSettings()
         self.error_store = ErrorStore()
+        self.color_snapshot_store = ColorSnapshotStore()
 
         self.main_tab = MainTab(callbacks, self.helpers, self.armed_target, self.csv_store, self.log_store,
                                  self.replace_settings, self.request_replace_store, self.response_replace_store,
-                                 self.decode_replace_settings, self.decode_replace_target, self.error_store)
+                                 self.decode_replace_settings, self.decode_replace_target, self.error_store,
+                                 self.color_snapshot_store)
 
         self.http_listener = HttpListener(callbacks, self.helpers, self.armed_target,
                                            self.csv_store, self.log_store,
