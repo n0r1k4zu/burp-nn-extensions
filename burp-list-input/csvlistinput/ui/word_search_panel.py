@@ -5,18 +5,28 @@ independent of the CSV/Match & Replace/Color Snapshots features."""
 
 import jarray
 from java.awt import BorderLayout, FlowLayout
-from javax.swing import (JButton, JLabel, JPanel, JScrollPane, JSpinner, JSplitPane, JTable, JTextField,
+from javax.swing import (JButton, JComboBox, JLabel, JPanel, JScrollPane, JSpinner, JSplitPane, JTable, JTextField,
                           ListSelectionModel, SpinnerNumberModel, SwingUtilities)
 from javax.swing.event import ListSelectionListener
 from javax.swing.table import AbstractTableModel
 
 from burp import IMessageEditorController
 
-from csvlistinput import word_search_engine
+from csvlistinput import decode_engine, word_search_engine
 
 COLUMNS = ["List No", "Packet No", "Req/Resp", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
 _DEFAULT_CONTEXT_CHARS = 30
+
+# Representative decode-direction transforms only (decode_engine.py also has
+# Encode counterparts, not relevant to previewing already-captured traffic).
+_DECODE_LABELS = [label for label in decode_engine.TRANSFORM_LABELS if "Decode" in label or label == "ROT13"]
+_DEFAULT_DECODE_LABEL = "URL Decode"
+
+
+def _decode_preview(text, label):
+    result = decode_engine.run_all(text, enabled_labels=[label])[0]
+    return result.text if result.ok() else "(%s)" % result.error
 
 
 class WordSearchTableModel(AbstractTableModel):
@@ -89,13 +99,12 @@ class _SelectionListener(ListSelectionListener):
 
 
 class WordSearchPanel(JPanel):
-    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None, on_decode=None):
+    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None):
         JPanel.__init__(self, BorderLayout())
         self.callbacks = callbacks
         self.helpers = helpers
         self.log_fn = log_fn
         self.error_fn = error_fn
-        self.on_decode = on_decode
 
         top = JPanel(FlowLayout(FlowLayout.LEFT))
         top.add(JLabel("Search word:"))
@@ -121,9 +130,31 @@ class WordSearchPanel(JPanel):
 
         table_panel = JPanel(BorderLayout())
         table_panel.add(JScrollPane(self.table), BorderLayout.CENTER)
-        below_list = JPanel(FlowLayout(FlowLayout.LEFT))
-        self.send_to_decode_button = JButton("Send selected row to Decode", actionPerformed=self._on_send_to_decode)
-        below_list.add(self.send_to_decode_button)
+
+        below_list = JPanel(BorderLayout())
+        decode_option = JPanel(FlowLayout(FlowLayout.LEFT))
+        decode_option.add(JLabel("Decode:"))
+        self.decode_combo = JComboBox(_DECODE_LABELS)
+        self.decode_combo.setSelectedItem(_DEFAULT_DECODE_LABEL)
+        self.decode_combo.addActionListener(self._on_decode_option_changed)
+        decode_option.add(self.decode_combo)
+        below_list.add(decode_option, BorderLayout.WEST)
+
+        decoded_fields = JPanel(FlowLayout(FlowLayout.LEFT))
+        decoded_fields.add(JLabel("Before:"))
+        self.decoded_before_field = JTextField(18)
+        self.decoded_before_field.setEditable(False)
+        decoded_fields.add(self.decoded_before_field)
+        decoded_fields.add(JLabel("Match:"))
+        self.decoded_match_field = JTextField(18)
+        self.decoded_match_field.setEditable(False)
+        decoded_fields.add(self.decoded_match_field)
+        decoded_fields.add(JLabel("After:"))
+        self.decoded_after_field = JTextField(18)
+        self.decoded_after_field.setEditable(False)
+        decoded_fields.add(self.decoded_after_field)
+        below_list.add(decoded_fields, BorderLayout.CENTER)
+
         table_panel.add(below_list, BorderLayout.SOUTH)
 
         self.controller = _EditorController()
@@ -137,7 +168,9 @@ class WordSearchPanel(JPanel):
         split.setResizeWeight(0.5)
         self.add(split, BorderLayout.CENTER)
 
-        self.status_label = JLabel("Enter a search word and press Search. Select a result row to preview it below.")
+        self.status_label = JLabel(
+            "Enter a search word and press Search. Select a result row to preview it and its decoded "
+            "Before/Match/After below.")
         self.add(self.status_label, BorderLayout.SOUTH)
 
     def _on_search(self, event):
@@ -156,34 +189,40 @@ class WordSearchPanel(JPanel):
             return
         self.table_model.set_hits(hits)
         self._show_hit(None)
+        self._update_decode_preview(None)
         self.status_label.setText("%d hit(s) found for \"%s\"." % (len(hits), word))
         if self.log_fn:
             self.log_fn("History Search: %d hit(s) found for \"%s\" (before=%d, after=%d)" % (
                 len(hits), word, before_chars, after_chars))
 
     def _on_clear(self, event):
-        self.word_field.setText("")
-        self.before_spinner.setValue(_DEFAULT_CONTEXT_CHARS)
-        self.after_spinner.setValue(_DEFAULT_CONTEXT_CHARS)
         self.table_model.set_hits([])
         self._show_hit(None)
+        self._update_decode_preview(None)
         self.status_label.setText("Cleared.")
 
     def _on_selection(self, row):
-        self._show_hit(self.table_model.hit_at(row))
+        hit = self.table_model.hit_at(row)
+        self._show_hit(hit)
+        self._update_decode_preview(hit)
 
-    def _on_send_to_decode(self, event):
+    def _on_decode_option_changed(self, event):
         view_row = self.table.getSelectedRow()
         if view_row < 0:
-            self.status_label.setText("Select a result row first.")
+            self._update_decode_preview(None)
             return
-        hit = self.table_model.hit_at(self.table.convertRowIndexToModel(view_row))
+        self._update_decode_preview(self.table_model.hit_at(self.table.convertRowIndexToModel(view_row)))
+
+    def _update_decode_preview(self, hit):
         if hit is None:
+            self.decoded_before_field.setText("")
+            self.decoded_match_field.setText("")
+            self.decoded_after_field.setText("")
             return
-        text = hit["before"] + hit["match"] + hit["after"]
-        if self.on_decode:
-            self.on_decode(text)
-        self.status_label.setText("Sent the selected row's text to the Decode tab.")
+        label = str(self.decode_combo.getSelectedItem())
+        self.decoded_before_field.setText(_decode_preview(hit["before"], label))
+        self.decoded_match_field.setText(_decode_preview(hit["match"], label))
+        self.decoded_after_field.setText(_decode_preview(hit["after"], label))
 
     def _show_hit(self, hit):
         self.controller.current_hit = hit

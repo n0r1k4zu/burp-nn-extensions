@@ -45,8 +45,7 @@ class MainTab(ITab):
                                                          log_fn=self.log, error_fn=self.log_error)
         self.color_snapshot_panel = ColorSnapshotPanel(callbacks, helpers, color_snapshot_store,
                                                           log_fn=self.log, error_fn=self.log_error)
-        self.word_search_panel = WordSearchPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error,
-                                                   on_decode=self.show_decode)
+        self.word_search_panel = WordSearchPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.errors_panel = ErrorsPanel(error_store)
 
         mapping_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, self.insertion_point_panel, self.csv_panel)
