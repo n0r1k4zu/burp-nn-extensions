@@ -156,6 +156,9 @@ class WordSearchPanel(JPanel):
         self.end_packet_field = JTextField(6)
         self.end_packet_field.setToolTipText("End packet number (blank: last packet)")
         top.add(self.end_packet_field)
+        self.all_packets_button = JButton("All", actionPerformed=self._on_all_packets)
+        self.all_packets_button.setToolTipText("Search all HTTP History packets")
+        top.add(self.all_packets_button)
         self.search_button = JButton("Search", actionPerformed=self._on_search)
         top.add(self.search_button)
         self.clear_button = JButton("Clear", actionPerformed=self._on_clear)
@@ -275,6 +278,12 @@ class WordSearchPanel(JPanel):
         self._show_hit(None)
         self._update_decode_preview(None)
         self.status_label.setText("Cleared.")
+
+    def _on_all_packets(self, event):
+        """Explicitly restore the Packet No filter to all HTTP History."""
+        self.start_packet_field.setText("")
+        self.end_packet_field.setText("")
+        self.status_label.setText("Packet No range set to all HTTP History.")
 
     def _on_selection(self, row):
         hit = self.table_model.hit_at(row)

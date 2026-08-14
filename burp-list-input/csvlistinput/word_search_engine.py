@@ -7,6 +7,37 @@ separate from the History Search tab's Swing code
 not how it's presented.
 """
 
+from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space, to_bytestring_space
+
+try:
+    _JYTHON_UNICODE = unicode
+except NameError:  # CPython test runtime
+    _JYTHON_UNICODE = None
+
+
+def terms_for_byte_text(terms):
+    """Convert Swing/CSV Unicode terms into Burp's byte-string space.
+
+    Jython otherwise compares a Unicode search term to a raw HTTP ``str``
+    by implicitly ASCII-decoding the packet, which fails for UTF-8 bytes.
+    CPython tests intentionally keep native text strings unchanged.
+    """
+    if _JYTHON_UNICODE is None:
+        return terms
+    return [to_bytestring_space(term) for term in terms]
+
+
+def display_text(byte_text):
+    """Convert byte-string result slices for Swing only (Jython runtime)."""
+    return from_bytestring_space(byte_text) if _JYTHON_UNICODE is not None else byte_text
+
+
+def message_text(helpers, raw_bytes):
+    """Return Burp byte-string text, while retaining CPython test support."""
+    if _JYTHON_UNICODE is None:
+        return helpers.bytesToString(raw_bytes)
+    return bytes_to_bytestring(helpers, raw_bytes)
+
 
 def parse_search_query(query):
     """Parse a literal-word query into ``(terms, operator)``.
@@ -24,9 +55,13 @@ def parse_search_query(query):
     operator = None
     escaped = False
     escape_prefix = None
-    for char in query or "":
+    # All grammar tokens are Unicode.  In particular, a Japanese Mac's
+    # ``¥`` escape prefix is UTF-8 (c2 a5); comparing it against a Python
+    # 2/Jython byte literal would trigger an implicit ASCII decode before
+    # the search even starts.
+    for char in query or u"":
         if escaped:
-            if char in "&|\\¥":
+            if char in u"&|\\¥":
                 chars.append(char)
             else:
                 chars.append(escape_prefix)
@@ -34,11 +69,11 @@ def parse_search_query(query):
             escaped = False
             escape_prefix = None
             continue
-        if char in "\\¥":
+        if char in u"\\¥":
             escaped = True
             escape_prefix = char
-        elif char in "&|":
-            term = "".join(chars).strip()
+        elif char in u"&|":
+            term = u"".join(chars).strip()
             if not term:
                 raise ValueError("Each search term must be non-empty.")
             if operator is not None and operator != char:
@@ -50,7 +85,7 @@ def parse_search_query(query):
             chars.append(char)
     if escaped:
         chars.append(escape_prefix)
-    term = "".join(chars).strip()
+    term = u"".join(chars).strip()
     if not term:
         raise ValueError("Each search term must be non-empty.")
     terms.append(term)
@@ -108,6 +143,7 @@ def hits_in_text(text, word, before_chars, after_chars, max_hits=None):
     scanning stops as soon as that many matches have been found rather than
     constructing a full result list and truncating it afterwards."""
     terms, operator = parse_search_query(word)
+    terms = terms_for_byte_text(terms)
     return hits_in_text_for_terms(text, terms, operator, before_chars, after_chars, max_hits)
 
 
@@ -177,6 +213,7 @@ def search(callbacks, helpers, word, before_chars, after_chars,
     omitted boundary leaves that end of the history unbounded."""
     results = []
     terms, operator = parse_search_query(word)
+    terms = terms_for_byte_text(terms)
     packet_no = 0
     for item in callbacks.getProxyHistory():
         packet_no += 1
@@ -187,12 +224,13 @@ def search(callbacks, helpers, word, before_chars, after_chars,
         request_bytes = item.getRequest()
         response_bytes = item.getResponse()
         http_service = item.getHttpService()
-        request_text = helpers.bytesToString(request_bytes) if request_bytes is not None else ""
-        response_text = helpers.bytesToString(response_bytes) if response_bytes is not None else ""
+        request_text = message_text(helpers, request_bytes) if request_bytes is not None else ""
+        response_text = message_text(helpers, response_bytes) if response_bytes is not None else ""
         for side, before, match, after in hits_in_packet_for_terms(
                 request_text, response_text, terms, operator, before_chars, after_chars):
             results.append({
-                "packet_no": packet_no, "side": side, "before": before, "match": match, "after": after,
+                "packet_no": packet_no, "side": side, "before": display_text(before),
+                "match": display_text(match), "after": display_text(after),
                 "request_bytes": request_bytes, "response_bytes": response_bytes,
                 "http_service": http_service,
             })

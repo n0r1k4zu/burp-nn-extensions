@@ -20,7 +20,6 @@ from burp import IMessageEditorController
 
 from csvlistinput import decode_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
-from csvlistinput.proxy_history_lookup import find_packet_no
 
 COLUMNS = ["List No", "Packet No", "Req/Resp", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
@@ -92,9 +91,12 @@ class LiveWordWatchTableModel(AbstractTableModel):
         return None
 
     def _packet_no_display(self, h):
-        if h.packet_no is None:
-            h.packet_no = find_packet_no(self.callbacks, self.helpers, h.http_service, h.request_bytes)
-        return h.packet_no if h.packet_no != -1 else "-"
+        # Never reverse-lookup Proxy History from getValueAt().  JTable calls
+        # this on Swing's EDT while repainting a new live hit; a full history
+        # scan here can freeze all of Burp even for a single result.  Live
+        # traffic has no packet index in the legacy listener callback, so use
+        # '-' unless a future producer supplies one directly.
+        return h.packet_no if h.packet_no is not None and h.packet_no != -1 else "-"
 
 
 class _EditorController(IMessageEditorController):

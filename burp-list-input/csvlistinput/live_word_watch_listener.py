@@ -63,6 +63,7 @@ class LiveWordWatchListener(IHttpListener):
                 return
             try:
                 terms, operator = word_search_engine.parse_search_query(self.settings.word)
+                terms = word_search_engine.terms_for_byte_text(terms)
                 self._last_query_error = None
             except ValueError as e:
                 # Do not flood the Errors tab once per message while the
@@ -105,7 +106,7 @@ class LiveWordWatchListener(IHttpListener):
             return True  # fail open -- don't silently drop traffic over a parse error
 
     def _scan(self, toolFlag, messageInfo, side, raw_bytes, terms, operator):
-        text = self.helpers.bytesToString(raw_bytes)
+        text = word_search_engine.message_text(self.helpers, raw_bytes)
         # The cap must be passed into the search itself.  Truncating a fully
         # built result list afterwards still lets a common one-character word
         # allocate millions of hit tuples on Burp's HTTP thread.
@@ -124,7 +125,8 @@ class LiveWordWatchListener(IHttpListener):
                 or len(request_bytes) > _MAX_SCAN_BYTES or len(response_bytes) > _MAX_SCAN_BYTES):
             return
         hits = word_search_engine.hits_in_packet_for_terms(
-            self.helpers.bytesToString(request_bytes), self.helpers.bytesToString(response_bytes),
+            word_search_engine.message_text(self.helpers, request_bytes),
+            word_search_engine.message_text(self.helpers, response_bytes),
             terms, operator, self.settings.before_chars, self.settings.after_chars, _MAX_HITS_PER_MESSAGE)
         for side, before, match, after in hits:
             self._append_hits(toolFlag, side, [(before, match, after)], request_bytes,
@@ -136,9 +138,12 @@ class LiveWordWatchListener(IHttpListener):
             hit = LiveWordHit()
             hit.side = side
             hit.tool_label = tool_label
-            hit.before = before
-            hit.match = match
-            hit.after = after
+            # Results are byte-string slices while searching; convert at the
+            # UI boundary so JTable/Decode never has to implicitly ASCII
+            # decode a raw non-ASCII HTTP byte.
+            hit.before = word_search_engine.display_text(before)
+            hit.match = word_search_engine.display_text(match)
+            hit.after = word_search_engine.display_text(after)
             hit.request_bytes = request_bytes
             hit.response_bytes = response_bytes
             hit.http_service = http_service

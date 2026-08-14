@@ -18,7 +18,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **Errors タブ** — Scanner含むいずれかのBurpツールでの送受信処理中に拡張内部でエラーが起きた場合や、arm・再検出に失敗した場合に、その内容（メッセージ・スタックトレース）を一覧表示します。エラーが1件でもあるとタブ名が赤字で「Errors (件数)」に変わるため、Burp上での動作がおかしいときにすぐ気付けます。
 - **Color Snapshots** — Proxy historyの全パケットの色（`setHighlight`。無色も含む）をコメント付きでスナップショットとして丸ごとバックアップし、履歴から選んでリストアできます。全パケットの色を一括で無色に戻す**Clear all colors**もあります。CSV/Match & Replace機能とは独立しており、手動で付けた色分けも対象です。
 - **History Search** — 指定したワードでHTTP History全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索し、ヒットした前後を指定文字数（既定30文字）だけ切り出して一覧表示します。`hoge & piyo`で同じPacket Noに両方ある通信、`hoge | piyo`でどちらかがある通信を検索できます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします（`&`と`|`の混在は不可）。Packet Noの開始・終了を指定すれば、その範囲だけを検索できます（空欄なら全件）。同じパケット内に複数ヒットがあれば、それぞれ別の行として表示されます。Before / Match / Afterはセル単位で選択でき、右クリックからコピーできます。行を選択すると、該当パケットのリクエスト/レスポンスをその場でプレビューでき、リスト下部のプルダウン（既定URL Decode、Noneも選択可）で選んだ方式を選択中の行のBefore/Match/Afterへその場で適用して確認できます。
-- **Parameters** — Proxy HTTP Historyのリクエストを、Target & List Mappingと同じJSON/XML・ネスト値対応パーサーで解析し、構造パスごとに重複なく一覧化します。`Range...`からPacket No範囲を指定でき、出現回数と出現Packet No群を確認できます。アカウント・権限・金銭関連の候補は赤、トークン・識別子・PII候補は黄で強調します（診断時の優先確認用であり、脆弱性の検出結果ではありません）。
+- **Parameters** — Proxy HTTP Historyのリクエストを、Target & List Mappingと同じJSON/XML・ネスト値対応パーサーで解析し、構造パスごとに重複なく一覧化します。`Range...`からPacket No範囲を指定でき、出現回数と出現Packet No群を確認できます。上段のパラメータを選ぶと、下段に値ごとの出現回数・Packet No群を表示します。アカウント・権限・金銭関連の候補は赤、トークン・識別子・PII候補は黄で強調します（診断時の優先確認用であり、脆弱性の検出結果ではありません）。
 - **Live Word Watch** — History Searchと同じ形式（List No / Packet No / Req/Resp / Before / Match / After、選択行のプレビュー、Decodeプルダウンでのその場デコード）で、既存のhistoryをまとめて検索するのではなく、**選択したツールを通るリアルタイムの通信**を監視し、指定したワードがヒットした瞬間に1行ずつ追加していきます。History Searchと同じく、`&`による同一Packet No内のAND検索、`|`によるOR検索を使えます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします。Before / Match / Afterはセル単位で選択し、右クリックからコピーできます。DecodeはNone（変換なし）も選択可能です。armは不要で、Match & Replaceと同様に「Enabled」と対象ツールフラグで動作します。**Scope only**での絞り込み、1通信あたり200件のヒット上限、5MB超の本文のスキップにより、Burp全体への負荷を抑えています。
 
 ## 必要環境
@@ -80,7 +80,7 @@ Proxy history全体から特定のワードを検索したい場合:
 
 1. **History Search** タブの **Search word** にワードを入力する
 2. **Chars before** / **Chars after** で、ヒット箇所の前後それぞれ何文字を切り出すかを指定する（既定はどちらも30文字）
-3. 必要ならPacket Noの開始・終了を指定する（空欄は全件）。`hoge & piyo`で同一Packet No内のAND、`hoge | piyo`でOR。記号を文字として探す場合はWindowsで`\&`/`\|`/`\\`、日本語Macで`¥&`/`¥|`/`¥¥`を使う
+3. 必要ならPacket Noの開始・終了を指定する（空欄または**All**で全件）。`hoge & piyo`で同一Packet No内のAND、`hoge | piyo`でOR。記号を文字として探す場合はWindowsで`\&`/`\|`/`\\`、日本語Macで`¥&`/`¥|`/`¥¥`を使う
 4. **Search** を押すと、指定範囲のProxy history（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索する
 5. 結果は一覧表（List No / Packet No / Req/Resp / Before / Match / After）に、ヒットごとに1行ずつ表示される。Before / Match / Afterはセル単位で選択でき、右クリックの**Copy selected cell**でコピーできる
 6. 行を選択すると、下部にそのパケットのリクエスト/レスポンスがプレビュー表示される（該当箇所はBurp標準のメッセージビューア内検索で探せます）

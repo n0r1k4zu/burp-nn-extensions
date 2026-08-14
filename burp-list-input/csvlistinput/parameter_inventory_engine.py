@@ -3,13 +3,30 @@
 
 The inventory deliberately delegates extraction to ``detection_engine`` so
 it has the same JSON/XML/nested-value coverage as Target & List Mapping.
-Only structural parameter paths are retained; request values are never kept
-or shown in this tab.
+Structural paths are aggregated for the main table; per-value aggregates are
+retained only in memory so the UI can reveal them for a user-selected path.
 """
 
 import re
 
 from csvlistinput import detection_engine
+
+try:
+    _UNICODE_TYPE = unicode
+except NameError:  # CPython test runtime
+    _UNICODE_TYPE = str
+
+
+def _display_value(value):
+    """Safely make a parser's byte-string value suitable for a Swing cell."""
+    if value is None:
+        return u""
+    if isinstance(value, _UNICODE_TYPE):
+        return value
+    try:
+        return value.decode('utf-8')
+    except UnicodeDecodeError:
+        return value.decode('latin-1')
 
 
 # These names are useful leads during authorized testing, not vulnerability
@@ -52,7 +69,8 @@ def risk_level(path):
 def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detector=None):
     """Return inventory rows for inclusive 1-based Proxy History bounds.
 
-    Each row is ``{'path', 'count', 'packet_nos', 'risk'}``, sorted by path.
+    Each row is ``{'path', 'count', 'packet_nos', 'risk', 'values'}``, sorted
+    by path. ``values`` is an internal mapping used by ``value_rows()``.
     ``count`` is the number of appearances and ``packet_nos`` is the unique
     packet-number set in which that structural path appeared.
     """
@@ -78,12 +96,31 @@ def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detect
             path = point.path
             row = rows.get(path)
             if row is None:
-                row = {'path': path, 'count': 0, 'packet_nos': set(), 'risk': risk_level(path)}
+                row = {'path': path, 'count': 0, 'packet_nos': set(), 'risk': risk_level(path), 'values': {}}
                 rows[path] = row
             row['count'] += 1
             row['packet_nos'].add(packet_no)
+            value = _display_value(getattr(point, 'original_value', None))
+            value_row = row['values'].get(value)
+            if value_row is None:
+                value_row = {'value': value, 'count': 0, 'packet_nos': set()}
+                row['values'][value] = value_row
+            value_row['count'] += 1
+            value_row['packet_nos'].add(packet_no)
     result = list(rows.values())
     for row in result:
         row['packet_nos'] = sorted(row['packet_nos'])
     result.sort(key=lambda row: row['path'].lower())
+    return result
+
+
+def value_rows(parameter_row):
+    """Return selected parameter's unique values, sorted for stable display."""
+    if not parameter_row:
+        return []
+    result = []
+    for row in parameter_row.get('values', {}).values():
+        result.append({'value': row['value'], 'count': row['count'],
+                       'packet_nos': sorted(row['packet_nos'])})
+    result.sort(key=lambda row: row['value'])
     return result

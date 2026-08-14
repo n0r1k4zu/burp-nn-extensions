@@ -68,6 +68,12 @@ class WordSearchEngineTest(unittest.TestCase):
         self.assertEqual(["hoge&piyo", "ufu|bar", u"slash¥value"], terms)
         self.assertEqual("|", operator)
 
+    def test_unicode_query_can_use_japanese_mac_yen_escape(self):
+        terms, operator = word_search_engine.parse_search_query(u"日本¥|東京 | 大阪")
+
+        self.assertEqual([u"日本|東京", u"大阪"], terms)
+        self.assertEqual("|", operator)
+
     def test_mixed_query_operators_are_rejected(self):
         with self.assertRaises(ValueError):
             word_search_engine.parse_search_query("hoge & piyo | ufu")
@@ -150,6 +156,8 @@ class WordSearchEngineTest(unittest.TestCase):
         user_id = next(row for row in rows if row['path'] == '$.userId')
         self.assertEqual(2, user_id['count'])
         self.assertEqual([2, 3], user_id['packet_nos'])
+        self.assertEqual([{'value': '', 'count': 2, 'packet_nos': [2, 3]}],
+                         parameter_inventory_engine.value_rows(user_id))
 
 
 if __name__ == "__main__":

@@ -932,7 +932,7 @@
           <p>
             <span class="k">Search word</span> に検索したい文字列を入力します。<span class="k">Chars before</span>
             / <span class="k">Chars after</span> で、ヒット箇所の前・後それぞれ何文字を切り出すかを個別に指定できます
-            （既定はどちらも30文字）。<span class="k">Packet No range</span>の開始・終了を指定すれば、その範囲だけを検索できます（空欄は全件）。
+            （既定はどちらも30文字）。<span class="k">Packet No range</span>の開始・終了を指定すれば、その範囲だけを検索できます（空欄または<span class="k">All</span>は全件）。
             <code>hoge &amp; piyo</code> は同一Packet No内のAND、<code>hoge | piyo</code> はORです。記号を文字として検索する場合はWindowsで<code>\&amp;</code>/<code>\|</code>/<code>\\</code>、日本語Macで<code>¥&amp;</code>/<code>¥|</code>/<code>¥¥</code>を使います（演算子の混在は不可）。
           </p>
         </li>
@@ -1000,7 +1000,7 @@
         <p class="section-dek">指定したHTTP History範囲のリクエストから、構造化されたパラメータ一覧を作成します。</p>
       </div>
       <p><span class="k">Range...</span>から開始・終了Packet Noを設定し（既定は全HTTP History）、<span class="k">Build parameter list</span>を押します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。値は表示せず、構造パスごとに重複を統合します。</p>
-      <p>一覧は <span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> です。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
+      <p>上段の一覧は <span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> を表示します。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
     </section>
 
     <!-- ================= LIVE WORD WATCH ================= -->

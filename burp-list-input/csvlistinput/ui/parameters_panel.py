@@ -3,12 +3,14 @@
 
 from java.awt import BorderLayout, Color, FlowLayout
 from javax.swing import (JButton, JLabel, JMenuItem, JOptionPane, JPanel, JPopupMenu, JScrollPane, JTable,
-                          ListSelectionModel)
+                          JSplitPane, ListSelectionModel)
+from javax.swing.event import ListSelectionListener
 from javax.swing.table import AbstractTableModel, DefaultTableCellRenderer
 
 from csvlistinput import parameter_inventory_engine
 
 COLUMNS = ["#", "Identified Parameter", "Occurrences", "Packet Nos"]
+VALUE_COLUMNS = ["#", "Value", "Occurrences", "Packet Nos"]
 _HIGH_COLOR = Color(255, 204, 204)
 _MEDIUM_COLOR = Color(255, 239, 184)
 
@@ -55,12 +57,57 @@ class _RiskRenderer(DefaultTableCellRenderer):
             return component
         entry = table.getModel().row_at(table.convertRowIndexToModel(row))
         if entry and entry['risk'] == 'high':
+            component.setForeground(Color.BLACK)
             component.setBackground(_HIGH_COLOR)
         elif entry and entry['risk'] == 'medium':
+            component.setForeground(Color.BLACK)
             component.setBackground(_MEDIUM_COLOR)
         else:
+            # Burp's dark theme uses a black table background; explicitly
+            # restore a readable foreground for unhighlighted rows.
+            component.setForeground(Color.WHITE)
             component.setBackground(table.getBackground())
         return component
+
+
+class ParameterValuesTableModel(AbstractTableModel):
+    def __init__(self):
+        AbstractTableModel.__init__(self)
+        self.rows = []
+
+    def set_rows(self, rows):
+        self.rows = rows
+        self.fireTableDataChanged()
+
+    def getRowCount(self):
+        return len(self.rows)
+
+    def getColumnCount(self):
+        return len(VALUE_COLUMNS)
+
+    def getColumnName(self, col):
+        return VALUE_COLUMNS[col]
+
+    def getValueAt(self, row, col):
+        entry = self.rows[row]
+        if col == 0:
+            return row + 1
+        if col == 1:
+            return entry['value']
+        if col == 2:
+            return entry['count']
+        if col == 3:
+            return ','.join(str(no) for no in entry['packet_nos'])
+        return None
+
+
+class _ParameterSelectionListener(ListSelectionListener):
+    def __init__(self, panel):
+        self.panel = panel
+
+    def valueChanged(self, event):
+        if not event.getValueIsAdjusting():
+            self.panel._show_selected_values()
 
 
 class ParametersPanel(JPanel):
@@ -94,7 +141,20 @@ class ParametersPanel(JPanel):
         renderer = _RiskRenderer()
         for column in range(len(COLUMNS)):
             self.table.getColumnModel().getColumn(column).setCellRenderer(renderer)
-        self.add(JScrollPane(self.table), BorderLayout.CENTER)
+        self.table.getSelectionModel().addListSelectionListener(_ParameterSelectionListener(self))
+
+        self.values_table_model = ParameterValuesTableModel()
+        self.values_table = JTable(self.values_table_model)
+        self.values_table.setAutoCreateRowSorter(True)
+        self.values_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+        values_panel = JPanel(BorderLayout())
+        self.values_label = JLabel("Select a parameter above to display its unique values.")
+        values_panel.add(self.values_label, BorderLayout.NORTH)
+        values_panel.add(JScrollPane(self.values_table), BorderLayout.CENTER)
+
+        split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(self.table), values_panel)
+        split.setResizeWeight(0.55)
+        self.add(split, BorderLayout.CENTER)
 
         self.status_label = JLabel("Range: all HTTP History. Build parameter list to scan request parameters.")
         self.add(self.status_label, BorderLayout.SOUTH)
@@ -155,6 +215,8 @@ class ParametersPanel(JPanel):
                 self.error_fn("Parameters", "Parameter inventory failed: %s" % e)
             return
         self.table_model.set_rows(rows)
+        self.values_table_model.set_rows([])
+        self.values_label.setText("Select a parameter above to display its unique values.")
         high = sum(1 for row in rows if row['risk'] == 'high')
         medium = sum(1 for row in rows if row['risk'] == 'medium')
         self.status_label.setText("%d unique parameter(s) in %s (red: %d, yellow: %d)." % (
@@ -164,3 +226,14 @@ class ParametersPanel(JPanel):
 
     def log(self, message):
         self.log_fn(message)
+
+    def _show_selected_values(self):
+        view_row = self.table.getSelectedRow()
+        if view_row < 0:
+            self.values_table_model.set_rows([])
+            self.values_label.setText("Select a parameter above to display its unique values.")
+            return
+        entry = self.table_model.row_at(self.table.convertRowIndexToModel(view_row))
+        rows = parameter_inventory_engine.value_rows(entry)
+        self.values_table_model.set_rows(rows)
+        self.values_label.setText("Values for %s (%d unique value(s)):" % (entry['path'], len(rows)))
