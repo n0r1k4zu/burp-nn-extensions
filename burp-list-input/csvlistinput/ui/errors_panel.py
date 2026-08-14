@@ -8,6 +8,7 @@ showing up in Burp's separate Extender > Extensions > Errors console."""
 import time
 
 from java.awt import BorderLayout, FlowLayout
+from java.lang import Integer
 from javax.swing import JButton, JPanel, JScrollPane, JSplitPane, JTable, JTextArea, ListSelectionModel, \
     SwingUtilities
 from javax.swing.event import ListSelectionListener
@@ -40,6 +41,9 @@ class ErrorsTableModel(AbstractTableModel):
     def getColumnName(self, col):
         return COLUMNS[col]
 
+    def getColumnClass(self, col):
+        return Integer if col == 0 else str
+
     def entry_at(self, row):
         if 0 <= row < len(self._cache):
             return self._cache[row]
@@ -48,7 +52,7 @@ class ErrorsTableModel(AbstractTableModel):
     def getValueAt(self, row, col):
         e = self._cache[row]
         if col == 0:
-            return e.seq_id
+            return Integer(e.seq_id) if e.seq_id is not None else None
         if col == 1:
             return time.strftime("%H:%M:%S", time.localtime(e.timestamp)) if e.timestamp else ""
         if col == 2:

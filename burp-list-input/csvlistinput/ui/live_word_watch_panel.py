@@ -10,6 +10,7 @@ import jarray
 from java.awt import BorderLayout, FlowLayout, GridLayout, Toolkit
 from java.awt.datatransfer import StringSelection
 from java.awt.event import ActionListener, MouseAdapter
+from java.lang import Integer
 from javax.swing import (BoxLayout, JButton, JCheckBox, JComboBox, JLabel, JMenuItem, JPanel, JPopupMenu,
                           JScrollPane, JSpinner, JSplitPane, JTable, JTextField, ListSelectionModel,
                           SpinnerNumberModel, SwingUtilities)
@@ -69,6 +70,9 @@ class LiveWordWatchTableModel(AbstractTableModel):
     def getColumnName(self, col):
         return COLUMNS[col]
 
+    def getColumnClass(self, col):
+        return Integer if col == 0 else str
+
     def hit_at(self, row):
         if 0 <= row < len(self._cache):
             return self._cache[row]
@@ -77,7 +81,7 @@ class LiveWordWatchTableModel(AbstractTableModel):
     def getValueAt(self, row, col):
         h = self._cache[row]
         if col == 0:
-            return h.seq_id
+            return Integer(h.seq_id) if h.seq_id is not None else None
         if col == 1:
             return self._packet_no_display(h)
         if col == 2:

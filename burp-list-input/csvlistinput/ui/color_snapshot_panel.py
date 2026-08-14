@@ -7,11 +7,14 @@ packets by hand or via another tool/extension."""
 import time
 
 from java.awt import BorderLayout, FlowLayout
+from java.lang import Integer
 from javax.swing import (JButton, JLabel, JOptionPane, JPanel, JScrollPane, JTable, JTextField,
                           ListSelectionModel, SwingUtilities)
 from javax.swing.table import AbstractTableModel
+from javax.swing.table import TableRowSorter
 
 from csvlistinput import color_snapshot_engine
+from csvlistinput.ui.sort_helpers import NumericSequenceComparator
 
 COLUMNS = ["#", "Time", "Comment", "Colored / Total"]
 
@@ -35,6 +38,9 @@ class ColorSnapshotTableModel(AbstractTableModel):
     def getColumnName(self, col):
         return COLUMNS[col]
 
+    def getColumnClass(self, col):
+        return Integer if col == 0 else str
+
     def entry_at(self, row):
         if 0 <= row < len(self._cache):
             return self._cache[row]
@@ -43,7 +49,7 @@ class ColorSnapshotTableModel(AbstractTableModel):
     def getValueAt(self, row, col):
         e = self._cache[row]
         if col == 0:
-            return e.seq_id
+            return Integer(e.seq_id) if e.seq_id is not None else None
         if col == 1:
             return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(e.timestamp)) if e.timestamp else ""
         if col == 2:
@@ -78,7 +84,9 @@ class ColorSnapshotPanel(JPanel):
 
         self.table_model = ColorSnapshotTableModel(color_snapshot_store)
         self.table = JTable(self.table_model)
-        self.table.setAutoCreateRowSorter(True)
+        sorter = TableRowSorter(self.table_model)
+        sorter.setComparator(3, NumericSequenceComparator())
+        self.table.setRowSorter(sorter)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.add(JScrollPane(self.table), BorderLayout.CENTER)
 

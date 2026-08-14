@@ -4,6 +4,7 @@
 import re
 
 from java.awt import BorderLayout, Dimension, FlowLayout
+from java.lang import Integer
 from javax.swing import (DefaultCellEditor, JComboBox, JLabel, JPanel, JScrollPane, JSplitPane, JTable,
                           JTextArea, JTextField, ListSelectionModel, RowFilter, ScrollPaneConstants)
 from javax.swing.event import DocumentListener, ListSelectionListener
@@ -31,6 +32,9 @@ class InsertionPointTableModel(AbstractTableModel):
     def getColumnName(self, col):
         return COLUMNS[col]
 
+    def getColumnClass(self, col):
+        return Integer if col == 2 else str
+
     def _point(self, row):
         return self.armed_target.template_points[row]
 
@@ -41,7 +45,7 @@ class InsertionPointTableModel(AbstractTableModel):
         if col == 1:
             return (p.type + " (recovered)") if p.recovered else p.type
         if col == 2:
-            return p.nesting_depth
+            return Integer(p.nesting_depth)
         if col == 3:
             preview = p.original_value if p.original_value is not None else ""
             preview = preview.replace("\n", "\\n").replace("\r", "\\r")

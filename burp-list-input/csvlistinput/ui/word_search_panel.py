@@ -7,6 +7,7 @@ import jarray
 from java.awt import BorderLayout, FlowLayout, Toolkit
 from java.awt.event import MouseAdapter
 from java.awt.datatransfer import StringSelection
+from java.lang import Integer
 from javax.swing import (JButton, JComboBox, JLabel, JMenuItem, JPanel, JPopupMenu, JScrollPane, JSpinner,
                           JSplitPane, JTable, JTextField, ListSelectionModel, SpinnerNumberModel, SwingUtilities)
 from javax.swing.event import ListSelectionListener
@@ -52,6 +53,9 @@ class WordSearchTableModel(AbstractTableModel):
     def getColumnName(self, col):
         return COLUMNS[col]
 
+    def getColumnClass(self, col):
+        return Integer if col in (0, 1) else str
+
     def hit_at(self, row):
         if 0 <= row < len(self.hits):
             return self.hits[row]
@@ -60,7 +64,7 @@ class WordSearchTableModel(AbstractTableModel):
     def getValueAt(self, row, col):
         h = self.hits[row]
         if col == 0:
-            return row + 1
+            return Integer(row + 1)
         if col == 1:
             return h["packet_no"]
         if col == 2:

@@ -999,8 +999,8 @@
         <h2>Parameters（パラメータ棚卸し）</h2>
         <p class="section-dek">指定したHTTP History範囲のリクエストから、構造化されたパラメータ一覧を作成します。</p>
       </div>
-      <p><span class="k">Range...</span>から開始・終了Packet Noを設定し（既定は全HTTP History）、<span class="k">Build parameter list</span>を押します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。値は表示せず、構造パスごとに重複を統合します。</p>
-      <p>上段の一覧は <span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> を表示します。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
+      <p>History Searchと同じ<span class="k">Packet No range</span>で開始・終了Packet Noを指定し（空欄または<span class="k">All</span>は全HTTP History）、<span class="k">Build parameter list</span>を押します。<span class="k">Clear</span>は上下の集計結果を消去します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。</p>
+      <p>上段の一覧は <span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> を表示します。上下それぞれのFind欄で全列を絞り込め、列見出しクリックでソートできます（番号・出現回数・Packet No群は数値として比較）。下段の値を選び、<span class="k">Decode selected value</span>で方式を選ぶと、さらに下のDecoded Value欄で変換結果を確認できます。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
     </section>
 
     <!-- ================= LIVE WORD WATCH ================= -->
@@ -1287,8 +1287,9 @@
         <table>
           <thead><tr><th>項目</th><th>説明</th></tr></thead>
           <tbody>
-            <tr><td><span class="k">Range...</span></td><td>開始・終了Packet Noを指定します。空欄はそれぞれ先頭・末尾で、既定は全HTTP Historyです。</td></tr>
+            <tr><td><span class="k">Packet No range</span> / <span class="k">All</span></td><td>開始・終了Packet Noを指定します。空欄またはAllは全HTTP Historyです。</td></tr>
             <tr><td><span class="k">Build parameter list</span></td><td>指定範囲のリクエストをTarget &amp; List Mappingと同じパーサーで解析し、構造パスを重複なく集計します。</td></tr>
+            <tr><td><span class="k">Clear</span></td><td>パラメータ一覧と、選択行に対応する下段の値一覧を消去します。</td></tr>
             <tr><td>一覧の列</td><td><span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span>。</td></tr>
             <tr><td>赤 / 黄の行</td><td>赤は認可・アカウント・金銭関連、黄はトークン・識別子・PII候補です。脆弱性の検出結果ではなく、診断上の優先確認用の目印です。</td></tr>
           </tbody>

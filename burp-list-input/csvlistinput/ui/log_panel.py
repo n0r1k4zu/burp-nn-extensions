@@ -8,14 +8,16 @@ import time
 
 import jarray
 from java.awt import BorderLayout, FlowLayout
+from java.lang import Integer
 from javax.swing import (JButton, JCheckBox, JPanel, JScrollPane, JSplitPane, JTable, ListSelectionModel,
                           SwingUtilities)
 from javax.swing.event import ListSelectionListener
-from javax.swing.table import AbstractTableModel
+from javax.swing.table import AbstractTableModel, TableRowSorter
 
 from burp import IMessageEditorController
 
 from csvlistinput.proxy_history_lookup import find_packet_no
+from csvlistinput.ui.sort_helpers import NumericTextComparator
 
 COLUMNS = ["#", "Packet No", "Time", "Tool", "Status", "Row#", "Resp", "Host/Path", "Note"]
 
@@ -65,6 +67,9 @@ class LogTableModel(AbstractTableModel):
     def getColumnName(self, col):
         return COLUMNS[col]
 
+    def getColumnClass(self, col):
+        return Integer if col in (0, 6) else str
+
     def entry_at(self, row):
         if 0 <= row < len(self._cache):
             return self._cache[row]
@@ -73,7 +78,7 @@ class LogTableModel(AbstractTableModel):
     def getValueAt(self, row, col):
         e = self._cache[row]
         if col == 0:
-            return e.seq_id
+            return Integer(e.seq_id) if e.seq_id is not None else None
         if col == 1:
             return self._packet_no_display(e)
         if col == 2:
@@ -85,7 +90,7 @@ class LogTableModel(AbstractTableModel):
         if col == 5:
             return e.csv_row_no if e.csv_row_no is not None else ""
         if col == 6:
-            return e.response_status if e.response_status is not None else ""
+            return Integer(e.response_status) if e.response_status is not None else None
         if col == 7:
             return e.connection_display or ""
         if col == 8:
@@ -142,7 +147,12 @@ class LogPanel(JPanel):
 
         self.table_model = LogTableModel(log_store, callbacks, helpers)
         self.table = JTable(self.table_model)
-        self.table.setAutoCreateRowSorter(True)
+        sorter = TableRowSorter(self.table_model)
+        # Packet No and CSV Row# can be '-' / arbitrary text, but numeric
+        # values still sort numerically whenever present.
+        sorter.setComparator(1, NumericTextComparator())
+        sorter.setComparator(5, NumericTextComparator())
+        self.table.setRowSorter(sorter)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.table.getSelectionModel().addListSelectionListener(_SelectionListener(self))
 
