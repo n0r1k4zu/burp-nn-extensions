@@ -44,10 +44,20 @@ _MEDIUM_RISK = set([
     'token', 'accesstoken', 'refreshtoken', 'sessionid', 'apikey', 'api_key',
     'email', 'phone', 'mobile', 'address', 'birthdate', 'dob', 'ssn', 'passport',
 ])
+_AGGRESSIVE_HIGH_HINTS = (
+    'user', 'account', 'owner', 'tenant', 'org', 'role', 'permission', 'privilege',
+    'auth', 'admin', 'amount', 'price', 'total', 'balance', 'cost', 'payment',
+    'invoice', 'order', 'transaction', 'transfer', 'wallet', 'bank', 'card',
+    'salary', 'quota', 'limit', 'credit', 'refund', 'discount')
+_AGGRESSIVE_MEDIUM_HINTS = (
+    'password', 'passwd', 'pwd', 'secret', 'token', 'session', 'csrf', 'nonce',
+    'email', 'phone', 'mobile', 'address', 'birth', 'dob', 'ssn', 'passport',
+    'name', 'key', 'identifier', 'request', 'redirect', 'return', 'url', 'query',
+    'filter', 'sort', 'page', 'file', 'path', 'content', 'message')
 _TOKEN_RE = re.compile(r'[a-z0-9]+')
 
 
-def risk_level(path):
+def risk_level(path, aggressive=False):
     """Return ``high``, ``medium`` or ``None`` for a structural path."""
     lowered = (path or '').lower()
     normalized = lowered.replace('-', '_')
@@ -63,11 +73,16 @@ def risk_level(path):
         return 'high'
     if any(word in compact for word in _MEDIUM_RISK if len(word) >= 5):
         return 'medium'
+    if aggressive:
+        if any(word in compact for word in _AGGRESSIVE_HIGH_HINTS):
+            return 'high'
+        if any(word in compact for word in _AGGRESSIVE_MEDIUM_HINTS):
+            return 'medium'
     return None
 
 
 def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detector=None,
-            cancel_check=None):
+            cancel_check=None, aggressive_focus=False):
     """Return inventory rows for inclusive 1-based Proxy History bounds.
 
     Each row is ``{'path', 'count', 'packet_nos', 'risk', 'values'}``, sorted
@@ -101,7 +116,7 @@ def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detect
             row = rows.get(path)
             if row is None:
                 row = {'path': path, 'count': 0, 'packet_nos': set(), 'groups': set(),
-                       'risk': risk_level(path), 'values': {}}
+                       'risk': risk_level(path, aggressive_focus), 'values': {}}
                 rows[path] = row
             row['count'] += 1
             row['packet_nos'].add(packet_no)

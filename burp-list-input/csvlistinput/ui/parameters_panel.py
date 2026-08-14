@@ -7,19 +7,18 @@ from java.awt import BorderLayout, Color, FlowLayout
 from java.lang import Integer, Runnable
 from java.util import Comparator
 from java.util.regex import Pattern
-from javax.swing import (JButton, JLabel, JPanel, JScrollPane, JTable, JTextField, JSplitPane,
+from javax.swing import (JButton, JCheckBox, JLabel, JPanel, JScrollPane, JTable, JTextField, JSplitPane,
                           JComboBox, JTextArea, ListSelectionModel, SwingUtilities)
 from javax.swing.event import DocumentListener, ListSelectionListener
 from javax.swing.table import AbstractTableModel, DefaultTableCellRenderer, TableRowSorter
 from javax.swing import RowFilter
 
-from csvlistinput import decode_engine, parameter_inventory_engine
+from csvlistinput import codec_engine, parameter_inventory_engine
 
 COLUMNS = ["#", "Group", "Identified Parameter", "Occurrences", "Packet No"]
 VALUE_COLUMNS = ["#", "Group", "Value", "Occurrences", "Packet No"]
 _NONE_DECODE_LABEL = "None"
-_DECODE_LABELS = [_NONE_DECODE_LABEL] + [
-    label for label in decode_engine.TRANSFORM_LABELS if "Decode" in label or label == "ROT13"]
+_CODEC_LAYER_LABELS = ["None", "URL", "Base64", "Hex", "HTML Entity", "Unicode \\uXXXX", "ROT13"]
 _HIGH_COLOR = Color(255, 204, 204)
 _MEDIUM_COLOR = Color(255, 239, 184)
 
@@ -72,10 +71,20 @@ class ParametersTableModel(AbstractTableModel):
 
 
 class _RiskRenderer(DefaultTableCellRenderer):
+    def __init__(self, panel):
+        DefaultTableCellRenderer.__init__(self)
+        self.panel = panel
+
     def getTableCellRendererComponent(self, table, value, is_selected, has_focus, row, column):
         component = DefaultTableCellRenderer.getTableCellRendererComponent(
             self, table, value, is_selected, has_focus, row, column)
         if is_selected:
+            return component
+        # Focus controls presentation only.  Risk classification can still
+        # be calculated by Aggressive mode while Focus is off.
+        if not self.panel.focus_checkbox.isSelected():
+            component.setForeground(Color.WHITE)
+            component.setBackground(table.getBackground())
             return component
         entry = table.getModel().row_at(table.convertRowIndexToModel(row))
         if entry and entry['risk'] == 'high':
@@ -161,6 +170,20 @@ class _FilterListener(DocumentListener):
         self.panel._apply_filter(self.which)
 
 
+class _ManualDecodeListener(DocumentListener):
+    def __init__(self, panel):
+        self.panel = panel
+
+    def insertUpdate(self, event):
+        self.panel._update_manual_decode()
+
+    def removeUpdate(self, event):
+        self.panel._update_manual_decode()
+
+    def changedUpdate(self, event):
+        self.panel._update_manual_decode()
+
+
 class _PacketNosComparator(Comparator):
     """Sort comma-separated Packet Nos as integer sequences, not text."""
     def compare(self, left, right):
@@ -205,7 +228,18 @@ class ParametersPanel(JPanel):
         top.add(self.cancel_button)
         self.clear_button = JButton("Clear", actionPerformed=self._on_clear)
         top.add(self.clear_button)
-        top.add(JLabel("Red: authorization/money/account fields   Yellow: tokens, identifiers, PII candidates"))
+        self.focus_checkbox = JCheckBox(
+            "Focus (color noteworthy parameters)", False,
+            actionPerformed=self._on_focus_toggle)
+        self.focus_checkbox.setToolTipText("Color high-risk candidates red and medium-risk candidates yellow.")
+        top.add(self.focus_checkbox)
+        self.aggressive_checkbox = JCheckBox(
+            "Aggressive (broader candidate detection)", False,
+            actionPerformed=self._on_aggressive_toggle)
+        self.aggressive_checkbox.setToolTipText(
+            "Broaden name heuristics for authorization, money, authentication and PII candidates.")
+        top.add(self.aggressive_checkbox)
+        top.add(JLabel("Focus colors: red = high impact, yellow = candidate"))
         self.add(top, BorderLayout.NORTH)
 
         self.table_model = ParametersTableModel()
@@ -214,7 +248,7 @@ class ParametersPanel(JPanel):
         self.table_sorter.setComparator(4, _PacketNosComparator())
         self.table.setRowSorter(self.table_sorter)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
-        renderer = _RiskRenderer()
+        renderer = _RiskRenderer(self)
         for column in range(len(COLUMNS)):
             self.table.getColumnModel().getColumn(column).setCellRenderer(renderer)
         self.table.getSelectionModel().addListSelectionListener(_ParameterSelectionListener(self))
@@ -234,23 +268,58 @@ class ParametersPanel(JPanel):
         self.value_filter_field = JTextField(16)
         self.value_filter_field.getDocument().addDocumentListener(_FilterListener(self, 'values'))
         values_header.add(self.value_filter_field)
-        values_header.add(JLabel("Decode selected value:"))
-        self.decode_combo = JComboBox(_DECODE_LABELS)
-        self.decode_combo.setSelectedItem(_NONE_DECODE_LABEL)
-        self.decode_combo.addActionListener(self._on_decode_changed)
-        values_header.add(self.decode_combo)
+        values_header.add(JLabel("Selected value Decode:"))
+        values_header.add(JLabel("Outer:"))
+        self.decode_outer_combo = JComboBox(_CODEC_LAYER_LABELS)
+        self.decode_outer_combo.setSelectedItem(_NONE_DECODE_LABEL)
+        self.decode_outer_combo.addActionListener(self._on_decode_changed)
+        values_header.add(self.decode_outer_combo)
+        values_header.add(JLabel("Inner:"))
+        self.decode_inner_combo = JComboBox(_CODEC_LAYER_LABELS)
+        self.decode_inner_combo.setSelectedItem(_NONE_DECODE_LABEL)
+        self.decode_inner_combo.addActionListener(self._on_decode_changed)
+        values_header.add(self.decode_inner_combo)
         values_panel.add(values_header, BorderLayout.NORTH)
-        values_center = JPanel(BorderLayout())
-        values_center.add(JScrollPane(self.values_table), BorderLayout.CENTER)
-        self.decoded_value_area = JTextArea(2, 30)
+        self.decoded_value_area = JTextArea(6, 60)
         self.decoded_value_area.setEditable(False)
         self.decoded_value_area.setLineWrap(True)
         self.decoded_value_area.setWrapStyleWord(False)
         decoded_panel = JPanel(BorderLayout())
         decoded_panel.add(JLabel("Decoded Value:"), BorderLayout.NORTH)
         decoded_panel.add(JScrollPane(self.decoded_value_area), BorderLayout.CENTER)
-        values_center.add(decoded_panel, BorderLayout.SOUTH)
-        values_panel.add(values_center, BorderLayout.CENTER)
+        selected_split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(self.values_table), decoded_panel)
+        selected_split.setResizeWeight(0.62)
+        selected_split.setOneTouchExpandable(True)
+        values_panel.add(selected_split, BorderLayout.CENTER)
+
+        # Independent paste-and-decode workbench.  This is deliberately below
+        # the selected-value preview so users can inspect arbitrary text
+        # without changing the selected parameter/value row.
+        manual_panel = JPanel(BorderLayout())
+        manual_header = JPanel(FlowLayout(FlowLayout.LEFT))
+        manual_header.add(JLabel("Manual Decode (paste left -> result right):"))
+        manual_header.add(JLabel("Outer:"))
+        self.manual_outer_combo = JComboBox(_CODEC_LAYER_LABELS)
+        self.manual_outer_combo.setSelectedItem(_NONE_DECODE_LABEL)
+        self.manual_outer_combo.addActionListener(self._on_manual_decode_changed)
+        manual_header.add(self.manual_outer_combo)
+        manual_header.add(JLabel("Inner:"))
+        self.manual_inner_combo = JComboBox(_CODEC_LAYER_LABELS)
+        self.manual_inner_combo.setSelectedItem(_NONE_DECODE_LABEL)
+        self.manual_inner_combo.addActionListener(self._on_manual_decode_changed)
+        manual_header.add(self.manual_inner_combo)
+        manual_panel.add(manual_header, BorderLayout.NORTH)
+        self.manual_input_area = JTextArea(5, 40)
+        self.manual_input_area.setLineWrap(True); self.manual_input_area.setWrapStyleWord(False)
+        self.manual_input_area.getDocument().addDocumentListener(_ManualDecodeListener(self))
+        self.manual_output_area = JTextArea(5, 40)
+        self.manual_output_area.setEditable(False)
+        self.manual_output_area.setLineWrap(True); self.manual_output_area.setWrapStyleWord(False)
+        manual_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, JScrollPane(self.manual_input_area),
+                                  JScrollPane(self.manual_output_area))
+        manual_split.setResizeWeight(0.5); manual_split.setOneTouchExpandable(True)
+        manual_panel.add(manual_split, BorderLayout.CENTER)
+        values_panel.add(manual_panel, BorderLayout.SOUTH)
 
         parameter_list_panel = JPanel(BorderLayout())
         parameter_filter = JPanel(FlowLayout(FlowLayout.LEFT))
@@ -326,7 +395,8 @@ class ParametersPanel(JPanel):
         try:
             rows = parameter_inventory_engine.collect(
                 self.callbacks, self.helpers, start_packet_no, end_packet_no,
-                cancel_check=lambda: self._cancel_requested)
+                cancel_check=lambda: self._cancel_requested,
+                aggressive_focus=self.aggressive_checkbox.isSelected())
             cancelled = self._cancel_requested
             SwingUtilities.invokeLater(_UiRunnable(
                 lambda: self._scan_finished(rows, cancelled, start_packet_no, end_packet_no)))
@@ -379,6 +449,20 @@ class ParametersPanel(JPanel):
         self.decoded_value_area.setText("")
         self.status_label.setText("Cleared.")
 
+    def _on_focus_toggle(self, event):
+        """Toggle coloring without changing the underlying classification."""
+        self.table.repaint()
+        self.status_label.setText("Focus %s." % ("enabled" if self.focus_checkbox.isSelected() else "disabled"))
+
+    def _on_aggressive_toggle(self, event):
+        """Reclassify current rows immediately; the next build uses it too."""
+        aggressive = self.aggressive_checkbox.isSelected()
+        for row in self.table_model.rows:
+            row['risk'] = parameter_inventory_engine.risk_level(row.get('path', ''), aggressive)
+        self.table_model.fireTableDataChanged()
+        self.status_label.setText("Aggressive detection %s. Rebuild to rescan the selected range." %
+                                  ("enabled" if aggressive else "disabled"))
+
     def log(self, message):
         self.log_fn(message)
 
@@ -404,14 +488,66 @@ class ParametersPanel(JPanel):
             self.decoded_value_area.setText("")
             return
         row = self.values_table_model.rows[self.values_table.convertRowIndexToModel(view_row)]
-        label = str(self.decode_combo.getSelectedItem())
-        if label == _NONE_DECODE_LABEL:
-            result_text = row['value']
-        else:
-            result = decode_engine.run_all(row['value'], enabled_labels=[label])[0]
-            result_text = result.text if result.ok() else "(%s)" % result.error
+        codec_name = self._selected_codec_chain()
+        try:
+            result_text = row['value'] if codec_name == _NONE_DECODE_LABEL else codec_engine.decode_value(
+                codec_name, row['value'])
+            result_text = self._display_decoded(result_text)
+        except Exception as error:
+            result_text = "(decode failed with Codec=%s: %s)" % (codec_name, error)
         self.decoded_value_area.setText(result_text)
         self.decoded_value_area.setCaretPosition(0)
+
+    def _selected_codec_chain(self):
+        outer = str(self.decode_outer_combo.getSelectedItem())
+        inner = str(self.decode_inner_combo.getSelectedItem())
+        if outer == _NONE_DECODE_LABEL:
+            return inner
+        if inner == _NONE_DECODE_LABEL:
+            return outer
+        return outer + " -> " + inner
+
+    def _manual_codec_chain(self):
+        outer = str(self.manual_outer_combo.getSelectedItem())
+        inner = str(self.manual_inner_combo.getSelectedItem())
+        if outer == _NONE_DECODE_LABEL:
+            return inner
+        if inner == _NONE_DECODE_LABEL:
+            return outer
+        return outer + " -> " + inner
+
+    def _on_manual_decode_changed(self, event):
+        self._update_manual_decode()
+
+    def _update_manual_decode(self):
+        text = self.manual_input_area.getText()
+        if not text:
+            self.manual_output_area.setText("")
+            return
+        codec_name = self._manual_codec_chain()
+        try:
+            result = text if codec_name == _NONE_DECODE_LABEL else codec_engine.decode_value(codec_name, text)
+            self.manual_output_area.setText(self._display_decoded(result))
+        except Exception as error:
+            self.manual_output_area.setText("(decode failed with Codec=%s: %s)" % (codec_name, error))
+        self.manual_output_area.setCaretPosition(0)
+
+    def _display_decoded(self, value):
+        if value is None:
+            return u''
+        try:
+            if isinstance(value, unicode):
+                return value
+        except NameError:
+            if isinstance(value, str):
+                return value
+        try:
+            return value.decode('utf-8')
+        except Exception:
+            try:
+                return value.decode('latin-1')
+            except Exception:
+                return str(value)
 
     def _apply_filter(self, which):
         field = self.parameter_filter_field if which == 'parameters' else self.value_filter_field
