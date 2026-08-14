@@ -1,0 +1,387 @@
+# -*- coding: utf-8 -*-
+"""Passive Proxy-History statistics, Aura-aware aggregation and annotations.
+
+No HTTP is sent.  Classification follows the SF Helper precedence while
+splitting HTML screens into conventional Web and SPA shells.  Aggregation is
+intentionally limited to Aura SPA updates and only adjacent same-key runs.
+"""
+
+import hashlib
+import json
+import re
+
+try:
+    from urllib import unquote_plus
+except ImportError:
+    from urllib.parse import unquote_plus
+
+WEB_SCREEN = u"Web画面"
+WEB_PART = u"Web個別パーツ取得"
+SPA_SCREEN = u"SPA（画面）"
+SPA_UPDATE = u"SPA（画面更新）"
+API = u"API"
+
+CLASS_ORDER = [WEB_SCREEN, WEB_PART, SPA_SCREEN, SPA_UPDATE, API]
+CLASS_DEFINITIONS = {
+    WEB_SCREEN: u"SPAシェルではないHTMLレスポンス。",
+    WEB_PART: u"JavaScript、CSS、画像、フォント、メディア等の静的アセット。",
+    SPA_SCREEN: u"Aura、Lightning、LWC、React、Vue、Angularの起動マーカーを含むHTML。",
+    SPA_UPDATE: u"Auraのパス・message・aura.contextを含む画面更新通信。",
+    API: u"上記以外（auraAnalyticを含む）の通信。",
+}
+
+_STATIC_EXTS = set(['js', 'css', 'map', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp',
+                    'woff', 'woff2', 'ttf', 'eot', 'mp4', 'webm', 'mp3', 'pdf'])
+_STATIC_MIME = ('javascript', 'css', 'image/', 'font/', 'audio/', 'video/', 'application/pdf')
+_AURA_MARKERS = ('/aura', 'sfsites/aura', 'auracmpdef', 'auraresources')
+_SPA_HTML_MARKERS = ('aura://', 'lightning', 'lwc', 'react', 'vue', 'angular')
+_LEADING_NUMBER_RE = re.compile(r'^\s*\[(\d+)\]\s*')
+_OBJECT_KEYS = set(['objectapiname', 'objecttype', 'sobjecttype', 'entityname', 'objectname'])
+# Accept the canonical form produced by MyTools as well as tags created by
+# older builds/manual editing: whitespace, single quotes, and an unquoted
+# token are harmless variations.  Matching is case-insensitive because
+# History comments are user-controlled text.
+_GROUP_TAG_RE = re.compile(
+    r'\[\s*group\s*=\s*(?:"([^"\]\r\n]+)"|\'([^\'\]\r\n]+)\'|([^\]\s]+))\s*\]',
+    re.IGNORECASE)
+_STATISTICS_TAG_RE = re.compile(
+    r'\[(?:Web画面|Web個別パーツ取得|SPA（画面）|SPA（画面更新）|API|集約対象(?:_集約先No[^\]\r\n]+)?)\]\s*')
+
+
+def _comment_text(comment):
+    """Normalize Burp/Jython Java strings and byte comments to Unicode."""
+    if comment is None:
+        return u''
+    try:
+        if isinstance(comment, bytes):
+            try:
+                return comment.decode('utf-8')
+            except Exception:
+                return comment.decode('latin-1')
+    except NameError:
+        pass
+    try:
+        return unicode(comment)
+    except NameError:
+        return str(comment)
+    except Exception:
+        return u'%s' % comment
+
+
+def _text(helpers, value):
+    if value is None:
+        return u''
+    try:
+        return helpers.bytesToString(value)
+    except Exception:
+        if isinstance(value, bytes):
+            return value.decode('latin-1')
+        return value
+
+
+def _headers(text):
+    return text.split('\r\n\r\n', 1)[0].split('\n')
+
+
+def _header(headers, name):
+    prefix = name.lower() + ':'
+    for line in headers[1:]:
+        if line.lower().startswith(prefix):
+            return line.split(':', 1)[1].strip()
+    return ''
+
+
+def _request_parts(text):
+    lines = _headers(text)
+    first = lines[0].split() if lines else []
+    method = first[0] if first else ''
+    target = first[1] if len(first) > 1 else '/'
+    path, _, query = target.partition('?')
+    body = text.split('\r\n\r\n', 1)[1] if '\r\n\r\n' in text else ''
+    return method, path, query, body, lines
+
+
+def _short_descriptor(value):
+    value = (value or '').split('://', 1)[-1]
+    if '/ACTION$' in value:
+        left, action = value.split('/ACTION$', 1)
+        return '%s/%s' % (left.split('.')[-1].split('/')[-1], action)
+    return value.split('.')[-1]
+
+
+def _aura_key(path, body, headers):
+    """Build the conservative SF-Helper-inspired aggregation key."""
+    message = ''
+    page_uri = ''
+    for pair in body.split('&'):
+        key, sep, value = pair.partition('=')
+        if not sep:
+            continue
+        if key == 'message':
+            message = unquote_plus(value)
+        elif key == 'aura.pageURI':
+            page_uri = unquote_plus(value)
+    descriptors = []
+    objects = []
+    apex_calls = []
+    def collect_objects(value, key=''):
+        if isinstance(value, dict):
+            for child_key, child_value in value.items():
+                collect_objects(child_value, str(child_key))
+        elif isinstance(value, list):
+            for child_value in value:
+                collect_objects(child_value, key)
+        elif str(key).lower() in _OBJECT_KEYS and value:
+            objects.append(str(value))
+    try:
+        actions = json.loads(message).get('actions', [])
+        for action in actions:
+            if isinstance(action, dict):
+                descriptor = _short_descriptor(action.get('descriptor', ''))
+                if descriptor:
+                    descriptors.append(descriptor)
+                params = action.get('params', {})
+                collect_objects(params)
+                if 'ApexActionController' in (action.get('descriptor', '') or '') and isinstance(params, dict):
+                    apex_name = params.get('classname') or params.get('apexClass') or ''
+                    apex_method = params.get('method') or params.get('methodName') or ''
+                    if apex_name or apex_method:
+                        apex_calls.append('%s.%s' % (apex_name, apex_method))
+    except Exception:
+        pass
+    auth = 'auth' if _header(headers, 'Cookie') or _header(headers, 'Authorization') else 'guest'
+    if descriptors:
+        return 'AURA|%s|%s|obj=%s|apex=%s|%s|%s' % (
+            path, ','.join(sorted(set(descriptors))), ','.join(sorted(set(objects))) or '-',
+            ','.join(sorted(set(apex_calls))) or '-', page_uri, auth)
+    # Component-resource requests without descriptors are safe to merge only
+    # when their full relevant request content is identical.
+    digest = hashlib.sha1((path + '\n' + body + '\n' + auth).encode('utf-8')).hexdigest()
+    return 'AURA-CONTENT|%s' % digest
+
+
+def classify_packet(path, request_body, response_text, response_mime=''):
+    """Return one of the five documented class labels, in precedence order."""
+    lowered_path = (path or '').lower()
+    lowered_body = (request_body or '').lower()
+    response_lower = (response_text or '').lower()
+    mime = (response_mime or '').lower()
+    if 'auraanalytic' in lowered_path:
+        return API
+    if any(marker in lowered_path for marker in _AURA_MARKERS) or 'message=' in lowered_body or 'aura.context=' in lowered_body:
+        return SPA_UPDATE
+    ext = lowered_path.rsplit('.', 1)[-1] if '.' in lowered_path.rsplit('/', 1)[-1] else ''
+    if ext in _STATIC_EXTS or any(marker in mime for marker in _STATIC_MIME):
+        return WEB_PART
+    if 'html' in mime or '<html' in response_lower:
+        return SPA_SCREEN if any(marker in response_lower for marker in _SPA_HTML_MARKERS) else WEB_SCREEN
+    return API
+
+
+def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None, cancel_check=None):
+    """Analyze inclusive one-based History bounds and return packet records."""
+    records = []
+    packet_no = 0
+    for item in callbacks.getProxyHistory():
+        packet_no += 1
+        if cancel_check and cancel_check():
+            break
+        if start_packet_no is not None and packet_no < start_packet_no:
+            continue
+        if end_packet_no is not None and packet_no > end_packet_no:
+            break
+        request = _text(helpers, item.getRequest())
+        response = _text(helpers, item.getResponse())
+        method, path, query, body, request_headers = _request_parts(request)
+        response_headers = _headers(response)
+        response_mime = _header(response_headers, 'Content-Type')
+        cls = classify_packet(path, body, response, response_mime)
+        records.append({'packet_no': packet_no, 'item': item, 'class': cls, 'method': method,
+                        'path': path, 'query': query, 'body': body, 'headers': request_headers,
+                        'agg_key': _aura_key(path, body, request_headers) if cls == SPA_UPDATE else None,
+                        'agg_role': u'single', 'agg_rep': None})
+    _assign_aggregation(records)
+    return records
+
+
+def _assign_aggregation(records):
+    """Mark first/subsequent packets of adjacent same-key Aura runs."""
+    current = []
+    current_key = None
+    def finish(run):
+        if len(run) <= 1:
+            return
+        representative = run[0]
+        representative['agg_role'] = u'representative'
+        representative['agg_rep'] = representative
+        for record in run[1:]:
+            record['agg_role'] = u'target'
+            record['agg_rep'] = representative
+    for record in records:
+        if record['class'] != SPA_UPDATE:
+            continue
+        if current and record['agg_key'] == current_key:
+            current.append(record)
+        else:
+            finish(current)
+            current = [record]
+            current_key = record['agg_key']
+    finish(current)
+
+
+def summary_rows(records):
+    rows = []
+    for label in CLASS_ORDER:
+        total = len([record for record in records if record['class'] == label])
+        reduced = len([record for record in records
+                       if record['class'] == label and record['agg_role'] != u'target'])
+        rows.append({'class': label, 'including_aggregated': total,
+                     'excluding_aggregated': reduced, 'definition': CLASS_DEFINITIONS[label]})
+    return rows
+
+
+def _leading_number(comment):
+    match = _LEADING_NUMBER_RE.match(comment or '')
+    return match.group(1) if match else None
+
+
+def _append_tag(comment, tag):
+    marker = u'[%s]' % tag
+    if marker in (comment or ''):
+        return comment or u''
+    return ((comment or u'').rstrip() + (u' ' if comment else u'') + marker)
+
+
+def group_names(comment):
+    """Return sorted, de-duplicated group names from explicit group tags."""
+    names = []
+    for match in _GROUP_TAG_RE.findall(_comment_text(comment)):
+        name = next((value for value in match if value), u'').strip()
+        if name:
+            names.append(name)
+    return sorted(set(names))
+
+
+def group_display(comment):
+    return u', '.join(group_names(comment))
+
+
+def annotate_analysis(records, add_class_tags=False, add_aggregation_tags=False,
+                     clear_comments_first=False, color_targets=False, color_name='gray'):
+    """Apply explicitly requested History annotations; return update counts."""
+    updated = colored = 0
+    original_numbers = dict((record['packet_no'], _leading_number(record['item'].getComment() or u''))
+                            for record in records)
+    for record in records:
+        old = record['item'].getComment() or u''
+        comment = u'' if clear_comments_first else old
+        if add_class_tags:
+            comment = _append_tag(comment, record['class'])
+        if add_aggregation_tags and record['agg_role'] == u'target':
+            representative = record['agg_rep']
+            rep_number = original_numbers.get(representative['packet_no']) if representative else None
+            tag = (u'集約対象_集約先No%s' % rep_number if rep_number
+                   else u'集約対象')
+            comment = _append_tag(comment, tag)
+        if comment != old:
+            record['item'].setComment(comment)
+            updated += 1
+        if color_targets and record['agg_role'] == u'target':
+            record['item'].setHighlight(color_name)
+            colored += 1
+    return updated, colored
+
+
+def clear_analysis_annotations(callbacks, start_packet_no=None, end_packet_no=None):
+    """Remove only tags generated by Statistics from History comments.
+
+    User numbering (`[0001]`), groups (`[group="..."]`) and unrelated
+    bracket annotations remain untouched.
+    """
+    changed = packet_no = 0
+    for item in callbacks.getProxyHistory():
+        packet_no += 1
+        if start_packet_no is not None and packet_no < start_packet_no:
+            continue
+        if end_packet_no is not None and packet_no > end_packet_no:
+            break
+        old = item.getComment() or u''
+        new = _STATISTICS_TAG_RE.sub(u'', _comment_text(old)).strip()
+        if new != old:
+            item.setComment(new)
+            changed += 1
+    return changed
+
+
+def number_all(callbacks, start_number, digits):
+    """Prefix every current History comment with a zero-padded sequence."""
+    changed = 0
+    number = start_number
+    for item in callbacks.getProxyHistory():
+        old = item.getComment() or u''
+        rest = _LEADING_NUMBER_RE.sub(u'', old, count=1)
+        item.setComment((u'[%0*d] ' % (digits, number)) + rest)
+        number += 1
+        changed += 1
+    return changed
+
+
+def remove_numbering(callbacks):
+    changed = 0
+    for item in callbacks.getProxyHistory():
+        old = item.getComment() or u''
+        new = _LEADING_NUMBER_RE.sub(u'', old, count=1)
+        if new != old:
+            item.setComment(new)
+            changed += 1
+    return changed
+
+
+def add_group(items, group_name):
+    tag = (group_name or u'').strip()
+    if not tag or '"' in tag or '[' in tag or ']' in tag:
+        raise ValueError('Group name is empty.')
+    changed = 0
+    for item in items:
+        old = item.getComment() or u''
+        new = _append_tag(old, u'group="%s"' % tag)
+        if new != old:
+            item.setComment(new)
+            changed += 1
+    return changed
+
+
+def remove_group(callbacks, start_packet_no, end_packet_no, group_name):
+    name = (group_name or u'').strip()
+    marker = u'[group="%s"]' % name
+    if not name:
+        raise ValueError('Group name is empty.')
+    changed = packet_no = 0
+    for item in callbacks.getProxyHistory():
+        packet_no += 1
+        if start_packet_no is not None and packet_no < start_packet_no:
+            continue
+        if end_packet_no is not None and packet_no > end_packet_no:
+            break
+        old = item.getComment() or u''
+        new = old.replace(marker, u'').strip()
+        if new != old:
+            item.setComment(new)
+            changed += 1
+    return changed
+
+
+def clear_bracket_tags(callbacks, start_packet_no=None, end_packet_no=None):
+    changed = packet_no = 0
+    for item in callbacks.getProxyHistory():
+        packet_no += 1
+        if start_packet_no is not None and packet_no < start_packet_no:
+            continue
+        if end_packet_no is not None and packet_no > end_packet_no:
+            break
+        old = item.getComment() or u''
+        new = re.sub(r'\[[^\]\r\n]*\]\s*', u'', old).strip()
+        if new != old:
+            item.setComment(new)
+            changed += 1
+    return changed

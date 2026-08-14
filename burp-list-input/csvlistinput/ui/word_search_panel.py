@@ -4,10 +4,11 @@ for a literal word and list every occurrence with surrounding context,
 independent of the CSV/Match & Replace/Color Snapshots features."""
 
 import jarray
+from threading import Thread
 from java.awt import BorderLayout, FlowLayout, Toolkit
 from java.awt.event import MouseAdapter
 from java.awt.datatransfer import StringSelection
-from java.lang import Integer
+from java.lang import Integer, Runnable
 from javax.swing import (JButton, JComboBox, JLabel, JMenuItem, JPanel, JPopupMenu, JScrollPane, JSpinner,
                           JSplitPane, JTable, JTextField, ListSelectionModel, SpinnerNumberModel, SwingUtilities)
 from javax.swing.event import ListSelectionListener
@@ -17,7 +18,7 @@ from burp import IMessageEditorController
 
 from csvlistinput import decode_engine, word_search_engine
 
-COLUMNS = ["List No", "Packet No", "Req/Resp", "Before", "Match", "After"]
+COLUMNS = ["List No", "Packet No", "Group", "Req/Resp", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
 _DEFAULT_CONTEXT_CHARS = 30
 
@@ -26,6 +27,14 @@ _DEFAULT_CONTEXT_CHARS = 30
 _DECODE_LABELS = [label for label in decode_engine.TRANSFORM_LABELS if "Decode" in label or label == "ROT13"]
 _DEFAULT_DECODE_LABEL = "URL Decode"
 _NONE_DECODE_LABEL = "None"
+
+
+class _UiRunnable(Runnable):
+    def __init__(self, fn):
+        self.fn = fn
+
+    def run(self):
+        self.fn()
 
 
 def _decode_preview(text, label):
@@ -68,12 +77,14 @@ class WordSearchTableModel(AbstractTableModel):
         if col == 1:
             return h["packet_no"]
         if col == 2:
-            return h["side"]
+            return h.get("group", "")
         if col == 3:
-            return h["before"]
+            return h["side"]
         if col == 4:
-            return h["match"]
+            return h["before"]
         if col == 5:
+            return h["match"]
+        if col == 6:
             return h["after"]
         return None
 
@@ -138,6 +149,8 @@ class WordSearchPanel(JPanel):
         self.helpers = helpers
         self.log_fn = log_fn
         self.error_fn = error_fn
+        self._search_worker = None
+        self._cancel_requested = False
 
         top = JPanel(FlowLayout(FlowLayout.LEFT))
         top.add(JLabel("Search word:"))
@@ -165,6 +178,9 @@ class WordSearchPanel(JPanel):
         top.add(self.all_packets_button)
         self.search_button = JButton("Search", actionPerformed=self._on_search)
         top.add(self.search_button)
+        self.cancel_button = JButton("Cancel", actionPerformed=self._on_cancel)
+        self.cancel_button.setEnabled(False)
+        top.add(self.cancel_button)
         self.clear_button = JButton("Clear", actionPerformed=self._on_clear)
         top.add(self.clear_button)
         self.add(top, BorderLayout.NORTH)
@@ -227,6 +243,8 @@ class WordSearchPanel(JPanel):
         self.add(self.status_label, BorderLayout.SOUTH)
 
     def _on_search(self, event):
+        if self._search_worker is not None:
+            return
         word = self.word_field.getText()
         if not word:
             self.status_label.setText("Enter a search word first.")
@@ -242,22 +260,57 @@ class WordSearchPanel(JPanel):
         except ValueError as e:
             self.status_label.setText(str(e))
             return
+        self.search_button.setEnabled(False)
+        self.search_button.setText("Searching...")
+        self.cancel_button.setEnabled(True)
+        self.status_label.setText("Searching Proxy history in the background...")
+        self._cancel_requested = False
+        self._search_worker = Thread(target=self._search_worker_run,
+                                     args=(word, before_chars, after_chars, start_packet_no, end_packet_no))
+        self._search_worker.setDaemon(True)
+        self._search_worker.start()
+
+    def _search_worker_run(self, word, before_chars, after_chars, start_packet_no, end_packet_no):
         try:
             hits = word_search_engine.search(self.callbacks, self.helpers, word, before_chars, after_chars,
-                                             start_packet_no, end_packet_no)
+                                             start_packet_no, end_packet_no,
+                                             cancel_check=lambda: self._cancel_requested)
+            SwingUtilities.invokeLater(_UiRunnable(
+                lambda: self._search_finished(hits, word, before_chars, after_chars,
+                                               start_packet_no, end_packet_no, self._cancel_requested)))
         except Exception as e:
-            self.status_label.setText("Search failed: %s" % e)
-            if self.error_fn:
-                self.error_fn("History Search", "Search failed: %s" % e)
-            return
+            SwingUtilities.invokeLater(_UiRunnable(lambda error=e: self._search_failed(error)))
+
+    def _restore_search_buttons(self):
+        self._search_worker = None
+        self.search_button.setEnabled(True)
+        self.search_button.setText("Search")
+        self.cancel_button.setEnabled(False)
+
+    def _search_finished(self, hits, word, before_chars, after_chars, start_packet_no, end_packet_no, cancelled):
         self.table_model.set_hits(hits)
         self._show_hit(None)
         self._update_decode_preview(None)
         range_text = self._range_display(start_packet_no, end_packet_no)
-        self.status_label.setText("%d hit(s) found for \"%s\" in %s." % (len(hits), word, range_text))
+        self._restore_search_buttons()
+        prefix = "Cancelled: " if cancelled else ""
+        self.status_label.setText("%s%d hit(s) found for \"%s\" in %s." % (prefix, len(hits), word, range_text))
         if self.log_fn:
             self.log_fn("History Search: %d hit(s) found for \"%s\" (%s, before=%d, after=%d)" % (
                 len(hits), word, range_text, before_chars, after_chars))
+
+    def _search_failed(self, error):
+        self._restore_search_buttons()
+        self.status_label.setText("Search failed: %s" % error)
+        if self.error_fn:
+            self.error_fn("History Search", "Search failed: %s" % error)
+
+    def _on_cancel(self, event):
+        if self._search_worker is None:
+            return
+        self._cancel_requested = True
+        self.status_label.setText("Cancel requested; finishing the current packet...")
+        self.cancel_button.setEnabled(False)
 
     def _packet_no_or_none(self, text, boundary_name):
         value = str(text).strip()

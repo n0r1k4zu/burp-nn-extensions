@@ -8,6 +8,7 @@ not how it's presented.
 """
 
 from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space, to_bytestring_space
+from csvlistinput.statistics_engine import group_display
 
 try:
     _JYTHON_UNICODE = unicode
@@ -201,7 +202,7 @@ def hits_in_packet_for_terms(request_text, response_text, terms, operator,
 
 
 def search(callbacks, helpers, word, before_chars, after_chars,
-           start_packet_no=None, end_packet_no=None):
+           start_packet_no=None, end_packet_no=None, cancel_check=None):
     """Returns a list of hit dicts, one per occurrence, in Proxy history
     order (request occurrences before response occurrences within the
     same packet). Each dict: {"packet_no", "side", "before", "match",
@@ -217,6 +218,8 @@ def search(callbacks, helpers, word, before_chars, after_chars,
     packet_no = 0
     for item in callbacks.getProxyHistory():
         packet_no += 1
+        if cancel_check and cancel_check():
+            break
         if start_packet_no is not None and packet_no < start_packet_no:
             continue
         if end_packet_no is not None and packet_no > end_packet_no:
@@ -224,6 +227,7 @@ def search(callbacks, helpers, word, before_chars, after_chars,
         request_bytes = item.getRequest()
         response_bytes = item.getResponse()
         http_service = item.getHttpService()
+        group = group_display(item.getComment() if hasattr(item, 'getComment') else u'')
         request_text = message_text(helpers, request_bytes) if request_bytes is not None else ""
         response_text = message_text(helpers, response_bytes) if response_bytes is not None else ""
         for side, before, match, after in hits_in_packet_for_terms(
@@ -231,6 +235,7 @@ def search(callbacks, helpers, word, before_chars, after_chars,
             results.append({
                 "packet_no": packet_no, "side": side, "before": display_text(before),
                 "match": display_text(match), "after": display_text(after),
+                "group": group,
                 "request_bytes": request_bytes, "response_bytes": response_bytes,
                 "http_service": http_service,
             })

@@ -122,6 +122,40 @@ class WordSearchEngineTest(unittest.TestCase):
         self.assertEqual(1, count)
         self.assertEqual("before changed", codec_engine.base64_decode(codec_engine.url_decode(replaced)))
 
+    def test_url_base64_handles_embedded_token_with_wrapper_text(self):
+        token = codec_engine.base64_encode("before value")
+        raw = codec_engine.url_encode("prefix=abc;token=" + token + ";suffix=xyz")
+        rule = DecodeReplaceRule()
+        rule.codec = u"URL → Base64"
+        rule.find = u"value"
+        rule.replace_with = u"changed"
+
+        preview = codec_engine.decode_value(rule.codec, raw)
+        self.assertEqual("prefix=abc;token=before value;suffix=xyz", preview)
+        replaced, count = decode_replace_engine.apply_rule(raw, rule)
+        self.assertEqual(1, count)
+        self.assertEqual("prefix=abc;token=before changed;suffix=xyz",
+                         codec_engine.decode_value(rule.codec, replaced))
+
+    def test_other_nested_codecs_preview_embedded_values(self):
+        url_hex = codec_engine.url_encode("prefix=abc;token=6869;suffix=xyz")
+        self.assertEqual("prefix=abc;token=hi;suffix=xyz",
+                         codec_engine.decode_value(u"URL → Hex", url_hex))
+
+        b64_url = codec_engine.base64_encode("hello%20world")
+        wrapped = "prefix=abc;token=" + b64_url + ";suffix=xyz"
+        self.assertEqual("prefix=abc;token=hello world;suffix=xyz",
+                         codec_engine.decode_value(u"Base64 → URL", wrapped))
+
+    def test_three_plus_codec_chain_decodes_and_reencodes_in_reverse(self):
+        chain = u"URL -> Base64 -> URL -> ROT13"
+        raw = codec_engine.url_encode(codec_engine.base64_encode(codec_engine.url_encode(codec_engine.rot13("hello world"))))
+
+        self.assertEqual(["URL", "Base64", "URL", "ROT13"], codec_engine.codec_steps(chain))
+        self.assertEqual(["URL", "Base64"], codec_engine.codec_steps(u"URL → Base64"))
+        self.assertEqual("hello world", codec_engine.decode_value(chain, raw))
+        self.assertEqual(raw, codec_engine.encode_value(chain, "hello world"))
+
     def test_parameter_risk_tiers_include_authorization_and_money_fields(self):
         self.assertEqual('high', parameter_inventory_engine.risk_level('$.accountId'))
         self.assertEqual('high', parameter_inventory_engine.risk_level('body[amount]'))
@@ -156,7 +190,7 @@ class WordSearchEngineTest(unittest.TestCase):
         user_id = next(row for row in rows if row['path'] == '$.userId')
         self.assertEqual(2, user_id['count'])
         self.assertEqual([2, 3], user_id['packet_nos'])
-        self.assertEqual([{'value': '', 'count': 2, 'packet_nos': [2, 3]}],
+        self.assertEqual([{'value': '', 'count': 2, 'packet_nos': [2, 3], 'groups': []}],
                          parameter_inventory_engine.value_rows(user_id))
 
 

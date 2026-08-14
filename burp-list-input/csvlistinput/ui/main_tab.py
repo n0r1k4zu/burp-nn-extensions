@@ -12,6 +12,7 @@ from burp import ITab
 from csvlistinput.constants import SendStatus
 from csvlistinput.models import LogEntry
 from csvlistinput.ui.color_snapshot_panel import ColorSnapshotPanel
+from csvlistinput.ui.comment_snapshot_panel import CommentSnapshotPanel
 from csvlistinput.ui.csv_panel import CsvPanel
 from csvlistinput.ui.decode_panel import DecodePanel
 from csvlistinput.ui.decode_replace_panel import DecodeReplacePanel
@@ -21,6 +22,9 @@ from csvlistinput.ui.live_word_watch_panel import LiveWordWatchPanel
 from csvlistinput.ui.log_panel import LogPanel
 from csvlistinput.ui.parameters_panel import ParametersPanel
 from csvlistinput.ui.replace_panel import ReplacePanel
+from csvlistinput.ui.statistics_panel import StatisticsPanel
+from csvlistinput.ui.annotations_panel import AnnotationsPanel
+from csvlistinput.ui.aura_audit_panel import AuraAuditPanel
 from csvlistinput.ui.target_info_panel import TargetInfoPanel
 from csvlistinput.ui.word_search_panel import WordSearchPanel
 
@@ -29,7 +33,7 @@ class MainTab(ITab):
     def __init__(self, callbacks, helpers, armed_target, csv_store, log_store,
                  replace_settings, request_replace_store, response_replace_store,
                  decode_replace_settings, decode_replace_target, error_store, color_snapshot_store,
-                 live_word_watch_settings, live_word_watch_store):
+                 comment_snapshot_store, live_word_watch_settings, live_word_watch_store):
         self.callbacks = callbacks
         self.armed_target = armed_target
         self.csv_store = csv_store
@@ -48,10 +52,15 @@ class MainTab(ITab):
                                                          log_fn=self.log, error_fn=self.log_error)
         self.color_snapshot_panel = ColorSnapshotPanel(callbacks, helpers, color_snapshot_store,
                                                           log_fn=self.log, error_fn=self.log_error)
+        self.comment_snapshot_panel = CommentSnapshotPanel(callbacks, helpers, comment_snapshot_store,
+                                                           log_fn=self.log, error_fn=self.log_error)
         self.word_search_panel = WordSearchPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.live_word_watch_panel = LiveWordWatchPanel(callbacks, helpers, live_word_watch_settings,
                                                            live_word_watch_store, error_fn=self.log_error)
         self.parameters_panel = ParametersPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
+        self.statistics_panel = StatisticsPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
+        self.annotations_panel = AnnotationsPanel(callbacks, log_fn=self.log, error_fn=self.log_error)
+        self.aura_audit_panel = AuraAuditPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.errors_panel = ErrorsPanel(error_store)
 
         mapping_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, self.insertion_point_panel, self.csv_panel)
@@ -67,11 +76,15 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Target & Replace with Decode & Encode", self.decode_replace_panel)
         self.tabbed_pane.addTab("Match & Replace", self.replace_panel)
         self.tabbed_pane.addTab("Log", self.log_panel)
-        self.tabbed_pane.addTab("Color Snapshots", self.color_snapshot_panel)
         self.tabbed_pane.addTab("History Search", self.word_search_panel)
         self.tabbed_pane.addTab("Live Word Watch", self.live_word_watch_panel)
         self.tabbed_pane.addTab("Parameters", self.parameters_panel)
+        self.tabbed_pane.addTab("Numbering & Grouping", self.annotations_panel)
+        self.tabbed_pane.addTab("Statistics", self.statistics_panel)
         self.tabbed_pane.addTab("Decode", self.decode_panel)
+        self.tabbed_pane.addTab("Color Snapshots", self.color_snapshot_panel)
+        self.tabbed_pane.addTab("Comment Snapshots", self.comment_snapshot_panel)
+        self.tabbed_pane.addTab("Aura Diagnostic", self.aura_audit_panel)
         self.errors_tab_index = self.tabbed_pane.getTabCount()
         self.tabbed_pane.addTab("Errors", self.errors_panel)
         self._update_errors_tab_title()
@@ -105,6 +118,10 @@ class MainTab(ITab):
             self.decode_panel.set_text(text)
             self.tabbed_pane.setSelectedComponent(self.decode_panel)
         SwingUtilities.invokeLater(do_show)
+
+    def set_aura_audit_target(self, message):
+        self.aura_audit_panel.set_target_message(message)
+        self.tabbed_pane.setSelectedComponent(self.aura_audit_panel)
 
     def log(self, message):
         entry = LogEntry()

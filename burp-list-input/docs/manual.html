@@ -421,9 +421,12 @@
         <a href="#match-replace">Match &amp; Replace（置換）</a>
         <a href="#decode">Decode（デコード）</a>
         <a href="#color-snapshots">Color Snapshots（色のバックアップ/リストア）</a>
+        <a href="#comment-snapshots">Comment Snapshots（Commentのバックアップ/リストア）</a>
         <a href="#history-search">History Search（ワード検索）</a>
         <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
         <a href="#parameters">Parameters（パラメータ棚卸し）</a>
+        <a href="#statistics">Statistics（分類・集約）</a>
+        <a href="#numbering-grouping">Numbering &amp; Grouping</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
       <li class="toc-group">
@@ -632,12 +635,15 @@
             一覧から行を選択すると、画面下部に <span class="k">Original Value (full)</span>
             （そのInsertion Pointの現在の値）が表示されます。値が何らかの方式でエンコードされている場合は
             <span class="k">Codec</span> 列でその方式（None / URL / Base64 / Hex / HTML Entity /
-            Unicode <code>\uXXXX</code> / ROT13）を選んでください。<code>URL → Base64</code>のような2段Codecも選べ、
-            左から外側→内側へデコードし、逆順に再エンコードします。選ぶと同時に、画面下部の
+            Unicode <code>\uXXXX</code> / ROT13）を選んでください。<code>URL -&gt; Base64</code>のようなCodec chainも選べ、
+            3段以上は<code>URL -&gt; Base64 -&gt; URL</code>のようにCodec欄へ直接入力できます。左から外側→内側へデコードし、逆順に再エンコードします。選ぶと同時に、画面下部の
             <span class="k">Decoded Value (using selected Codec)</span> 欄にデコード結果がその場でプレビュー
             表示されるので、正しいCodecを選べているか（意味の通る値になっているか）をすぐ確認できます。
+            URLデコード後などに前後のラッパー文字列がある場合も、Base64/Hexの安全なトークン部分を識別して
+            デコード表示します。
             エンコードされていない値であれば <span class="k">None</span> のままで構いません。
           </p>
+          <p class="step-note">画面下部の<span class="k">Paste text to decode</span>へ値を貼り付け、Codec chainを選ぶ（または直接入力する）と、右側にデコード結果を表示できます。この操作は置換ルールを変更しません。</p>
           <p class="step-note">
             デコードに失敗した場合（Codecの選択が値と合っていない等）は、Decoded Value欄に
             「(decode failed with Codec=...)」のようにエラー内容が表示されます。拡張が止まることはありません。
@@ -912,6 +918,17 @@
       </div>
     </section>
 
+    <!-- ================= COMMENT SNAPSHOTS ================= -->
+    <section class="doc-section" id="comment-snapshots">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Comment Snapshots（Commentのバックアップ / リストア）</h2>
+        <p class="section-dek">Proxy history全パケットのCommentを保存し、あとから選んで復元するタブです。</p>
+      </div>
+      <p><span class="k">Snapshot note</span>にメモを入力して<span class="k">Take snapshot</span>を押すと、現在のProxy historyにある全パケットのCommentを保存します。履歴から選択して<span class="k">Restore selected</span>を押すと、その時点のCommentで上書き復元します。</p>
+      <p>スナップショット取得後に追加されたパケットは変更しません。復元は既存Commentを上書きするため、必要なら復元前に新しいスナップショットを取得してください。スナップショットは拡張のメモリ上だけに保持され、リロード時に消去されます。</p>
+    </section>
+
     <!-- ================= HISTORY SEARCH ================= -->
     <section class="doc-section" id="history-search">
       <div class="section-head">
@@ -1000,7 +1017,20 @@
         <p class="section-dek">指定したHTTP History範囲のリクエストから、構造化されたパラメータ一覧を作成します。</p>
       </div>
       <p>History Searchと同じ<span class="k">Packet No range</span>で開始・終了Packet Noを指定し（空欄または<span class="k">All</span>は全HTTP History）、<span class="k">Build parameter list</span>を押します。<span class="k">Clear</span>は上下の集計結果を消去します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。</p>
-      <p>上段の一覧は <span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span> を表示します。上下それぞれのFind欄で全列を絞り込め、列見出しクリックでソートできます（番号・出現回数・Packet No群は数値として比較）。下段の値を選び、<span class="k">Decode selected value</span>で方式を選ぶと、さらに下のDecoded Value欄で変換結果を確認できます。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
+      <p>上段の一覧は <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> を表示します。上下それぞれのFind欄で全列を絞り込め、列見出しクリックでソートできます（番号・出現回数・Packet No群は数値として比較）。下段の値を選び、<span class="k">Decode selected value</span>で方式を選ぶと、さらに下のDecoded Value欄で変換結果を確認できます。赤はアカウント・権限・金銭関連、黄はトークン・識別子・PII候補です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
+    </section>
+
+    <section class="doc-section" id="statistics">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Statistics（分類・集約）</h2>
+        <p class="section-dek">選択したProxy Historyを受動的に分類・集約し、Commentと色で整理します。HTTP通信は送信しません。</p>
+      </div>
+      <p><span class="k">Packet No range</span>を入力するか<span class="k">All</span>を選び、<span class="k">Build statistics</span>を押します。分類は、(1) SPAでないHTMLレスポンス＝Web画面、(2) JavaScript/CSS/画像/フォント等＝Web個別パーツ取得、(3) SPA起動マーカーを含むHTML＝SPA（画面）、(4) Aura path / <code>message=</code> / <code>aura.context=</code>＝SPA（画面更新）、(5) それ以外＝API、の優先順です。</p>
+      <p>Aura集約はSPA（画面更新）だけが対象です。同一のAura descriptor・page URI・認証状態を持つ通信を比較し、descriptorのないコンポーネント取得は内容全体が一致した場合だけ対象にします。履歴順で同じキーが連続するグループの先頭を代表、それ以外を集約対象とし、他の種類の通信は集約しません。表の「including」は履歴上の全件、「excluding」は集約対象を除いた件数です。</p>
+      <p><span class="k">Apply selected annotations</span>では、分類を<code>[Web画面]</code>等で追記、集約対象を<code>[集約対象]</code>で追記できます。代表パケットのComment先頭に<code>[1992]</code>のような採番がある場合は、集約対象へ<code>[集約対象_集約先No1992]</code>を追記します。<span class="k">Clear annotations</span>はStatisticsが追加した分類・集約タグだけを削除し、採番・グループ・その他のタグは残します。</p>
+      <h2 id="numbering-grouping">Numbering &amp; Grouping</h2>
+      <p>採番・採番解除・グループ削除・ブラケットタグ削除は専用タブへ分離しました。全HTTP HistoryのComment先頭へ指定桁数・開始番号で<code>[0001]</code>のように付与し、採番解除で先頭番号だけを外します。Proxy Historyで複数パケットを選択し、右クリックの<span class="k">MyTools: Group selected History packets</span>からグループ名を入力すると、各Commentへ<code>[group="user1"]</code>形式の明示的なグループ定義を追加します。この定義はParameters上下のGroup列とHistory SearchのGroup列へ表示されます。範囲指定で特定グループだけを削除でき、<span class="k">Clear all [tags] in range</span>は範囲内のすべての<code>[...]</code>タグを削除します。</p>
     </section>
 
     <!-- ================= LIVE WORD WATCH ================= -->

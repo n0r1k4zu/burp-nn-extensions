@@ -201,7 +201,34 @@ class DecodeReplacePanel(JPanel):
         detail_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, original_block, decoded_block)
         detail_split.setResizeWeight(0.5)
         detail_panel.add(detail_split, BorderLayout.CENTER)
-        detail_panel.setPreferredSize(Dimension(100, 130))
+
+        # A standalone left-to-right decoder. It is deliberately separate
+        # from the row's rule Codec so pasted inspection text never changes
+        # how an insertion point will be rewritten on send.
+        selection_panel = JPanel(BorderLayout())
+        selection_controls = JPanel(FlowLayout(FlowLayout.LEFT))
+        self.selection_codec_combo = JComboBox(list(codec_engine.CODEC_NAMES))
+        self.selection_codec_combo.setEditable(True)
+        self.selection_decode_button = JButton("Decode pasted text", actionPerformed=self._on_selection_decode)
+        selection_controls.add(JLabel("Decode chain:"))
+        selection_controls.add(self.selection_codec_combo)
+        selection_controls.add(self.selection_decode_button)
+        selection_controls.add(JLabel("3+ layers: URL -> Base64 -> URL"))
+        self.selection_input_detail, selection_input_scroll = _make_detail_area()
+        self.selection_input_detail.setEditable(True)
+        self.selection_decode_detail, selection_result_scroll = _make_detail_area()
+        input_block = JPanel(BorderLayout())
+        input_block.add(JLabel("Paste text to decode:"), BorderLayout.NORTH)
+        input_block.add(selection_input_scroll, BorderLayout.CENTER)
+        result_block = JPanel(BorderLayout())
+        result_block.add(JLabel("Decoded result:"), BorderLayout.NORTH)
+        result_block.add(selection_result_scroll, BorderLayout.CENTER)
+        selection_split = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, input_block, result_block)
+        selection_split.setResizeWeight(0.5)
+        selection_panel.add(selection_controls, BorderLayout.NORTH)
+        selection_panel.add(selection_split, BorderLayout.CENTER)
+        detail_panel.add(selection_panel, BorderLayout.SOUTH)
+        detail_panel.setPreferredSize(Dimension(100, 245))
 
         main_split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(self.table), detail_panel)
         main_split.setResizeWeight(0.7)
@@ -209,7 +236,9 @@ class DecodeReplacePanel(JPanel):
 
     def _configure_editors(self):
         codec_col = self.table.getColumnModel().getColumn(4)
-        codec_col.setCellEditor(DefaultCellEditor(JComboBox(list(codec_engine.CODEC_NAMES))))
+        codec_combo = JComboBox(list(codec_engine.CODEC_NAMES))
+        codec_combo.setEditable(True)
+        codec_col.setCellEditor(DefaultCellEditor(codec_combo))
 
     def _on_enabled_toggle(self, event):
         self.settings.enabled = self.enabled_checkbox.isSelected()
@@ -219,6 +248,23 @@ class DecodeReplacePanel(JPanel):
             self.settings.enabled_tool_flags.add(flag)
         else:
             self.settings.enabled_tool_flags.discard(flag)
+
+    def _on_selection_decode(self, event):
+        selected = self.selection_input_detail.getText()
+        if not selected:
+            self.selection_decode_detail.setText("Paste text into the left area first.")
+            return
+        codec_name = self.selection_codec_combo.getEditor().getItem()
+        if codec_name is None:
+            self.selection_decode_detail.setText("Choose or enter a Decode chain first.")
+            return
+        try:
+            decoded = codec_engine.decode_value(codec_name, selected)
+            self.selection_decode_detail.setText(decoded)
+        except Exception as e:
+            self.selection_decode_detail.setText(
+                u"(decode failed with Codec=%s: %s)" % (codec_name, e))
+        self.selection_decode_detail.setCaretPosition(0)
 
     def _refresh_detail(self):
         row = self.table.getSelectedRow()

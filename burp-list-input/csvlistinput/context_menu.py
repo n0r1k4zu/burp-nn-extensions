@@ -23,11 +23,12 @@ Both reuse the same selection-extraction logic (_extract_selection).
 import traceback
 
 from java.awt.event import ActionListener
-from javax.swing import JMenuItem
+from javax.swing import JMenuItem, JOptionPane
 
 from burp import IContextMenuFactory, IContextMenuInvocation
 
 from csvlistinput import detection_engine, matching
+from csvlistinput import statistics_engine
 from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space
 
 _REQUEST_CONTEXTS = set([
@@ -114,10 +115,44 @@ class _SendToDecodeAction(ActionListener):
             self.on_decode(self.selected_text)
 
 
+class _GroupHistoryAction(ActionListener):
+    """Append a user-named bracket tag to the selected History comments."""
+    def __init__(self, messages, log_fn, error_fn):
+        self.messages = messages
+        self.log_fn = log_fn
+        self.error_fn = error_fn
+
+    def actionPerformed(self, event):
+        name = JOptionPane.showInputDialog(None, 'Group name:', 'MyTools: Group selected packets',
+                                           JOptionPane.QUESTION_MESSAGE)
+        if name is None:
+            return
+        try:
+            changed = statistics_engine.add_group(self.messages, name)
+            if self.log_fn:
+                self.log_fn('Statistics: added group [%s] to %d selected packet(s).' % (name, changed))
+        except Exception as e:
+            if self.error_fn:
+                self.error_fn('Statistics: Group selected packets', str(e), traceback.format_exc())
+
+
+class _AuraTargetAction(ActionListener):
+    def __init__(self, message, callback, log_fn):
+        self.message = message
+        self.callback = callback
+        self.log_fn = log_fn
+
+    def actionPerformed(self, event):
+        if self.callback:
+            self.callback(self.message)
+        elif self.log_fn:
+            self.log_fn('Aura Diagnostic: panel is not available.')
+
+
 class ContextMenuFactory(IContextMenuFactory):
     def __init__(self, helpers, armed_target, decode_replace_target, request_replace_store,
                  response_replace_store, on_armed=None, on_replace_added=None, on_decode=None,
-                 log_fn=None, error_fn=None):
+                 on_aura_target=None, log_fn=None, error_fn=None):
         self.helpers = helpers
         self.armed_target = armed_target
         self.decode_replace_target = decode_replace_target
@@ -126,6 +161,7 @@ class ContextMenuFactory(IContextMenuFactory):
         self.on_armed = on_armed
         self.on_replace_added = on_replace_added
         self.on_decode = on_decode
+        self.on_aura_target = on_aura_target
         self.log_fn = log_fn
         self.error_fn = error_fn
 
@@ -147,6 +183,14 @@ class ContextMenuFactory(IContextMenuFactory):
             self.helpers, self.decode_replace_target, message, "Target & Replace with Decode & Encode",
             self.on_armed, self.log_fn, self.error_fn))
         items.append(decode_replace_item)
+
+        group_item = JMenuItem('MyTools: Group selected History packets')
+        group_item.addActionListener(_GroupHistoryAction(messages, self.log_fn, self.error_fn))
+        items.append(group_item)
+
+        aura_item = JMenuItem('MyTools: Set Aura diagnostic target')
+        aura_item.addActionListener(_AuraTargetAction(message, self.on_aura_target, self.log_fn))
+        items.append(aura_item)
 
         selected_text, side_label = self._extract_selection(invocation, message)
         if selected_text:

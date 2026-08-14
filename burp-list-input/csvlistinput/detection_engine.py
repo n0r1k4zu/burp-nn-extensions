@@ -29,14 +29,233 @@ so the UI can flag them rather than presenting them at full confidence.
 Off by default: recovered results can land at the wrong nesting level if
 the corruption goes deep enough, which is a real risk for a tool whose
 whole point is precise byte-offset substitution.
+
+``detect()`` is intentionally a compatibility facade.  Its implementation is
+split into DetectionContext (one Burp analysis), DetectionPipeline (ordered
+transport/header/body stages), and DetectionEngine (bounded caching/resource
+policy).  Every feature should call this facade or an explicitly configured
+DetectionEngine rather than invoking an individual decomposer directly.
 """
 
+import hashlib
+import threading
 import traceback
+from collections import OrderedDict
 
 from csvlistinput import json_offset_parser, multipart_decomposer, xml_offset_scanner
 from csvlistinput.constants import BurpParamType, EscapeMode, InsertionPointType, NESTED_JSON_MARKER, NESTED_XML_MARKER
 from csvlistinput.models import InsertionPoint
 from csvlistinput.utils import bytes_to_bytestring, looks_like_json, looks_like_xml, url_decode_with_map
+
+
+# These defaults are deliberately conservative enough not to affect normal
+# application traffic, while giving every consumer of this module the same
+# protection against pathological history entries.  Callers that need legacy
+# unlimited-body behaviour can construct DetectionEngine(max_body_bytes=None).
+DEFAULT_CACHE_SIZE = 64
+DEFAULT_MAX_CACHEABLE_BYTES = 1024 * 1024
+DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024
+DEFAULT_MAX_JSON_STRUCTURE_DEPTH = 256
+
+
+def _clone_point(point):
+    """Return an independent copy suitable for crossing a cache boundary.
+
+    UI code is allowed to retain and annotate the returned points.  Returning
+    the cache's own instances would therefore make one tab capable of changing
+    the result later observed by another tab.
+    """
+    clone = InsertionPoint(
+        path=point.path, type_=point.type, start=point.start, end=point.end,
+        original_value=point.original_value, context=point.context,
+        nesting_depth=point.nesting_depth,
+        container_chain=[dict(item) for item in point.container_chain],
+        quote_char=point.quote_char,
+        multipart_part_index=point.multipart_part_index)
+    clone.recovered = bool(getattr(point, 'recovered', False))
+    return clone
+
+
+def _clone_points(points):
+    return [_clone_point(point) for point in points]
+
+
+def _service_cache_key(http_service):
+    if http_service is None:
+        return None
+    try:
+        return (http_service.getProtocol(), http_service.getHost(), http_service.getPort())
+    except Exception:
+        # An unusual/custom IHttpService implementation should not prevent
+        # detection.  Disabling cache reuse for it is safer than guessing.
+        return ('uncacheable-service', id(http_service))
+
+
+def _json_structure_depth_exceeds(text, maximum):
+    """Cheap, string-aware guard for structurally pathological JSON.
+
+    This is not a parser and does not decide validity.  It only counts object
+    and array delimiters outside quoted strings before the recursive parser is
+    entered.  Exact parsing and byte offsets remain the parser's responsibility.
+    """
+    if maximum is None:
+        return False
+    depth = 0
+    in_string = False
+    escaped = False
+    for ch in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == '\\':
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == '{' or ch == '[':
+            depth += 1
+            if depth > maximum:
+                return True
+        elif ch == '}' or ch == ']':
+            if depth:
+                depth -= 1
+    return False
+
+
+def _deduplicate_points(points):
+    """Suppress only byte-identical discoveries, preserving first-seen order.
+
+    Repeated parameter names at different offsets remain distinct.  This only
+    removes the same structural point emitted twice by overlapping analyzers.
+    """
+    seen = set()
+    unique = []
+    for point in points:
+        key = (point.path, point.type, point.start, point.end)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(point)
+    return unique
+
+
+class DetectionContext(object):
+    """Immutable request-analysis inputs shared by all detection stages."""
+
+    def __init__(self, helpers, request_bytes, http_service, buf, request_info,
+                 on_error=None, lenient=False, max_body_bytes=None,
+                 max_json_structure_depth=None):
+        self.helpers = helpers
+        self.request_bytes = request_bytes
+        self.http_service = http_service
+        self.buf = buf
+        self.request_info = request_info
+        self.headers = list(request_info.getHeaders())
+        self.body_offset = request_info.getBodyOffset()
+        self.on_error = on_error
+        self.lenient = lenient
+        self.max_body_bytes = max_body_bytes
+        self.max_json_structure_depth = max_json_structure_depth
+
+
+class DetectionEngine(object):
+    """Reusable, thread-safe request detector with a bounded result cache.
+
+    The public module-level ``detect`` function delegates to one instance of
+    this class, so Target Mapping, Decode/Replace, and Parameters all use the
+    exact same pipeline.  A separate instance is useful in tests or
+    when a caller needs different resource limits.
+    """
+
+    def __init__(self, cache_size=DEFAULT_CACHE_SIZE,
+                 max_cacheable_bytes=DEFAULT_MAX_CACHEABLE_BYTES,
+                 max_body_bytes=DEFAULT_MAX_BODY_BYTES,
+                 max_json_structure_depth=DEFAULT_MAX_JSON_STRUCTURE_DEPTH):
+        self.cache_size = max(0, int(cache_size or 0))
+        self.max_cacheable_bytes = max_cacheable_bytes
+        self.max_body_bytes = max_body_bytes
+        self.max_json_structure_depth = max_json_structure_depth
+        self._cache = OrderedDict()
+        self._lock = threading.RLock()
+        self._hits = 0
+        self._misses = 0
+
+    def clear_cache(self):
+        with self._lock:
+            self._cache.clear()
+            self._hits = 0
+            self._misses = 0
+
+    def cache_stats(self):
+        with self._lock:
+            return {'hits': self._hits, 'misses': self._misses,
+                    'entries': len(self._cache)}
+
+    def _cache_key(self, buf, http_service, lenient):
+        try:
+            # Jython 2 byte-string: passing it directly avoids an implicit
+            # ASCII decode of bytes >= 0x80.
+            digest = hashlib.sha256(buf).digest()
+        except TypeError:
+            # Python 3 regression runner, where hashlib requires bytes.
+            digest = hashlib.sha256(buf.encode('latin-1')).digest()
+        return (digest, len(buf), _service_cache_key(http_service), bool(lenient),
+                self.max_body_bytes, self.max_json_structure_depth)
+
+    def _can_cache(self, buf):
+        return (self.cache_size > 0 and
+                (self.max_cacheable_bytes is None or len(buf) <= self.max_cacheable_bytes))
+
+    def _touch_cache_key(self, key):
+        # OrderedDict.move_to_end is not available on every Jython 2.7
+        # distribution supported by Burp.
+        value = self._cache.pop(key)
+        self._cache[key] = value
+
+    def detect(self, helpers, request_bytes, http_service=None, on_error=None, lenient=False):
+        buf = bytes_to_bytestring(helpers, request_bytes)
+        cacheable = self._can_cache(buf)
+        key = self._cache_key(buf, http_service, lenient) if cacheable else None
+        cached_result = None
+        if cacheable:
+            with self._lock:
+                cached = self._cache.get(key)
+                if cached is not None:
+                    self._hits += 1
+                    self._touch_cache_key(key)
+                    cached_points, cached_errors = cached
+                    cached_result = (_clone_points(cached_points), list(cached_errors))
+                else:
+                    self._misses += 1
+        if cached_result is not None:
+            cached_points, cached_errors = cached_result
+            for message in cached_errors:
+                _report(on_error, message)
+            return cached_points
+
+        errors = []
+
+        def capture_error(message):
+            errors.append(message)
+            _report(on_error, message)
+
+        request_info = _analyze_request(helpers, request_bytes, http_service)
+        context = DetectionContext(
+            helpers, request_bytes, http_service, buf, request_info,
+            on_error=capture_error, lenient=lenient,
+            max_body_bytes=self.max_body_bytes,
+            max_json_structure_depth=self.max_json_structure_depth)
+        points = DetectionPipeline(context).run()
+
+        if cacheable:
+            with self._lock:
+                self._cache[key] = (_clone_points(points), list(errors))
+                self._touch_cache_key(key)
+                while len(self._cache) > self.cache_size:
+                    self._cache.popitem(last=False)
+        return points
 
 
 def _identity_decode(buf, start, end):
@@ -82,7 +301,8 @@ def _make_recovered_reporter(on_error, label):
     return on_recovered
 
 
-def _recurse_into_leaf_value(buf, ip, decode_fn, out_points, on_error=None, lenient=False):
+def _recurse_into_leaf_value(buf, ip, decode_fn, out_points, on_error=None, lenient=False,
+                             max_json_structure_depth=None):
     """Given a flat InsertionPoint `ip` (already appended to out_points),
     check whether its value is itself a serialized JSON or XML document
     and, if so, append deeper InsertionPoints for what's inside it --
@@ -107,6 +327,11 @@ def _recurse_into_leaf_value(buf, ip, decode_fn, out_points, on_error=None, leni
         return decoded_to_raw[local_pos]
 
     if looks_like_json(stripped):
+        if _json_structure_depth_exceeds(stripped, max_json_structure_depth):
+            _report(on_error, "%s: nested JSON expansion skipped because structural nesting "
+                              "exceeds the configured depth limit of %d"
+                              % (ip.path, max_json_structure_depth))
+            return
         inner = None
         try:
             inner = json_offset_parser.detect_in_text(
@@ -150,7 +375,8 @@ def _get_header_value(headers_list, name):
     return None
 
 
-def _extract_header_points(buf, headers_list, body_offset, on_error=None, lenient=False):
+def _extract_header_points(buf, headers_list, body_offset, on_error=None, lenient=False,
+                           max_json_structure_depth=None):
     points = []
     first_line_end = buf.find('\r\n', 0)
     if first_line_end == -1:
@@ -189,11 +415,14 @@ def _extract_header_points(buf, headers_list, body_offset, on_error=None, lenien
             path=path, type_=InsertionPointType.HEADER, start=v_start, end=v_end,
             original_value=buf[v_start:v_end], context=EscapeMode.RAW, nesting_depth=0)
         points.append(ip)
-        _recurse_into_leaf_value(buf, ip, _identity_decode, points, on_error=on_error, lenient=lenient)
+        _recurse_into_leaf_value(
+            buf, ip, _identity_decode, points, on_error=on_error, lenient=lenient,
+            max_json_structure_depth=max_json_structure_depth)
     return points
 
 
-def _decompose_multipart_part(buf, part, out_points, on_error=None, lenient=False):
+def _decompose_multipart_part(buf, part, out_points, on_error=None, lenient=False,
+                              max_json_structure_depth=None):
     body_start = part['body_start']
     body_end = part['body_end']
     if body_start >= body_end:
@@ -205,6 +434,11 @@ def _decompose_multipart_part(buf, part, out_points, on_error=None, lenient=Fals
 
     sub_points = None
     if 'json' in ct or (not ct and looks_like_json(text)):
+        if _json_structure_depth_exceeds(text, max_json_structure_depth):
+            _report(on_error, "%s: JSON expansion skipped because structural nesting exceeds "
+                              "the configured depth limit of %d"
+                              % (prefix, max_json_structure_depth))
+            return
         try:
             sub_points = json_offset_parser.detect(buf, body_start, body_end, allow_lenient=lenient,
                                                      on_recovered=_make_recovered_reporter(on_error, prefix),
@@ -232,7 +466,8 @@ def _decompose_multipart_part(buf, part, out_points, on_error=None, lenient=Fals
         out_points.append(p)
 
 
-def _add_multipart_attr_params(request_info, buf, out_points, on_error=None, lenient=False):
+def _add_multipart_attr_params(request_info, buf, out_points, on_error=None, lenient=False,
+                               max_json_structure_depth=None):
     for param in request_info.getParameters():
         if param.getType() != BurpParamType.MULTIPART_ATTR:
             continue
@@ -243,10 +478,13 @@ def _add_multipart_attr_params(request_info, buf, out_points, on_error=None, len
             path='multipart[' + name + ']', type_=InsertionPointType.MULTIPART_ATTR,
             start=start, end=end, original_value=buf[start:end], context=EscapeMode.RAW)
         out_points.append(ip)
-        _recurse_into_leaf_value(buf, ip, _identity_decode, out_points, on_error=on_error, lenient=lenient)
+        _recurse_into_leaf_value(
+            buf, ip, _identity_decode, out_points, on_error=on_error, lenient=lenient,
+            max_json_structure_depth=max_json_structure_depth)
 
 
-def _add_body_fallback_params(request_info, buf, out_points, on_error=None, lenient=False):
+def _add_body_fallback_params(request_info, buf, out_points, on_error=None, lenient=False,
+                              max_json_structure_depth=None):
     for param in request_info.getParameters():
         if param.getType() != BurpParamType.BODY:
             continue
@@ -259,13 +497,21 @@ def _add_body_fallback_params(request_info, buf, out_points, on_error=None, leni
         out_points.append(ip)
         # x-www-form-urlencoded values are percent-encoded in the raw buffer.
         _recurse_into_leaf_value(buf, ip, lambda b, s, e: url_decode_with_map(b, s, e, True),
-                                  out_points, on_error=on_error, lenient=lenient)
+                                  out_points, on_error=on_error, lenient=lenient,
+                                  max_json_structure_depth=max_json_structure_depth)
 
 
-def _process_body(request_info, buf, out_points, on_error=None, lenient=False):
+def _process_body(request_info, buf, out_points, on_error=None, lenient=False,
+                  max_body_bytes=None, max_json_structure_depth=None):
     body_offset = request_info.getBodyOffset()
     body_end = len(buf)
     if body_offset >= body_end:
+        return
+    body_size = body_end - body_offset
+    if max_body_bytes is not None and body_size > max_body_bytes:
+        _report(on_error, "Body detection skipped: %d bytes exceeds the configured %d-byte limit; "
+                          "URL, cookie and header points were still collected."
+                          % (body_size, max_body_bytes))
         return
     headers_list = list(request_info.getHeaders())
     content_type = _get_header_value(headers_list, 'content-type') or ''
@@ -277,13 +523,22 @@ def _process_body(request_info, buf, out_points, on_error=None, lenient=False):
             boundary = multipart_decomposer.parse_boundary(content_type)
             parts = multipart_decomposer.decompose(buf, body_offset, body_end, boundary) if boundary else []
             for part in parts:
-                _decompose_multipart_part(buf, part, out_points, on_error=on_error, lenient=lenient)
-            _add_multipart_attr_params(request_info, buf, out_points, on_error=on_error, lenient=lenient)
+                _decompose_multipart_part(
+                    buf, part, out_points, on_error=on_error, lenient=lenient,
+                    max_json_structure_depth=max_json_structure_depth)
+            _add_multipart_attr_params(
+                request_info, buf, out_points, on_error=on_error, lenient=lenient,
+                max_json_structure_depth=max_json_structure_depth)
         except Exception:
             _report_exc(on_error, "multipart body detection raised:")
         return
 
     if 'json' in ct_lower or looks_like_json(body_text):
+        if _json_structure_depth_exceeds(body_text, max_json_structure_depth):
+            _report(on_error, "JSON body detection skipped: structural nesting exceeds the "
+                              "configured depth limit of %d; URL, cookie and header points "
+                              "were still collected." % max_json_structure_depth)
+            return
         json_points = None
         try:
             json_points = json_offset_parser.detect(buf, body_offset, body_end, allow_lenient=lenient,
@@ -313,7 +568,80 @@ def _process_body(request_info, buf, out_points, on_error=None, lenient=False):
         out_points.extend(xml_points)
         return
 
-    _add_body_fallback_params(request_info, buf, out_points, on_error=on_error, lenient=lenient)
+    _add_body_fallback_params(
+        request_info, buf, out_points, on_error=on_error, lenient=lenient,
+        max_json_structure_depth=max_json_structure_depth)
+
+
+def _analyze_request(helpers, request_bytes, http_service):
+    """Keep Burp's overloaded analyzeRequest selection in one place."""
+    if http_service is not None:
+        return helpers.analyzeRequest(http_service, request_bytes)
+    return helpers.analyzeRequest(request_bytes)
+
+
+def _url_form_decode(buf, start, end):
+    return url_decode_with_map(buf, start, end, True)
+
+
+def _cookie_decode(buf, start, end):
+    return url_decode_with_map(buf, start, end, False)
+
+
+def _collect_url_cookie_points(context, out_points):
+    """Collect Burp-analyzed transport parameters and expand nested values."""
+    for param in context.request_info.getParameters():
+        ptype = param.getType()
+        if ptype == BurpParamType.URL:
+            start, end = param.getValueStart(), param.getValueEnd()
+            ip = InsertionPoint(
+                path='url[' + param.getName() + ']', type_=InsertionPointType.URL_PARAM,
+                start=start, end=end, original_value=context.buf[start:end],
+                context=EscapeMode.URL_COMPONENT)
+            out_points.append(ip)
+            _recurse_into_leaf_value(
+                context.buf, ip, _url_form_decode, out_points,
+                on_error=context.on_error, lenient=context.lenient,
+                max_json_structure_depth=context.max_json_structure_depth)
+        elif ptype == BurpParamType.COOKIE:
+            start, end = param.getValueStart(), param.getValueEnd()
+            ip = InsertionPoint(
+                path='cookie[' + param.getName() + ']', type_=InsertionPointType.COOKIE,
+                start=start, end=end, original_value=context.buf[start:end],
+                context=EscapeMode.URL_COMPONENT)
+            out_points.append(ip)
+            _recurse_into_leaf_value(
+                context.buf, ip, _cookie_decode, out_points,
+                on_error=context.on_error, lenient=context.lenient,
+                max_json_structure_depth=context.max_json_structure_depth)
+        # BODY/XML/XML_ATTR/MULTIPART_ATTR/JSON are intentionally handled by
+        # the shared body stage for deeper and deterministic granularity.
+
+
+class DetectionPipeline(object):
+    """Ordered request detection stages operating on one analyzed context."""
+
+    def __init__(self, context):
+        self.context = context
+
+    def run(self):
+        points = []
+        _collect_url_cookie_points(self.context, points)
+        points.extend(_extract_header_points(
+            self.context.buf, self.context.headers, self.context.body_offset,
+            on_error=self.context.on_error, lenient=self.context.lenient,
+            max_json_structure_depth=self.context.max_json_structure_depth))
+        try:
+            _process_body(
+                self.context.request_info, self.context.buf, points,
+                on_error=self.context.on_error, lenient=self.context.lenient,
+                max_body_bytes=self.context.max_body_bytes,
+                max_json_structure_depth=self.context.max_json_structure_depth)
+        except Exception:
+            # Body failure must never discard independently collected URL,
+            # cookie and header points.
+            _report_exc(self.context.on_error, "body detection raised unexpectedly:")
+        return _deduplicate_points(points)
 
 
 def detect(helpers, request_bytes, http_service=None, on_error=None, lenient=False):
@@ -329,50 +657,19 @@ def detect(helpers, request_bytes, http_service=None, on_error=None, lenient=Fal
     opts into best-effort recovery for malformed JSON (see module
     docstring) -- resulting points are marked `.recovered = True`.
     """
-    buf = bytes_to_bytestring(helpers, request_bytes)
-    if http_service is not None:
-        request_info = helpers.analyzeRequest(http_service, request_bytes)
-    else:
-        request_info = helpers.analyzeRequest(request_bytes)
+    return _DEFAULT_ENGINE.detect(
+        helpers, request_bytes, http_service=http_service,
+        on_error=on_error, lenient=lenient)
 
-    points = []
-    for param in request_info.getParameters():
-        ptype = param.getType()
-        if ptype == BurpParamType.URL:
-            start, end = param.getValueStart(), param.getValueEnd()
-            ip = InsertionPoint(
-                path='url[' + param.getName() + ']', type_=InsertionPointType.URL_PARAM,
-                start=start, end=end, original_value=buf[start:end], context=EscapeMode.URL_COMPONENT)
-            points.append(ip)
-            # Query string values are percent-encoded in the raw buffer.
-            _recurse_into_leaf_value(buf, ip, lambda b, s, e: url_decode_with_map(b, s, e, True),
-                                      points, on_error=on_error, lenient=lenient)
-        elif ptype == BurpParamType.COOKIE:
-            start, end = param.getValueStart(), param.getValueEnd()
-            ip = InsertionPoint(
-                path='cookie[' + param.getName() + ']', type_=InsertionPointType.COOKIE,
-                start=start, end=end, original_value=buf[start:end], context=EscapeMode.URL_COMPONENT)
-            points.append(ip)
-            # Cookies aren't form-urlencoded by spec, but %XX escaping of
-            # special characters is common; '+' is left literal (not
-            # decoded to space) since cookies don't share that convention.
-            _recurse_into_leaf_value(buf, ip, lambda b, s, e: url_decode_with_map(b, s, e, False),
-                                      points, on_error=on_error, lenient=lenient)
-        # PARAM_BODY/PARAM_XML/PARAM_XML_ATTR/PARAM_MULTIPART_ATTR/PARAM_JSON are
-        # deliberately NOT taken from analyzeRequest here -- the body is handled
-        # by our own recursive decomposers below for Burp-Scanner-equivalent (or
-        # deeper) granularity. PARAM_BODY is used only as a fallback when the
-        # body isn't JSON/XML/multipart. PARAM_MULTIPART_ATTR is added within
-        # the multipart branch.
 
-    points.extend(_extract_header_points(buf, list(request_info.getHeaders()), request_info.getBodyOffset(),
-                                          on_error=on_error, lenient=lenient))
+_DEFAULT_ENGINE = DetectionEngine()
 
-    try:
-        _process_body(request_info, buf, points, on_error=on_error, lenient=lenient)
-    except Exception:
-        # Never let a body-parsing edge case take down the whole detection
-        # pass -- URL/header/cookie points already collected are still useful.
-        _report_exc(on_error, "body detection raised unexpectedly:")
 
-    return points
+def clear_cache():
+    """Clear the shared detector cache (primarily useful for diagnostics)."""
+    _DEFAULT_ENGINE.clear_cache()
+
+
+def cache_stats():
+    """Return a snapshot of shared cache hit/miss counters."""
+    return _DEFAULT_ENGINE.cache_stats()

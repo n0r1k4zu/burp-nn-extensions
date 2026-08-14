@@ -78,7 +78,7 @@ def bytes_to_bytestring(helpers, java_bytes):
     (e.g. UTF-8-encoded Japanese text) is involved on either side.
     """
     s = helpers.bytesToString(java_bytes)
-    return unicode(s).encode('latin-1')
+    return _UNICODE_TYPE(s).encode('latin-1')
 
 
 def bytestring_to_bytes(helpers, s):

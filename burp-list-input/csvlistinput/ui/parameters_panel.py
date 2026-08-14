@@ -1,25 +1,35 @@
 # -*- coding: utf-8 -*-
 """Parameters tab: a range-scoped, de-duplicated Proxy History inventory."""
 
+from threading import Thread
+
 from java.awt import BorderLayout, Color, FlowLayout
-from java.lang import Integer
+from java.lang import Integer, Runnable
 from java.util import Comparator
 from java.util.regex import Pattern
 from javax.swing import (JButton, JLabel, JPanel, JScrollPane, JTable, JTextField, JSplitPane,
-                          JComboBox, JTextArea, ListSelectionModel)
+                          JComboBox, JTextArea, ListSelectionModel, SwingUtilities)
 from javax.swing.event import DocumentListener, ListSelectionListener
 from javax.swing.table import AbstractTableModel, DefaultTableCellRenderer, TableRowSorter
 from javax.swing import RowFilter
 
 from csvlistinput import decode_engine, parameter_inventory_engine
 
-COLUMNS = ["#", "Identified Parameter", "Occurrences", "Packet Nos"]
-VALUE_COLUMNS = ["#", "Value", "Occurrences", "Packet Nos"]
+COLUMNS = ["#", "Group", "Identified Parameter", "Occurrences", "Packet No"]
+VALUE_COLUMNS = ["#", "Group", "Value", "Occurrences", "Packet No"]
 _NONE_DECODE_LABEL = "None"
 _DECODE_LABELS = [_NONE_DECODE_LABEL] + [
     label for label in decode_engine.TRANSFORM_LABELS if "Decode" in label or label == "ROT13"]
 _HIGH_COLOR = Color(255, 204, 204)
 _MEDIUM_COLOR = Color(255, 239, 184)
+
+
+class _UiRunnable(Runnable):
+    def __init__(self, fn):
+        self.fn = fn
+
+    def run(self):
+        self.fn()
 
 
 class ParametersTableModel(AbstractTableModel):
@@ -41,7 +51,7 @@ class ParametersTableModel(AbstractTableModel):
         return COLUMNS[col]
 
     def getColumnClass(self, col):
-        return Integer if col in (0, 2) else str
+        return Integer if col in (0, 3) else str
 
     def row_at(self, row):
         return self.rows[row] if 0 <= row < len(self.rows) else None
@@ -51,10 +61,12 @@ class ParametersTableModel(AbstractTableModel):
         if col == 0:
             return Integer(row + 1)
         if col == 1:
-            return entry['path']
+            return ', '.join(entry.get('groups', []))
         if col == 2:
-            return Integer(entry['count'])
+            return entry['path']
         if col == 3:
+            return Integer(entry['count'])
+        if col == 4:
             return ','.join(str(no) for no in entry['packet_nos'])
         return None
 
@@ -99,17 +111,19 @@ class ParameterValuesTableModel(AbstractTableModel):
         return VALUE_COLUMNS[col]
 
     def getColumnClass(self, col):
-        return Integer if col in (0, 2) else str
+        return Integer if col in (0, 3) else str
 
     def getValueAt(self, row, col):
         entry = self.rows[row]
         if col == 0:
             return Integer(row + 1)
         if col == 1:
-            return entry['value']
+            return ', '.join(entry.get('groups', []))
         if col == 2:
-            return Integer(entry['count'])
+            return entry['value']
         if col == 3:
+            return Integer(entry['count'])
+        if col == 4:
             return ','.join(str(no) for no in entry['packet_nos'])
         return None
 
@@ -169,6 +183,8 @@ class ParametersPanel(JPanel):
         self.error_fn = error_fn
         self.start_packet_no = None
         self.end_packet_no = None
+        self._scan_worker = None
+        self._cancel_requested = False
 
         top = JPanel(FlowLayout(FlowLayout.LEFT))
         top.add(JLabel("Packet No range:"))
@@ -184,6 +200,9 @@ class ParametersPanel(JPanel):
         top.add(self.all_button)
         self.scan_button = JButton("Build parameter list", actionPerformed=self._on_scan)
         top.add(self.scan_button)
+        self.cancel_button = JButton("Cancel", actionPerformed=self._on_cancel)
+        self.cancel_button.setEnabled(False)
+        top.add(self.cancel_button)
         self.clear_button = JButton("Clear", actionPerformed=self._on_clear)
         top.add(self.clear_button)
         top.add(JLabel("Red: authorization/money/account fields   Yellow: tokens, identifiers, PII candidates"))
@@ -192,7 +211,7 @@ class ParametersPanel(JPanel):
         self.table_model = ParametersTableModel()
         self.table = JTable(self.table_model)
         self.table_sorter = TableRowSorter(self.table_model)
-        self.table_sorter.setComparator(3, _PacketNosComparator())
+        self.table_sorter.setComparator(4, _PacketNosComparator())
         self.table.setRowSorter(self.table_sorter)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         renderer = _RiskRenderer()
@@ -203,7 +222,7 @@ class ParametersPanel(JPanel):
         self.values_table_model = ParameterValuesTableModel()
         self.values_table = JTable(self.values_table_model)
         self.values_table_sorter = TableRowSorter(self.values_table_model)
-        self.values_table_sorter.setComparator(3, _PacketNosComparator())
+        self.values_table_sorter.setComparator(4, _PacketNosComparator())
         self.values_table.setRowSorter(self.values_table_sorter)
         self.values_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.values_table.getSelectionModel().addListSelectionListener(_ValueSelectionListener(self))
@@ -286,29 +305,70 @@ class ParametersPanel(JPanel):
                                         end_packet_no if end_packet_no is not None else "last")
 
     def _on_scan(self, event):
+        if self._scan_worker is not None:
+            return
         start_packet_no, end_packet_no, error = self._selected_range()
         if error:
             self.status_label.setText(error)
             return
+        self._cancel_requested = False
+        self.scan_button.setEnabled(False)
+        self.scan_button.setText("Building...")
+        self.cancel_button.setEnabled(True)
+        self.cancel_button.setText("Cancel build")
+        self.status_label.setText("Building parameter list in the background...")
+        self._scan_worker = Thread(target=self._scan_worker_run,
+                                    args=(start_packet_no, end_packet_no))
+        self._scan_worker.setDaemon(True)
+        self._scan_worker.start()
+
+    def _scan_worker_run(self, start_packet_no, end_packet_no):
         try:
             rows = parameter_inventory_engine.collect(
-                self.callbacks, self.helpers, start_packet_no, end_packet_no)
+                self.callbacks, self.helpers, start_packet_no, end_packet_no,
+                cancel_check=lambda: self._cancel_requested)
+            cancelled = self._cancel_requested
+            SwingUtilities.invokeLater(_UiRunnable(
+                lambda: self._scan_finished(rows, cancelled, start_packet_no, end_packet_no)))
         except Exception as e:
-            self.status_label.setText("Parameter inventory failed: %s" % e)
-            if self.error_fn:
-                self.error_fn("Parameters", "Parameter inventory failed: %s" % e)
-            return
+            SwingUtilities.invokeLater(_UiRunnable(lambda error=e: self._scan_failed(error)))
+
+    def _restore_scan_buttons(self):
+        self._scan_worker = None
+        self.scan_button.setEnabled(True)
+        self.scan_button.setText("Build parameter list")
+        self.cancel_button.setEnabled(False)
+        self.cancel_button.setText("Cancel")
+
+    def _scan_finished(self, rows, cancelled, start_packet_no, end_packet_no):
         self.table_model.set_rows(rows)
         self.values_table_model.set_rows([])
         self.values_label.setText("Select a parameter above to display its unique values.")
         self.decoded_value_area.setText("")
         high = sum(1 for row in rows if row['risk'] == 'high')
         medium = sum(1 for row in rows if row['risk'] == 'medium')
-        self.status_label.setText("%d unique parameter(s) in %s (red: %d, yellow: %d)." % (
+        self._restore_scan_buttons()
+        prefix = "Cancelled: " if cancelled else ""
+        self.status_label.setText("%s%d unique parameter(s) in %s (red: %d, yellow: %d)." % (
+            prefix,
             len(rows), self._range_label(start_packet_no, end_packet_no), high, medium))
         if self.log_fn:
             self.log("Parameters: %d unique parameter(s) inventoried from %s." % (
                 len(rows), self._range_label(start_packet_no, end_packet_no)))
+
+    def _scan_failed(self, error):
+        self._restore_scan_buttons()
+        self.status_label.setText("Parameter inventory failed: %s" % error)
+        if self.error_fn:
+            self.error_fn("Parameters", "Parameter inventory failed: %s" % error)
+
+    def _on_cancel(self, event):
+        if self._scan_worker is None:
+            return
+        self._cancel_requested = True
+        self.cancel_button.setEnabled(False)
+        self.cancel_button.setText("Stopping...")
+        self.status_label.setText("Cancel requested; finishing the current packet...")
 
     def _on_clear(self, event):
         self.table_model.set_rows([])

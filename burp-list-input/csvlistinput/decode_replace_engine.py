@@ -34,12 +34,44 @@ def apply_rule(raw_value, rule):
     if raw_value is None:
         raw_value = ''
 
-    decoded = codec_engine.decode_value(rule.codec, raw_value)
-
     find = to_bytestring_space(rule.find)
     if not find:
         raise ValueError("Find is empty")
     replace_with = to_bytestring_space(rule.replace_with)
+
+    # URL → Base64 is commonly used for values such as
+    # ``name=alice;token=SGVsbG8%3D``.  After URL decoding the whole field is
+    # not Base64, so apply the replacement to each safe embedded token and
+    # preserve the wrapper byte-for-byte.  Re-encode the changed token and
+    # then the complete outer URL layer.
+    if codec_engine.codec_steps(rule.codec) == ["URL", "Base64"]:
+        url_decoded = codec_engine.url_decode(raw_value)
+        parts = codec_engine.base64_embedded_parts(url_decoded)
+        if parts:
+            pieces = []
+            cursor = 0
+            total = 0
+            for start, end, token_decoded in parts:
+                pieces.append(url_decoded[cursor:start])
+                if isinstance(token_decoded, _UNICODE_TYPE) and isinstance(find, _BYTES_TYPE):
+                    local_find = find.decode('latin-1')
+                    local_replace = replace_with.decode('latin-1')
+                else:
+                    local_find = find
+                    local_replace = replace_with
+                if rule.is_regex:
+                    pattern = re.compile(local_find)
+                    changed, count = pattern.subn(local_replace, token_decoded)
+                else:
+                    count = token_decoded.count(local_find)
+                    changed = token_decoded.replace(local_find, local_replace)
+                pieces.append(codec_engine.base64_encode(changed))
+                total += count
+                cursor = end
+            pieces.append(url_decoded[cursor:])
+            return codec_engine.url_encode(''.join(pieces)), total
+
+    decoded = codec_engine.decode_value(rule.codec, raw_value)
     # CPython's test runtime represents decoded codec output as text while
     # the Jython/Burp runtime uses a byte-string ``str`` for both values.
     # Normalize only that test-runtime boundary; production values are

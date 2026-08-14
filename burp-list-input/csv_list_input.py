@@ -91,6 +91,7 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
 
         from csvlistinput.armed_target import ArmedTarget
         from csvlistinput.color_snapshot_store import ColorSnapshotStore
+        from csvlistinput.comment_snapshot_store import CommentSnapshotStore
         from csvlistinput.context_menu import ContextMenuFactory
         from csvlistinput.csv_payload_store import CsvPayloadStore
         from csvlistinput.decode_replace_settings import DecodeReplaceSettings
@@ -114,13 +115,15 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         self.decode_replace_settings = DecodeReplaceSettings()
         self.error_store = ErrorStore()
         self.color_snapshot_store = ColorSnapshotStore()
+        self.comment_snapshot_store = CommentSnapshotStore()
         self.live_word_watch_settings = LiveWordWatchSettings()
         self.live_word_watch_store = LiveWordWatchStore()
 
         self.main_tab = MainTab(callbacks, self.helpers, self.armed_target, self.csv_store, self.log_store,
                                  self.replace_settings, self.request_replace_store, self.response_replace_store,
                                  self.decode_replace_settings, self.decode_replace_target, self.error_store,
-                                 self.color_snapshot_store, self.live_word_watch_settings, self.live_word_watch_store)
+                                 self.color_snapshot_store, self.comment_snapshot_store,
+                                 self.live_word_watch_settings, self.live_word_watch_store)
 
         self.http_listener = HttpListener(callbacks, self.helpers, self.armed_target,
                                            self.csv_store, self.log_store,
@@ -134,7 +137,8 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
             self.helpers, self.armed_target, self.decode_replace_target,
             self.request_replace_store, self.response_replace_store,
             on_armed=self.main_tab.refresh, on_replace_added=self.main_tab.refresh,
-            on_decode=self.main_tab.show_decode, log_fn=self.main_tab.log, error_fn=self.main_tab.log_error)
+            on_decode=self.main_tab.show_decode, on_aura_target=self.main_tab.set_aura_audit_target,
+            log_fn=self.main_tab.log, error_fn=self.main_tab.log_error)
 
         callbacks.registerHttpListener(self.http_listener)
         callbacks.registerHttpListener(self.live_word_watch_listener)

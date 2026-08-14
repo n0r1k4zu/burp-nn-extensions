@@ -94,6 +94,11 @@ def url_encode(s):
 
 
 _BASE64_CHARS_RE = re.compile(r'^[A-Za-z0-9+/]*={0,2}$')
+# A Base64 value is often embedded in a JSON/string wrapper (for example
+# ``prefix:SGVsbG8=;suffix``).  Keep this deliberately conservative: only
+# token-shaped runs are considered and the decoded bytes must look like text.
+_BASE64_TOKEN_RE = re.compile(r'(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{4,}={0,2})(?![A-Za-z0-9+/_-])')
+_HEX_TOKEN_RE = re.compile(r'(?<![0-9A-Fa-f])([0-9A-Fa-f]{4,})(?![0-9A-Fa-f])')
 
 
 def base64_decode(s):
@@ -114,6 +119,97 @@ def base64_decode(s):
 
 def base64_encode(s):
     return _from_binary(base64.b64encode(_as_binary(s)))
+
+
+def _looks_like_text(value):
+    """Return whether decoded bytes are safe to expose as replacement text."""
+    try:
+        if isinstance(value, bytes):
+            decoded = value.decode('utf-8')
+        else:
+            # Jython byte-string-space ``str`` exposes decode(); CPython's
+            # test representation is a Latin-1 ``str`` and needs the
+            # equivalent bytes round-trip first.
+            decoded = value.decode('utf-8')
+    except AttributeError:
+        try:
+            decoded = value.encode('latin-1').decode('utf-8')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            return False
+    except UnicodeDecodeError:
+        # Treat opaque binary blobs as non-candidates.  This also prevents
+        # ordinary wrapper words such as ``prefix`` from being mistaken for
+        # Base64 merely because their decoded bytes are printable by chance.
+        return False
+    for ch in decoded:
+        code = ord(ch)
+        if code < 0x20 and ch not in ('\t', '\r', '\n'):
+            return False
+    return True
+
+
+def base64_embedded_parts(value):
+    """Return ``(start, end, decoded)`` for text-like embedded Base64 runs.
+
+    This is a tolerant companion to :func:`base64_decode`; the latter remains
+    strict for standalone values.  Invalid/opaque candidates are ignored so
+    wrappers and ordinary text are never replaced accidentally.
+    """
+    parts = []
+    for match in _BASE64_TOKEN_RE.finditer(value):
+        token = match.group(1)
+        try:
+            decoded = base64_decode(token)
+        except (ValueError, TypeError, IndexError):
+            continue
+        if _looks_like_text(decoded):
+            parts.append((match.start(1), match.end(1), decoded))
+    return parts
+
+
+def base64_decode_embedded(value):
+    """Decode text-like Base64 runs while preserving surrounding text."""
+    parts = base64_embedded_parts(value)
+    if not parts:
+        raise ValueError("no embedded Base64 value found")
+    out = []
+    cursor = 0
+    for start, end, decoded in parts:
+        out.append(value[cursor:start])
+        out.append(decoded)
+        cursor = end
+    out.append(value[cursor:])
+    return ''.join(out)
+
+
+def hex_embedded_parts(value):
+    """Return text-like embedded hexadecimal runs for nested-codec preview."""
+    parts = []
+    for match in _HEX_TOKEN_RE.finditer(value):
+        token = match.group(1)
+        if len(token) % 2:
+            continue
+        try:
+            decoded = hex_decode(token)
+        except (ValueError, TypeError):
+            continue
+        if _looks_like_text(decoded):
+            parts.append((match.start(1), match.end(1), decoded))
+    return parts
+
+
+def hex_decode_embedded(value):
+    parts = hex_embedded_parts(value)
+    if not parts:
+        raise ValueError("no embedded hexadecimal value found")
+    out = []
+    cursor = 0
+    for start, end, decoded in parts:
+        out.append(value[cursor:start])
+        out.append(decoded)
+        cursor = end
+    out.append(value[cursor:])
+    return ''.join(out)
 
 
 def hex_decode(s):
@@ -221,16 +317,20 @@ CODEC_PAIRS = {
     "ROT13": (rot13, rot13),
 }
 
-# A two-layer entry is written "outer → inner": decoding runs from left
-# to right, while encoding runs in reverse.  Thus "URL → Base64" handles
-# a value that was Base64-encoded first and URL-encoded afterwards.
+# A chain is written "outer -> inner": decoding runs from left to right,
+# while encoding runs in reverse.  Thus "URL -> Base64" handles a value that
+# was Base64-encoded first and URL-encoded afterwards.  The combo box offers
+# common one/two-layer chains; it is editable, so operators can enter three
+# or more layers such as "URL -> Base64 -> URL" when needed.
 _SINGLE_CODEC_NAMES = ["None", "URL", "Base64", "Hex", "HTML Entity", "Unicode \\uXXXX", "ROT13"]
 _NESTABLE_CODEC_NAMES = [name for name in _SINGLE_CODEC_NAMES if name != "None"]
-_NESTED_SEPARATOR = u" → "
+_NESTED_SEPARATOR = " -> "
+_LEGACY_NESTED_SEPARATOR = u" → "
 
 # Exposed so the UI can build the Codec combo box without duplicating this
-# list.  Include all ordered two-layer combinations, including repeated
-# encodings such as URL → URL.
+# list. Include common ordered two-layer combinations, including repeated
+# encodings such as URL → URL. Longer chains are parsed from editable input
+# rather than generating hundreds of hard-to-navigate menu entries.
 CODEC_NAMES = list(_SINGLE_CODEC_NAMES)
 CODEC_NAMES.extend([outer + _NESTED_SEPARATOR + inner
                     for outer in _NESTABLE_CODEC_NAMES for inner in _NESTABLE_CODEC_NAMES])
@@ -244,21 +344,41 @@ def codec_steps(codec_name):
     """
     if codec_name in CODEC_PAIRS:
         return [codec_name]
-    parts = codec_name.split(_NESTED_SEPARATOR)
-    if len(parts) != 2 or any(part not in _NESTABLE_CODEC_NAMES for part in parts):
+    # Accept the former Unicode-arrow form in saved rules, while only showing
+    # ASCII separators in the UI to avoid font/encoding mojibake on Burp's
+    # Java runtime.
+    codec_name = codec_name.replace(_LEGACY_NESTED_SEPARATOR, _NESTED_SEPARATOR)
+    parts = [part.strip() for part in codec_name.split(_NESTED_SEPARATOR)]
+    if len(parts) < 2 or any(part not in _NESTABLE_CODEC_NAMES for part in parts):
         raise KeyError(codec_name)
     return parts
 
 
 def decode_value(codec_name, value):
-    """Decode one or two layers, from the outermost layer inward."""
+    """Decode one or more layers, from the outermost layer inward."""
     for step in codec_steps(codec_name):
-        value = CODEC_PAIRS[step][0](value)
+        # ``hex_decode`` historically accepts separators; when the value has
+        # non-hex wrapper text, select the embedded-token path explicitly so
+        # the wrapper is not discarded by that permissive legacy decoder.
+        if step == "Hex" and re.search(r'[^0-9A-Fa-f\s]', value):
+            value = hex_decode_embedded(value)
+            continue
+        try:
+            value = CODEC_PAIRS[step][0](value)
+        except ValueError:
+            # URL-decoded JSON/form values can contain a Base64 token next to
+            # ordinary text.  Decode those tokens in place instead of making
+            # the preview (and the rule) fail because the whole field is not
+            # itself Base64.
+            if step not in ("Base64", "Hex"):
+                raise
+            value = (base64_decode_embedded(value) if step == "Base64"
+                     else hex_decode_embedded(value))
     return value
 
 
 def encode_value(codec_name, value):
-    """Re-encode one or two layers, from the innermost layer outward."""
+    """Re-encode one or more layers, from the innermost layer outward."""
     for step in reversed(codec_steps(codec_name)):
         value = CODEC_PAIRS[step][1](value)
     return value

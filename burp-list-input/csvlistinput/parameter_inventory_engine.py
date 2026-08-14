@@ -9,7 +9,7 @@ retained only in memory so the UI can reveal them for a user-selected path.
 
 import re
 
-from csvlistinput import detection_engine
+from csvlistinput import detection_engine, statistics_engine
 
 try:
     _UNICODE_TYPE = unicode
@@ -66,7 +66,8 @@ def risk_level(path):
     return None
 
 
-def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detector=None):
+def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detector=None,
+            cancel_check=None):
     """Return inventory rows for inclusive 1-based Proxy History bounds.
 
     Each row is ``{'path', 'count', 'packet_nos', 'risk', 'values'}``, sorted
@@ -79,6 +80,8 @@ def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detect
     packet_no = 0
     for item in callbacks.getProxyHistory():
         packet_no += 1
+        if cancel_check and cancel_check():
+            break
         if start_packet_no is not None and packet_no < start_packet_no:
             continue
         if end_packet_no is not None and packet_no > end_packet_no:
@@ -92,24 +95,29 @@ def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detect
             # One malformed/unusual packet must not prevent the rest of the
             # selected history from being inventoried.
             continue
+        groups = statistics_engine.group_names(item.getComment() if hasattr(item, 'getComment') else u'')
         for point in points:
             path = point.path
             row = rows.get(path)
             if row is None:
-                row = {'path': path, 'count': 0, 'packet_nos': set(), 'risk': risk_level(path), 'values': {}}
+                row = {'path': path, 'count': 0, 'packet_nos': set(), 'groups': set(),
+                       'risk': risk_level(path), 'values': {}}
                 rows[path] = row
             row['count'] += 1
             row['packet_nos'].add(packet_no)
+            row['groups'].update(groups)
             value = _display_value(getattr(point, 'original_value', None))
             value_row = row['values'].get(value)
             if value_row is None:
-                value_row = {'value': value, 'count': 0, 'packet_nos': set()}
+                value_row = {'value': value, 'count': 0, 'packet_nos': set(), 'groups': set()}
                 row['values'][value] = value_row
             value_row['count'] += 1
             value_row['packet_nos'].add(packet_no)
+            value_row['groups'].update(groups)
     result = list(rows.values())
     for row in result:
         row['packet_nos'] = sorted(row['packet_nos'])
+        row['groups'] = sorted(row['groups'])
     result.sort(key=lambda row: row['path'].lower())
     return result
 
@@ -121,6 +129,6 @@ def value_rows(parameter_row):
     result = []
     for row in parameter_row.get('values', {}).values():
         result.append({'value': row['value'], 'count': row['count'],
-                       'packet_nos': sorted(row['packet_nos'])})
+                       'packet_nos': sorted(row['packet_nos']), 'groups': sorted(row.get('groups', set()))})
     result.sort(key=lambda row: row['value'])
     return result
