@@ -10,6 +10,7 @@ retained only in memory so the UI can reveal them for a user-selected path.
 import re
 
 from csvlistinput import detection_engine, statistics_engine
+from csvlistinput.constants import InsertionPointType
 
 try:
     _UNICODE_TYPE = unicode
@@ -81,6 +82,25 @@ def risk_level(path, aggressive=False):
     return None
 
 
+def region_for_point(point):
+    """Return the transport region represented by an insertion point."""
+    point_type = getattr(point, 'type', None)
+    if point_type == InsertionPointType.URL_PARAM:
+        return 'Path / Query'
+    if point_type == InsertionPointType.COOKIE:
+        return 'Cookie'
+    if point_type == InsertionPointType.HEADER:
+        return 'Header'
+    if point_type in (InsertionPointType.MULTIPART_ATTR, InsertionPointType.MULTIPART_BODY_LEAF):
+        return 'Multipart body'
+    if point_type in (InsertionPointType.BODY_PARAM, InsertionPointType.JSON_LEAF,
+                      InsertionPointType.JSON_LEAF_NESTED, InsertionPointType.XML_TEXT,
+                      InsertionPointType.XML_TEXT_NESTED, InsertionPointType.XML_ATTR,
+                      InsertionPointType.XML_ATTR_NESTED):
+        return 'Body'
+    return None
+
+
 def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detector=None,
             cancel_check=None, aggressive_focus=False):
     """Return inventory rows for inclusive 1-based Proxy History bounds.
@@ -115,24 +135,30 @@ def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detect
             path = point.path
             row = rows.get(path)
             if row is None:
-                row = {'path': path, 'count': 0, 'packet_nos': set(), 'groups': set(),
+                row = {'path': path, 'count': 0, 'packet_nos': set(), 'groups': set(), 'regions': set(),
                        'risk': risk_level(path, aggressive_focus), 'values': {}}
                 rows[path] = row
             row['count'] += 1
             row['packet_nos'].add(packet_no)
             row['groups'].update(groups)
+            region = region_for_point(point)
+            if region:
+                row['regions'].add(region)
             value = _display_value(getattr(point, 'original_value', None))
             value_row = row['values'].get(value)
             if value_row is None:
-                value_row = {'value': value, 'count': 0, 'packet_nos': set(), 'groups': set()}
+                value_row = {'value': value, 'count': 0, 'packet_nos': set(), 'groups': set(), 'regions': set()}
                 row['values'][value] = value_row
             value_row['count'] += 1
             value_row['packet_nos'].add(packet_no)
             value_row['groups'].update(groups)
+            if region:
+                value_row['regions'].add(region)
     result = list(rows.values())
     for row in result:
         row['packet_nos'] = sorted(row['packet_nos'])
         row['groups'] = sorted(row['groups'])
+        row['regions'] = sorted(row['regions'])
     result.sort(key=lambda row: row['path'].lower())
     return result
 
@@ -143,7 +169,10 @@ def value_rows(parameter_row):
         return []
     result = []
     for row in parameter_row.get('values', {}).values():
-        result.append({'value': row['value'], 'count': row['count'],
-                       'packet_nos': sorted(row['packet_nos']), 'groups': sorted(row.get('groups', set()))})
+        entry = {'value': row['value'], 'count': row['count'],
+                 'packet_nos': sorted(row['packet_nos']), 'groups': sorted(row.get('groups', set()))}
+        if row.get('regions'):
+            entry['regions'] = sorted(row['regions'])
+        result.append(entry)
     result.sort(key=lambda row: row['value'])
     return result

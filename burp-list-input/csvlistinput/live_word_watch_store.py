@@ -19,6 +19,7 @@ class LiveWordHit(object):
         # "not looked up yet", -1 means "looked up, not found there".
         self.packet_no = None
         self.side = None  # "Request" or "Response"
+        self.region = "Unknown"
         self.tool_label = None
         self.before = ""
         self.match = ""

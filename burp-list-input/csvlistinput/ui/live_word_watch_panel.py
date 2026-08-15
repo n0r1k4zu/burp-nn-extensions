@@ -22,7 +22,7 @@ from burp import IMessageEditorController
 from csvlistinput import decode_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
 
-COLUMNS = ["List No", "Packet No", "Req/Resp", "Before", "Match", "After"]
+COLUMNS = ["List No", "Packet No", "Region", "Req/Resp", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
 
 # Same representative decode-direction subset as the History Search tab
@@ -85,12 +85,14 @@ class LiveWordWatchTableModel(AbstractTableModel):
         if col == 1:
             return self._packet_no_display(h)
         if col == 2:
-            return h.side
+            return h.region or "Unknown"
         if col == 3:
-            return h.before
+            return h.side
         if col == 4:
-            return h.match
+            return h.before
         if col == 5:
+            return h.match
+        if col == 6:
             return h.after
         return None
 

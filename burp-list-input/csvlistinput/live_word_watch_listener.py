@@ -144,6 +144,10 @@ class LiveWordWatchListener(IHttpListener):
             hit.before = word_search_engine.display_text(before)
             hit.match = word_search_engine.display_text(match)
             hit.after = word_search_engine.display_text(after)
+            hit.region = word_search_engine.region_for_hit(
+                word_search_engine.message_text(self.helpers,
+                    request_bytes if side == 'Request' else response_bytes),
+                before, match, after)
             hit.request_bytes = request_bytes
             hit.response_bytes = response_bytes
             hit.http_service = http_service

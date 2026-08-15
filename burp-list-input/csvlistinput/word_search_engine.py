@@ -201,6 +201,35 @@ def hits_in_packet_for_terms(request_text, response_text, terms, operator,
     return results[:max_hits] if max_hits is not None else results
 
 
+def region_for_hit(message_text_value, before, match, after):
+    """Classify a hit as path/status, header, or body from message offsets."""
+    text = message_text_value or ''
+    # Include the context prefix when possible so repeated words resolve to
+    # the occurrence represented by this result row, not the first occurrence.
+    start = text.find((before or '') + (match or ''))
+    if start >= 0:
+        start += len(before or '')
+    else:
+        start = text.find(match or '')
+    if start < 0:
+        return 'Unknown'
+    separator = text.find('\r\n\r\n')
+    separator_len = 4
+    if separator < 0:
+        separator = text.find('\n\n')
+        separator_len = 2
+    first_line = text.find('\r\n')
+    if first_line < 0:
+        first_line = text.find('\n')
+    if first_line < 0:
+        first_line = len(text)
+    if start < first_line:
+        return 'Path' if text.startswith(('GET ', 'POST ', 'PUT ', 'PATCH ', 'DELETE ', 'OPTIONS ', 'HEAD ')) else 'Status'
+    if separator >= 0 and start >= separator + separator_len:
+        return 'Body'
+    return 'Header'
+
+
 def search(callbacks, helpers, word, before_chars, after_chars,
            start_packet_no=None, end_packet_no=None, cancel_check=None):
     """Returns a list of hit dicts, one per occurrence, in Proxy history
@@ -232,9 +261,12 @@ def search(callbacks, helpers, word, before_chars, after_chars,
         response_text = message_text(helpers, response_bytes) if response_bytes is not None else ""
         for side, before, match, after in hits_in_packet_for_terms(
                 request_text, response_text, terms, operator, before_chars, after_chars):
+            source = request_text if side == 'Request' else response_text
+            region = region_for_hit(source, before, match, after)
             results.append({
                 "packet_no": packet_no, "side": side, "before": display_text(before),
                 "match": display_text(match), "after": display_text(after),
+                "region": region,
                 "group": group,
                 "request_bytes": request_bytes, "response_bytes": response_bytes,
                 "http_service": http_service,

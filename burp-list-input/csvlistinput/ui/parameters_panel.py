@@ -4,19 +4,20 @@
 from threading import Thread
 
 from java.awt import BorderLayout, Color, FlowLayout
+from java.awt.event import ActionListener
 from java.lang import Integer, Runnable
 from java.util import Comparator
 from java.util.regex import Pattern
 from javax.swing import (JButton, JCheckBox, JLabel, JPanel, JScrollPane, JTable, JTextField, JSplitPane,
-                          JComboBox, JTextArea, ListSelectionModel, SwingUtilities)
+                          JComboBox, JTextArea, ListSelectionModel, SwingUtilities, Timer)
 from javax.swing.event import DocumentListener, ListSelectionListener
 from javax.swing.table import AbstractTableModel, DefaultTableCellRenderer, TableRowSorter
 from javax.swing import RowFilter
 
 from csvlistinput import codec_engine, parameter_inventory_engine
 
-COLUMNS = ["#", "Group", "Identified Parameter", "Occurrences", "Packet No"]
-VALUE_COLUMNS = ["#", "Group", "Value", "Occurrences", "Packet No"]
+COLUMNS = ["#", "Group", "Region", "Identified Parameter", "Occurrences", "Packet No"]
+VALUE_COLUMNS = ["#", "Group", "Region", "Value", "Occurrences", "Packet No"]
 _NONE_DECODE_LABEL = "None"
 _CODEC_LAYER_LABELS = ["None", "URL", "Base64", "Hex", "HTML Entity", "Unicode \\uXXXX", "ROT13"]
 _HIGH_COLOR = Color(255, 204, 204)
@@ -50,7 +51,7 @@ class ParametersTableModel(AbstractTableModel):
         return COLUMNS[col]
 
     def getColumnClass(self, col):
-        return Integer if col in (0, 3) else str
+        return Integer if col in (0, 4) else str
 
     def row_at(self, row):
         return self.rows[row] if 0 <= row < len(self.rows) else None
@@ -62,10 +63,12 @@ class ParametersTableModel(AbstractTableModel):
         if col == 1:
             return ', '.join(entry.get('groups', []))
         if col == 2:
-            return entry['path']
+            return ', '.join(entry.get('regions', []))
         if col == 3:
-            return Integer(entry['count'])
+            return entry['path']
         if col == 4:
+            return Integer(entry['count'])
+        if col == 5:
             return ','.join(str(no) for no in entry['packet_nos'])
         return None
 
@@ -120,7 +123,7 @@ class ParameterValuesTableModel(AbstractTableModel):
         return VALUE_COLUMNS[col]
 
     def getColumnClass(self, col):
-        return Integer if col in (0, 3) else str
+        return Integer if col in (0, 4) else str
 
     def getValueAt(self, row, col):
         entry = self.rows[row]
@@ -129,10 +132,12 @@ class ParameterValuesTableModel(AbstractTableModel):
         if col == 1:
             return ', '.join(entry.get('groups', []))
         if col == 2:
-            return entry['value']
+            return ', '.join(entry.get('regions', []))
         if col == 3:
-            return Integer(entry['count'])
+            return entry['value']
         if col == 4:
+            return Integer(entry['count'])
+        if col == 5:
             return ','.join(str(no) for no in entry['packet_nos'])
         return None
 
@@ -184,6 +189,15 @@ class _ManualDecodeListener(DocumentListener):
         self.panel._update_manual_decode()
 
 
+class _FilterTimerListener(ActionListener):
+    """Jython-compatible adapter for javax.swing.Timer's Java constructor."""
+    def __init__(self, panel):
+        self.panel = panel
+
+    def actionPerformed(self, event):
+        self.panel._on_filter_timer(event)
+
+
 class _PacketNosComparator(Comparator):
     """Sort comma-separated Packet Nos as integer sequences, not text."""
     def compare(self, left, right):
@@ -208,6 +222,9 @@ class ParametersPanel(JPanel):
         self.end_packet_no = None
         self._scan_worker = None
         self._cancel_requested = False
+        self._pending_filters = set()
+        self._filter_timer = Timer(180, _FilterTimerListener(self))
+        self._filter_timer.setRepeats(False)
 
         top = JPanel(FlowLayout(FlowLayout.LEFT))
         top.add(JLabel("Packet No range:"))
@@ -245,7 +262,7 @@ class ParametersPanel(JPanel):
         self.table_model = ParametersTableModel()
         self.table = JTable(self.table_model)
         self.table_sorter = TableRowSorter(self.table_model)
-        self.table_sorter.setComparator(4, _PacketNosComparator())
+        self.table_sorter.setComparator(5, _PacketNosComparator())
         self.table.setRowSorter(self.table_sorter)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         renderer = _RiskRenderer(self)
@@ -256,7 +273,7 @@ class ParametersPanel(JPanel):
         self.values_table_model = ParameterValuesTableModel()
         self.values_table = JTable(self.values_table_model)
         self.values_table_sorter = TableRowSorter(self.values_table_model)
-        self.values_table_sorter.setComparator(4, _PacketNosComparator())
+        self.values_table_sorter.setComparator(5, _PacketNosComparator())
         self.values_table.setRowSorter(self.values_table_sorter)
         self.values_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.values_table.getSelectionModel().addListSelectionListener(_ValueSelectionListener(self))
@@ -550,6 +567,16 @@ class ParametersPanel(JPanel):
                 return str(value)
 
     def _apply_filter(self, which):
+        self._pending_filters.add(which)
+        self._filter_timer.restart()
+
+    def _on_filter_timer(self, event):
+        pending = list(self._pending_filters)
+        self._pending_filters.clear()
+        for which in pending:
+            self._apply_filter_now(which)
+
+    def _apply_filter_now(self, which):
         field = self.parameter_filter_field if which == 'parameters' else self.value_filter_field
         sorter = self.table_sorter if which == 'parameters' else self.values_table_sorter
         query = field.getText()
