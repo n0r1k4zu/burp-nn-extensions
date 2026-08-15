@@ -340,8 +340,10 @@ class ParametersPanel(JPanel):
 
         parameter_list_panel = JPanel(BorderLayout())
         parameter_filter = JPanel(FlowLayout(FlowLayout.LEFT))
-        parameter_filter.add(JLabel("Find parameters:"))
+        parameter_filter.add(JLabel("Find in results:"))
         self.parameter_filter_field = JTextField(24)
+        self.parameter_filter_field.setToolTipText(
+            "Filter the current parameter result rows; this does not rebuild the parameter inventory.")
         self.parameter_filter_field.getDocument().addDocumentListener(_FilterListener(self, 'parameters'))
         parameter_filter.add(self.parameter_filter_field)
         parameter_list_panel.add(parameter_filter, BorderLayout.NORTH)

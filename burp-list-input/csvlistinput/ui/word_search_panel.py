@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""History Search tab: search the Proxy history's request/response bytes
+"""Packet Grep tab: search the Proxy history's request/response bytes
 for a literal word and list every occurrence with surrounding context,
 independent of the CSV/Match & Replace/Color Snapshots features."""
 
@@ -9,10 +9,12 @@ from java.awt import BorderLayout, FlowLayout, Toolkit
 from java.awt.event import MouseAdapter
 from java.awt.datatransfer import StringSelection
 from java.lang import Integer, Runnable
+from java.util.regex import Pattern
 from javax.swing import (JButton, JComboBox, JLabel, JMenuItem, JPanel, JPopupMenu, JScrollPane, JSpinner,
                           JSplitPane, JTable, JTextField, ListSelectionModel, SpinnerNumberModel, SwingUtilities)
-from javax.swing.event import ListSelectionListener
-from javax.swing.table import AbstractTableModel
+from javax.swing.event import DocumentListener, ListSelectionListener
+from javax.swing.table import AbstractTableModel, TableRowSorter
+from javax.swing import RowFilter
 
 from burp import IMessageEditorController
 
@@ -35,6 +37,20 @@ class _UiRunnable(Runnable):
 
     def run(self):
         self.fn()
+
+
+class _ResultFilterListener(DocumentListener):
+    def __init__(self, panel):
+        self.panel = panel
+
+    def insertUpdate(self, event):
+        self.panel._apply_result_filter()
+
+    def removeUpdate(self, event):
+        self.panel._apply_result_filter()
+
+    def changedUpdate(self, event):
+        self.panel._apply_result_filter()
 
 
 def _decode_preview(text, label):
@@ -189,7 +205,8 @@ class WordSearchPanel(JPanel):
 
         self.table_model = WordSearchTableModel()
         self.table = JTable(self.table_model)
-        self.table.setAutoCreateRowSorter(True)
+        self.result_sorter = TableRowSorter(self.table_model)
+        self.table.setRowSorter(self.result_sorter)
         # Make Before / Match / After individually selectable, so their
         # values can be copied without selecting an entire result row.
         self.table.setCellSelectionEnabled(True)
@@ -200,6 +217,15 @@ class WordSearchPanel(JPanel):
         self.table.addMouseListener(_TablePopupListener(self))
 
         table_panel = JPanel(BorderLayout())
+        result_filter_row = JPanel(FlowLayout(FlowLayout.LEFT))
+        result_filter_row.add(JLabel("Find in results:"))
+        self.result_filter_field = JTextField(28)
+        self.result_filter_field.setToolTipText(
+            "Filter current result rows only; this does not run a new Packet Grep.")
+        self.result_filter_field.getDocument().addDocumentListener(_ResultFilterListener(self))
+        result_filter_row.add(self.result_filter_field)
+        result_filter_row.add(JLabel("(all result columns)"))
+        table_panel.add(result_filter_row, BorderLayout.NORTH)
         table_panel.add(JScrollPane(self.table), BorderLayout.CENTER)
 
         below_list = JPanel(BorderLayout())
@@ -298,14 +324,14 @@ class WordSearchPanel(JPanel):
         prefix = "Cancelled: " if cancelled else ""
         self.status_label.setText("%s%d hit(s) found for \"%s\" in %s." % (prefix, len(hits), word, range_text))
         if self.log_fn:
-            self.log_fn("History Search: %d hit(s) found for \"%s\" (%s, before=%d, after=%d)" % (
+            self.log_fn("Packet Grep: %d hit(s) found for \"%s\" (%s, before=%d, after=%d)" % (
                 len(hits), word, range_text, before_chars, after_chars))
 
     def _search_failed(self, error):
         self._restore_search_buttons()
         self.status_label.setText("Search failed: %s" % error)
         if self.error_fn:
-            self.error_fn("History Search", "Search failed: %s" % error)
+            self.error_fn("Packet Grep", "Search failed: %s" % error)
 
     def _on_cancel(self, event):
         if self._search_worker is None:
@@ -334,9 +360,18 @@ class WordSearchPanel(JPanel):
 
     def _on_clear(self, event):
         self.table_model.set_hits([])
+        self.result_filter_field.setText("")
+        self.result_sorter.setRowFilter(None)
         self._show_hit(None)
         self._update_decode_preview(None)
         self.status_label.setText("Cleared.")
+
+    def _apply_result_filter(self):
+        query = str(self.result_filter_field.getText())
+        if not query:
+            self.result_sorter.setRowFilter(None)
+            return
+        self.result_sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(query)))
 
     def _on_all_packets(self, event):
         """Explicitly restore the Packet No filter to all HTTP History."""
