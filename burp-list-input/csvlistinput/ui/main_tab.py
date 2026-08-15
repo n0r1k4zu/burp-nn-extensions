@@ -76,7 +76,7 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Target & Replace with Decode & Encode", self.decode_replace_panel)
         self.tabbed_pane.addTab("Match & Replace", self.replace_panel)
         self.tabbed_pane.addTab("Log", self.log_panel)
-        self.tabbed_pane.addTab("Parameters Enum", self.parameters_panel)
+        self.tabbed_pane.addTab("Parameter & Value Enum", self.parameters_panel)
         self.tabbed_pane.addTab("Packet Grep", self.word_search_panel)
         self.tabbed_pane.addTab("Live Grep", self.live_word_watch_panel)
         self.tabbed_pane.addTab("Numbering & Grouping", self.annotations_panel)
