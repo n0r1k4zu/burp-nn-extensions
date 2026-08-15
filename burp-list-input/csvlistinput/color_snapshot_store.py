@@ -81,3 +81,15 @@ class ColorSnapshotStore(object):
             except Exception:
                 pass
         return True
+
+    def replace_entries(self, entries):
+        """Replace the saved snapshot catalogue (used by settings restore)."""
+        with self._lock:
+            self.entries = list(entries)[:self.max_entries]
+            self._next_seq = max([getattr(entry, 'seq_id', 0) or 0 for entry in self.entries] + [0]) + 1
+            listeners = list(self._remove_listeners)
+        for fn in listeners:
+            try:
+                fn()
+            except Exception:
+                pass

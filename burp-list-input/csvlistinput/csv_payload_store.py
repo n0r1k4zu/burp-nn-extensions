@@ -8,6 +8,7 @@ mappable column names offered in the insertion-point mapping UI.
 """
 
 import csv
+import codecs
 import threading
 
 from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode
@@ -108,6 +109,16 @@ class CsvPayloadStore(object):
         with self._lock:
             self.pointer = self.start_index
 
+    def clear(self):
+        with self._lock:
+            self.file_path = None
+            self.headers = []
+            self.column_names = []
+            self.rows = []
+            self.pointer = 0
+            self.start_index = 0
+            self.load_warnings = []
+
     def set_start_row(self, one_based_row):
         """Configure which row Reset jumps back to, and jump the current
         pointer there immediately. `one_based_row` is 1-based (row 1 =
@@ -127,6 +138,66 @@ class CsvPayloadStore(object):
         """(headers, rows) copies, for building/refreshing a table view."""
         with self._lock:
             return list(self.headers), [list(r) for r in self.rows]
+
+    def backup_snapshot(self):
+        with self._lock:
+            return {'headers': list(self.headers), 'rows': [list(r) for r in self.rows],
+                    'start_row': self.start_index + 1}
+
+    def restore_snapshot(self, payload):
+        headers = list(payload.get('headers', []))
+        rows = [list(row) for row in payload.get('rows', [])]
+        if headers and len(headers) < 2:
+            raise ValueError('Target & List Mapping CSV needs at least No and one value column.')
+        for row in rows:
+            if len(row) != len(headers):
+                raise ValueError('A restored Target & List Mapping CSV row has the wrong number of columns.')
+        start_index = max(0, int(payload.get('start_row', 1)) - 1)
+        with self._lock:
+            self.headers = headers
+            self.column_names = headers[1:] if headers else []
+            self.rows = rows
+            self.start_index = min(start_index, len(rows))
+            self.pointer = self.start_index
+            self.file_path = None
+            self.load_warnings = []
+
+    def save_csv(self, file_path, encoding='utf-8', default_headers=None, default_rows=None):
+        """Save the current mapping list. A blank list exports a documented
+        example header so users can discover the required CSV format."""
+        headers, rows = self.snapshot()
+        if not headers:
+            headers = list(default_headers or ['No', 'Value1'])
+            rows = [list(row) for row in (default_rows or [])]
+        actual_encoding = 'utf-8' if encoding == 'utf-8-sig' else encoding
+        try:
+            unicode
+            is_jython = True
+        except NameError:
+            is_jython = False
+        handle = (open(file_path, 'wb') if is_jython else
+                  open(file_path, 'w', newline='', encoding=encoding))
+        try:
+            if encoding == 'utf-8-sig' and is_jython:
+                handle.write(codecs.BOM_UTF8)
+            writer = csv.writer(handle)
+            writer.writerow([self._csv_bytes(value, actual_encoding) for value in headers])
+            for row in rows:
+                writer.writerow([self._csv_bytes(value, actual_encoding) for value in row])
+        finally:
+            handle.close()
+
+    def _csv_bytes(self, value, encoding):
+        try:
+            # Values typed/loaded through Swing are Unicode, while some
+            # legacy/Jython table values are already raw bytes.  Calling
+            # unicode(raw_bytes) would try ASCII first and fails on bytes
+            # such as 0x89; preserve those bytes instead.
+            if isinstance(value, unicode):
+                return value.encode(encoding)  # Jython/Python 2 csv needs bytes
+            return str(value)
+        except NameError:  # CPython csv needs text, not bytes
+            return str(value)
 
     def get_cell(self, row_idx, col_idx):
         with self._lock:

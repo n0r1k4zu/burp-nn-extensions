@@ -6,6 +6,9 @@ from javax.swing import (JButton, JComboBox, JFileChooser, JLabel, JPanel, JScro
                           SpinnerNumberModel)
 from javax.swing.table import AbstractTableModel
 
+_EXAMPLE_HEADERS = ['No', 'param1', 'param2', 'param3']
+_EXAMPLE_ROWS = [['1', 'a', 'b', 'c'], ['2', 'aa', 'bb', 'cc'], ['3', 'aaa', 'bbb', 'ccc']]
+
 
 class CsvTableModel(AbstractTableModel):
     """Reads/writes csv_store directly -- unlike a DefaultTableModel
@@ -18,11 +21,25 @@ class CsvTableModel(AbstractTableModel):
         self.csv_store = csv_store
         self.headers = []
         self.row_count = 0
+        self.example_rows = []
+        self._show_example = True
 
     def reload(self):
         headers, rows = self.csv_store.snapshot()
-        self.headers = headers
-        self.row_count = len(rows)
+        # Show a concrete, non-active example before a CSV is loaded so its
+        # shape is immediately understandable without adding dummy payloads
+        # to the actual substitution store.
+        self.example_rows = [] if headers or not self._show_example else [list(row) for row in _EXAMPLE_ROWS]
+        self.headers = headers or list(_EXAMPLE_HEADERS)
+        self.row_count = len(rows) if headers else len(self.example_rows)
+        self.fireTableStructureChanged()
+
+    def show_empty(self):
+        """Keep the useful headers after Clear list, but no sample rows."""
+        self._show_example = False
+        self.headers = list(_EXAMPLE_HEADERS)
+        self.example_rows = []
+        self.row_count = 0
         self.fireTableStructureChanged()
 
     def getRowCount(self):
@@ -35,11 +52,13 @@ class CsvTableModel(AbstractTableModel):
         return self.headers[col] if col < len(self.headers) else ""
 
     def getValueAt(self, row, col):
+        if self.example_rows:
+            return self.example_rows[row][col]
         value = self.csv_store.get_cell(row, col)
         return value if value is not None else ""
 
     def isCellEditable(self, row, col):
-        return True
+        return not self.example_rows
 
     def setValueAt(self, value, row, col):
         self.csv_store.set_cell(row, col, value)
@@ -55,8 +74,12 @@ class CsvPanel(JPanel):
 
         top = JPanel(FlowLayout(FlowLayout.LEFT))
         self.load_button = JButton("Load CSV...", actionPerformed=self._on_load)
+        self.save_button = JButton("Export CSV...", actionPerformed=self._on_save)
+        self.clear_list_button = JButton("Clear list", actionPerformed=self._on_clear_list)
         self.encoding_combo = JComboBox(["utf-8", "shift_jis", "cp932", "utf-8-sig"])
         top.add(self.load_button)
+        top.add(self.save_button)
+        top.add(self.clear_list_button)
         top.add(JLabel("Encoding:"))
         top.add(self.encoding_combo)
 
@@ -69,11 +92,13 @@ class CsvPanel(JPanel):
         self.reset_button = JButton("Reset pointer", actionPerformed=self._on_reset)
         top.add(self.reset_button)
 
-        self.status_label = JLabel("No CSV loaded")
-        top.add(self.status_label)
+        # Retained as an internal action-status sink, but intentionally not
+        # placed in the compact toolbar: the sample table is self-explanatory.
+        self.status_label = JLabel("")
         self.add(top, BorderLayout.NORTH)
 
         self.table_model = CsvTableModel(csv_store)
+        self.table_model.reload()
         self.table = JTable(self.table_model)
         self.add(JScrollPane(self.table), BorderLayout.CENTER)
 
@@ -113,6 +138,30 @@ class CsvPanel(JPanel):
         self.csv_store.reset()
         self._update_pointer_label()
 
+    def _on_save(self, event):
+        if self.table.isEditing():
+            self.table.getCellEditor().stopCellEditing()
+        chooser = JFileChooser()
+        if chooser.showSaveDialog(self) != JFileChooser.APPROVE_OPTION:
+            return
+        try:
+            self.csv_store.save_csv(chooser.getSelectedFile().getAbsolutePath(),
+                                    encoding=str(self.encoding_combo.getSelectedItem()),
+                                    default_headers=_EXAMPLE_HEADERS,
+                                    default_rows=_EXAMPLE_ROWS if self.table_model.example_rows else None)
+            self.status_label.setText('Saved %d row(s) to CSV.' % self.csv_store.row_count())
+        except Exception as e:
+            self.status_label.setText('Save failed: %s' % e)
+
+    def _on_clear_list(self, event):
+        if self.table.isEditing():
+            self.table.getCellEditor().stopCellEditing()
+        self.csv_store.clear()
+        self.table_model.show_empty()
+        self.status_label.setText('List cleared.')
+        if self.on_loaded:
+            self.on_loaded()
+
     def _on_set_start_row(self, event):
         try:
             value = int(self.start_row_spinner.getValue())
@@ -128,6 +177,13 @@ class CsvPanel(JPanel):
         """Called externally (see MainTab) whenever a send may have
         consumed a CSV row, so the "Row N of M" display stays live
         instead of only updating on Load/Reset clicks."""
+        self._update_pointer_label()
+
+    def refresh_loaded_csv(self):
+        """Refresh headers/rows after Backup & Restore replaces the list."""
+        if self.table.isEditing():
+            self.table.getCellEditor().stopCellEditing()
+        self.table_model.reload()
         self._update_pointer_label()
 
     def _update_pointer_label(self):

@@ -99,7 +99,7 @@ class AuraAuditPanel(JPanel):
         row = JPanel(FlowLayout(FlowLayout.LEFT)); row.add(self.active); row.add(self.guestify); row.add(self.detect_endpoint)
         content.add(row)
         target = JLabel('Current target: (not set)')
-        target.setOpaque(True); target.setBackground(Color(255, 230, 150))
+        target.setOpaque(True); target.setBackground(Color(255, 230, 150)); target.setForeground(Color.BLACK)
         self.target_label = target
         target_row = JPanel(FlowLayout(FlowLayout.LEFT)); target_row.add(target); content.add(target_row)
         hint = JTextArea('Recommended: right-click an Aura request in Proxy History and choose '

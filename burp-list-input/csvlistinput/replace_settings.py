@@ -11,7 +11,8 @@ _REPEATER_FLAG = 0x00000040
 class ReplaceSettings(object):
     def __init__(self):
         self.enabled = False
-        self.enabled_tool_flags = set([_PROXY_FLAG, _REPEATER_FLAG])
+        self.enabled_tool_flags = set([_REPEATER_FLAG])
+        self.scope_only = False
         self.scope_method = True
         self.scope_path = True
         self.scope_headers = True

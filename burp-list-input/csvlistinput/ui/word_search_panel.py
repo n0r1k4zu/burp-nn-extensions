@@ -61,9 +61,10 @@ def _decode_preview(text, label):
 
 
 class WordSearchTableModel(AbstractTableModel):
-    def __init__(self):
+    def __init__(self, include_word_list_comment=False):
         AbstractTableModel.__init__(self)
         self.hits = []
+        self.include_word_list_comment = include_word_list_comment
 
     def set_hits(self, hits):
         self.hits = hits
@@ -73,9 +74,11 @@ class WordSearchTableModel(AbstractTableModel):
         return len(self.hits)
 
     def getColumnCount(self):
-        return len(COLUMNS)
+        return len(COLUMNS) + (1 if self.include_word_list_comment else 0)
 
     def getColumnName(self, col):
+        if self.include_word_list_comment and col == len(COLUMNS):
+            return "My Word List Comment"
         return COLUMNS[col]
 
     def getColumnClass(self, col):
@@ -104,6 +107,8 @@ class WordSearchTableModel(AbstractTableModel):
             return h["match"]
         if col == 7:
             return h["after"]
+        if self.include_word_list_comment and col == len(COLUMNS):
+            return h.get("word_list_comment", "")
         return None
 
 
@@ -161,7 +166,7 @@ class _TablePopupListener(MouseAdapter):
 
 
 class WordSearchPanel(JPanel):
-    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None):
+    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None, word_list_store=None):
         JPanel.__init__(self, BorderLayout())
         self.callbacks = callbacks
         self.helpers = helpers
@@ -169,14 +174,22 @@ class WordSearchPanel(JPanel):
         self.error_fn = error_fn
         self._search_worker = None
         self._cancel_requested = False
+        self.word_list_store = word_list_store
+        self.is_word_list_grep = word_list_store is not None
+        self.grep_label = "My Word List Grep" if self.is_word_list_grep else "Packet Grep"
 
+        start_row = JPanel(FlowLayout(FlowLayout.LEFT))
         top = JPanel(FlowLayout(FlowLayout.LEFT))
-        top.add(JLabel("Search word:"))
-        self.word_field = JTextField(24)
-        top.add(self.word_field)
-        query_help = JLabel("AND: hoge & piyo   OR: hoge | piyo   Literal &: Win \\& / Mac ¥&")
-        query_help.setToolTipText("Use \\| or ¥| for a literal '|', and \\\\ or ¥¥ for a literal escape character.")
-        top.add(query_help)
+        if not self.is_word_list_grep:
+            top.add(JLabel("Search word:"))
+            self.word_field = JTextField(24)
+            top.add(self.word_field)
+            query_help = JLabel("AND: hoge & piyo   OR: hoge | piyo   Literal &: Win \\& / Mac ¥&")
+            query_help.setToolTipText("Use \\| or ¥| for a literal '|', and \\\\ or ¥¥ for a literal escape character.")
+            top.add(query_help)
+        else:
+            self.word_field = None
+            top.add(JLabel("Searches every applied My Word List word."))
         top.add(JLabel("Chars before:"))
         self.before_spinner = JSpinner(SpinnerNumberModel(_DEFAULT_CONTEXT_CHARS, 0, 100000, 1))
         top.add(self.before_spinner)
@@ -194,16 +207,26 @@ class WordSearchPanel(JPanel):
         self.all_packets_button = JButton("All", actionPerformed=self._on_all_packets)
         self.all_packets_button.setToolTipText("Search all HTTP History packets")
         top.add(self.all_packets_button)
-        self.search_button = JButton("Search", actionPerformed=self._on_search)
-        top.add(self.search_button)
+        self.search_button = JButton("My Word List Grep Start" if self.is_word_list_grep else "Search",
+                                     actionPerformed=self._on_search)
+        if self.is_word_list_grep:
+            start_row.add(self.search_button)
+        else:
+            top.add(self.search_button)
         self.cancel_button = JButton("Cancel", actionPerformed=self._on_cancel)
         self.cancel_button.setEnabled(False)
         top.add(self.cancel_button)
         self.clear_button = JButton("Clear", actionPerformed=self._on_clear)
         top.add(self.clear_button)
-        self.add(top, BorderLayout.NORTH)
+        if self.is_word_list_grep:
+            north = JPanel(BorderLayout())
+            north.add(start_row, BorderLayout.NORTH)
+            north.add(top, BorderLayout.CENTER)
+            self.add(north, BorderLayout.NORTH)
+        else:
+            self.add(top, BorderLayout.NORTH)
 
-        self.table_model = WordSearchTableModel()
+        self.table_model = WordSearchTableModel(self.is_word_list_grep)
         self.table = JTable(self.table_model)
         self.result_sorter = TableRowSorter(self.table_model)
         self.table.setRowSorter(self.result_sorter)
@@ -221,7 +244,7 @@ class WordSearchPanel(JPanel):
         result_filter_row.add(JLabel("Find in results:"))
         self.result_filter_field = JTextField(28)
         self.result_filter_field.setToolTipText(
-            "Filter current result rows only; this does not run a new Packet Grep.")
+            "Filter current result rows only; this does not run a new %s." % self.grep_label)
         self.result_filter_field.getDocument().addDocumentListener(_ResultFilterListener(self))
         result_filter_row.add(self.result_filter_field)
         result_filter_row.add(JLabel("(all result columns)"))
@@ -266,17 +289,26 @@ class WordSearchPanel(JPanel):
         self.add(split, BorderLayout.CENTER)
 
         self.status_label = JLabel(
-            "Enter a search word and press Search. Select a result row to preview it and its decoded "
+            ("Enter a search word and press Search." if not self.is_word_list_grep else
+             "Apply words in My Word List, then press My Word List Grep Start.") + " Select a result row to preview it and its decoded "
             "Before/Match/After below.")
         self.add(self.status_label, BorderLayout.SOUTH)
 
     def _on_search(self, event):
         if self._search_worker is not None:
             return
-        word = self.word_field.getText()
-        if not word:
-            self.status_label.setText("Enter a search word first.")
-            return
+        if self.is_word_list_grep:
+            words = self.word_list_store.snapshot()
+            if not words:
+                self.status_label.setText("My Word List is empty. Add a Word and click Apply changes.")
+                return
+            word = None
+        else:
+            word = self.word_field.getText()
+            if not word:
+                self.status_label.setText("Enter a search word first.")
+                return
+            words = None
         before_chars = int(self.before_spinner.getValue())
         after_chars = int(self.after_spinner.getValue())
         try:
@@ -294,15 +326,27 @@ class WordSearchPanel(JPanel):
         self.status_label.setText("Searching Proxy history in the background...")
         self._cancel_requested = False
         self._search_worker = Thread(target=self._search_worker_run,
-                                     args=(word, before_chars, after_chars, start_packet_no, end_packet_no))
+                                     args=(word, words, before_chars, after_chars, start_packet_no, end_packet_no))
         self._search_worker.setDaemon(True)
         self._search_worker.start()
 
-    def _search_worker_run(self, word, before_chars, after_chars, start_packet_no, end_packet_no):
+    def _search_worker_run(self, word, words, before_chars, after_chars, start_packet_no, end_packet_no):
         try:
-            hits = word_search_engine.search(self.callbacks, self.helpers, word, before_chars, after_chars,
-                                             start_packet_no, end_packet_no,
-                                             cancel_check=lambda: self._cancel_requested)
+            if words is None:
+                hits = word_search_engine.search(self.callbacks, self.helpers, word, before_chars, after_chars,
+                                                 start_packet_no, end_packet_no,
+                                                 cancel_check=lambda: self._cancel_requested)
+            else:
+                hits = []
+                for row in words:
+                    if self._cancel_requested:
+                        break
+                    word_hits = word_search_engine.search(
+                        self.callbacks, self.helpers, row['word'], before_chars, after_chars,
+                        start_packet_no, end_packet_no, cancel_check=lambda: self._cancel_requested)
+                    for hit in word_hits:
+                        hit['word_list_comment'] = row.get('comment', '')
+                    hits.extend(word_hits)
             SwingUtilities.invokeLater(_UiRunnable(
                 lambda: self._search_finished(hits, word, before_chars, after_chars,
                                                start_packet_no, end_packet_no, self._cancel_requested)))
@@ -312,7 +356,7 @@ class WordSearchPanel(JPanel):
     def _restore_search_buttons(self):
         self._search_worker = None
         self.search_button.setEnabled(True)
-        self.search_button.setText("Search")
+        self.search_button.setText("My Word List Grep Start" if self.is_word_list_grep else "Search")
         self.cancel_button.setEnabled(False)
 
     def _search_finished(self, hits, word, before_chars, after_chars, start_packet_no, end_packet_no, cancelled):
@@ -322,16 +366,17 @@ class WordSearchPanel(JPanel):
         range_text = self._range_display(start_packet_no, end_packet_no)
         self._restore_search_buttons()
         prefix = "Cancelled: " if cancelled else ""
-        self.status_label.setText("%s%d hit(s) found for \"%s\" in %s." % (prefix, len(hits), word, range_text))
+        description = 'My Word List (%d word(s))' % len(self.word_list_store.snapshot()) if self.is_word_list_grep else '"%s"' % word
+        self.status_label.setText("%s%d hit(s) found for %s in %s." % (prefix, len(hits), description, range_text))
         if self.log_fn:
-            self.log_fn("Packet Grep: %d hit(s) found for \"%s\" (%s, before=%d, after=%d)" % (
-                len(hits), word, range_text, before_chars, after_chars))
+            self.log_fn("%s: %d hit(s) found for %s (%s, before=%d, after=%d)" % (
+                self.grep_label, len(hits), description, range_text, before_chars, after_chars))
 
     def _search_failed(self, error):
         self._restore_search_buttons()
         self.status_label.setText("Search failed: %s" % error)
         if self.error_fn:
-            self.error_fn("Packet Grep", "Search failed: %s" % error)
+            self.error_fn(self.grep_label, "Search failed: %s" % error)
 
     def _on_cancel(self, event):
         if self._search_worker is None:

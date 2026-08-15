@@ -44,7 +44,8 @@ class ArmedTarget(object):
         self.template_points_by_path = dict((p.path, p) for p in template_points)
         self.http_service = http_service
         self.original_request_bytes = request_bytes
-        self.active = True
+        # Arming/re-detecting only captures the template. Activation is an
+        # explicit user choice; never turn it on as a side effect.
         self.label = label
         # Drop stale mapping/override entries for paths that no longer exist
         # (e.g. re-arming against a differently-shaped request).

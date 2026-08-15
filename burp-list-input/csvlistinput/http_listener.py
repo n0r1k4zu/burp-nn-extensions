@@ -138,7 +138,8 @@ class HttpListener(IHttpListener):
 
         # Stage 1: Match & Replace -- traffic-wide, independent of any armed target.
         replace_live = (self.replace_settings.enabled
-                         and toolFlag in self.replace_settings.enabled_tool_flags)
+                         and toolFlag in self.replace_settings.enabled_tool_flags
+                         and (not self.replace_settings.scope_only or self._in_scope(messageInfo)))
         if replace_live:
             request_bytes = messageInfo.getRequest()
             http_service = messageInfo.getHttpService()
@@ -160,10 +161,14 @@ class HttpListener(IHttpListener):
         # armed target (decode_replace_target, separate from `target`
         # above), plus its OWN Enabled toggle + tool flags.
         decode_replace_applied = 0
-        if (self.decode_replace_settings.enabled
-                and toolFlag in self.decode_replace_settings.enabled_tool_flags
-                and self.decode_replace_target.is_armed()):
-            decode_replace_applied = self._apply_decode_replace(messageInfo, self.decode_replace_target, entry)
+        decode_diagnostic_logged = False
+        if self.decode_replace_settings.enabled and self.decode_replace_target.is_armed():
+            if toolFlag in self.decode_replace_settings.enabled_tool_flags:
+                decode_replace_applied = self._apply_decode_replace(messageInfo, self.decode_replace_target, entry)
+            elif self.decode_replace_target.log_diagnostics_for_other_tools:
+                decode_diagnostic_logged = self._maybe_log_diagnostic(
+                    toolFlag, messageInfo.getHttpService(), messageInfo.getRequest(), self.decode_replace_target,
+                    entry, feature_label="Target & Replace with Decode & Encode")
 
         notes = []
         if replace_live and entry.request_replace_count:
@@ -172,7 +177,7 @@ class HttpListener(IHttpListener):
             notes.append("Target & Replace with Decode & Encode: %d insertion point(s) updated"
                          % decode_replace_applied)
 
-        if logged:
+        if logged or decode_diagnostic_logged:
             # Stage 2 already logged `entry` (e.g. status APPLIED with no
             # note of its own) -- append the other stages' notes rather
             # than let them go unrepresented.
@@ -244,7 +249,8 @@ class HttpListener(IHttpListener):
         response_bytes_before = None
         response_replace_count = 0
         if (response_bytes is not None and self.replace_settings.enabled
-                and toolFlag in self.replace_settings.enabled_tool_flags):
+                and toolFlag in self.replace_settings.enabled_tool_flags
+                and (not self.replace_settings.scope_only or self._in_scope(messageInfo))):
             response_bytes_before = response_bytes
             response_bytes, response_replace_count = replace_engine.apply_to_response(
                 self.helpers, response_bytes, self.response_replace_store, self.replace_settings)
@@ -289,6 +295,13 @@ class HttpListener(IHttpListener):
             entry.send_status = SendStatus.REPLACED
             self.log_store.append(entry)
 
+    def _in_scope(self, messageInfo):
+        """Fail open only if Burp cannot derive a URL from this message."""
+        try:
+            return self.callbacks.isInScope(self.helpers.analyzeRequest(messageInfo).getUrl())
+        except Exception:
+            return True
+
     def _log_and_track(self, entry):
         self.log_store.append(entry)
         self._track_only(entry)
@@ -297,7 +310,8 @@ class HttpListener(IHttpListener):
         key = self._content_key(entry.request_bytes_after)
         self._pending_by_content.setdefault(key, []).append(entry)
 
-    def _maybe_log_diagnostic(self, toolFlag, http_service, request_bytes, target, entry):
+    def _maybe_log_diagnostic(self, toolFlag, http_service, request_bytes, target, entry,
+                              feature_label="Target & List Mapping"):
         try:
             live_sig = matching.signature_from_message(self.helpers, http_service, request_bytes)
         except Exception:
@@ -308,8 +322,8 @@ class HttpListener(IHttpListener):
         entry.connection_display = repr(live_sig)
         entry.request_bytes_after = request_bytes  # unmodified -- so it's still viewable in the Log tab
         entry.note = ("Host/path matched the armed target but tool flag '%s' is not enabled -- "
-                       "enable it in the Target panel if this send should be substituted."
-                       % entry.tool_label)
+                       "enable it in the %s panel if this send should be processed."
+                       % (entry.tool_label, feature_label))
         self._log_and_track(entry)
         return True
 

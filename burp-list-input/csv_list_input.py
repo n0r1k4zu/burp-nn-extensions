@@ -100,6 +100,7 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         from csvlistinput.live_word_watch_listener import LiveWordWatchListener
         from csvlistinput.live_word_watch_settings import LiveWordWatchSettings
         from csvlistinput.live_word_watch_store import LiveWordWatchStore
+        from csvlistinput.my_word_list_store import MyWordListStore
         from csvlistinput.log_store import LogStore
         from csvlistinput.replace_rule_store import ReplaceRuleStore
         from csvlistinput.replace_settings import ReplaceSettings
@@ -118,12 +119,14 @@ class BurpExtender(IBurpExtender, IExtensionStateListener):
         self.comment_snapshot_store = CommentSnapshotStore()
         self.live_word_watch_settings = LiveWordWatchSettings()
         self.live_word_watch_store = LiveWordWatchStore()
+        self.my_word_list_store = MyWordListStore()
 
         self.main_tab = MainTab(callbacks, self.helpers, self.armed_target, self.csv_store, self.log_store,
                                  self.replace_settings, self.request_replace_store, self.response_replace_store,
                                  self.decode_replace_settings, self.decode_replace_target, self.error_store,
                                  self.color_snapshot_store, self.comment_snapshot_store,
-                                 self.live_word_watch_settings, self.live_word_watch_store)
+                                 self.live_word_watch_settings, self.live_word_watch_store,
+                                 self.my_word_list_store)
 
         self.http_listener = HttpListener(callbacks, self.helpers, self.armed_target,
                                            self.csv_store, self.log_store,

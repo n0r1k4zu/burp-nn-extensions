@@ -73,10 +73,12 @@ class _RuleListPanel(JPanel):
         self.add_button = JButton("Add rule", actionPerformed=self._on_add)
         self.remove_button = JButton("Remove selected", actionPerformed=self._on_remove)
         self.load_button = JButton("Load CSV...", actionPerformed=self._on_load)
+        self.save_button = JButton("Export CSV...", actionPerformed=self._on_save)
         self.encoding_combo = JComboBox(["utf-8", "shift_jis", "cp932", "utf-8-sig"])
         top.add(self.add_button)
         top.add(self.remove_button)
         top.add(self.load_button)
+        top.add(self.save_button)
         top.add(JLabel("Encoding:"))
         top.add(self.encoding_combo)
         self.status_label = JLabel("")
@@ -115,6 +117,18 @@ class _RuleListPanel(JPanel):
             return
         self.table_model.refresh()
         self.status_label.setText("Loaded %d rule(s) (appended)" % count)
+
+    def _on_save(self, event):
+        self._stop_editing()
+        chooser = JFileChooser()
+        if chooser.showSaveDialog(self) != JFileChooser.APPROVE_OPTION:
+            return
+        try:
+            self.store.save_csv(chooser.getSelectedFile().getAbsolutePath(),
+                                encoding=str(self.encoding_combo.getSelectedItem()))
+            self.status_label.setText('Saved %d rule(s).' % len(self.store.snapshot()))
+        except Exception as e:
+            self.status_label.setText('Save failed: %s' % e)
 
 
 class _ReplaceFlagToggleListener(ActionListener):
@@ -158,6 +172,10 @@ class ReplacePanel(JPanel):
         self.enabled_checkbox = JCheckBox("Match & Replace: Enabled", settings.enabled,
                                            actionPerformed=self._on_enabled_toggle)
         enable_row.add(self.enabled_checkbox)
+        self.scope_only_checkbox = JCheckBox("Scope only", settings.scope_only,
+                                              actionPerformed=self._on_scope_only_toggle)
+        self.scope_only_checkbox.setToolTipText("Apply Match & Replace only when the request URL is in Burp Suite scope.")
+        enable_row.add(self.scope_only_checkbox)
         top.add(enable_row)
 
         top.add(JLabel("Tool flags to apply Match & Replace for (independent of the armed target's flags):"))
@@ -194,6 +212,9 @@ class ReplacePanel(JPanel):
 
     def _on_enabled_toggle(self, event):
         self.settings.enabled = self.enabled_checkbox.isSelected()
+
+    def _on_scope_only_toggle(self, event):
+        self.settings.scope_only = self.scope_only_checkbox.isSelected()
 
     def _on_flag_toggle(self, flag, checkbox):
         if checkbox.isSelected():

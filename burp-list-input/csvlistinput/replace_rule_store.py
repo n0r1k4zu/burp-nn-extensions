@@ -6,6 +6,7 @@ replacing it, so manually-added rules and CSV-imported rules coexist.
 """
 
 import csv
+import codecs
 import threading
 
 from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode
@@ -56,6 +57,45 @@ class ReplaceRuleStore(object):
     def enabled_rules(self):
         with self._lock:
             return [r for r in self.rules if r.enabled]
+
+    def snapshot(self):
+        """Copy rules for settings backup without exposing mutable entries."""
+        with self._lock:
+            return [ReplaceRule(r.before, r.after, r.enabled, r.is_regex) for r in self.rules]
+
+    def replace_rules(self, rules):
+        """Replace all rules atomically (used by Backup & Restore)."""
+        with self._lock:
+            self.rules = [ReplaceRule(r.before, r.after, r.enabled, r.is_regex) for r in rules]
+
+    def save_csv(self, file_path, encoding='utf-8'):
+        """Export the list in the same Before,After format Load CSV accepts."""
+        actual_encoding = 'utf-8' if encoding == 'utf-8-sig' else encoding
+        try:
+            unicode
+            is_jython = True
+        except NameError:
+            is_jython = False
+        handle = (open(file_path, 'wb') if is_jython else
+                  open(file_path, 'w', newline='', encoding=encoding))
+        try:
+            if encoding == 'utf-8-sig' and is_jython:
+                handle.write(codecs.BOM_UTF8)
+            writer = csv.writer(handle)
+            writer.writerow(['Before', 'After'])
+            for rule in self.snapshot():
+                writer.writerow([self._csv_bytes(rule.before, actual_encoding),
+                                 self._csv_bytes(rule.after, actual_encoding)])
+        finally:
+            handle.close()
+
+    def _csv_bytes(self, value, encoding):
+        try:
+            if isinstance(value, unicode):
+                return value.encode(encoding)
+            return str(value)
+        except NameError:
+            return str(value)
 
     def load_csv(self, file_path, encoding='utf-8'):
         """Expected format: header row `Before, After`. Appends loaded

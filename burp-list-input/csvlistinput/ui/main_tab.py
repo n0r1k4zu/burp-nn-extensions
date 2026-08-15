@@ -27,13 +27,15 @@ from csvlistinput.ui.annotations_panel import AnnotationsPanel
 from csvlistinput.ui.aura_audit_panel import AuraAuditPanel
 from csvlistinput.ui.target_info_panel import TargetInfoPanel
 from csvlistinput.ui.word_search_panel import WordSearchPanel
+from csvlistinput.ui.my_word_list_panel import MyWordListPanel
+from csvlistinput.ui.settings_backup_panel import SettingsBackupPanel
 
 
 class MainTab(ITab):
     def __init__(self, callbacks, helpers, armed_target, csv_store, log_store,
                  replace_settings, request_replace_store, response_replace_store,
                  decode_replace_settings, decode_replace_target, error_store, color_snapshot_store,
-                 comment_snapshot_store, live_word_watch_settings, live_word_watch_store):
+                 comment_snapshot_store, live_word_watch_settings, live_word_watch_store, my_word_list_store):
         self.callbacks = callbacks
         self.armed_target = armed_target
         self.csv_store = csv_store
@@ -57,6 +59,15 @@ class MainTab(ITab):
         self.word_search_panel = WordSearchPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.live_word_watch_panel = LiveWordWatchPanel(callbacks, helpers, live_word_watch_settings,
                                                            live_word_watch_store, error_fn=self.log_error)
+        self.my_word_list_panel = MyWordListPanel(my_word_list_store, log_fn=self.log)
+        self.my_word_list_grep_panel = WordSearchPanel(
+            callbacks, helpers, log_fn=self.log, error_fn=self.log_error, word_list_store=my_word_list_store)
+        self.settings_backup_panel = SettingsBackupPanel(
+            my_word_list_store, color_snapshot_store, comment_snapshot_store,
+            request_replace_store, response_replace_store, csv_store,
+            on_word_list_restored=self.my_word_list_panel.refresh_from_store,
+            on_rules_restored=self.replace_panel.refresh, on_csv_restored=self.csv_panel.refresh_loaded_csv,
+            log_fn=self.log, error_fn=self.log_error)
         self.parameters_panel = ParametersPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.statistics_panel = StatisticsPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.annotations_panel = AnnotationsPanel(callbacks, log_fn=self.log, error_fn=self.log_error)
@@ -79,11 +90,14 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Parameter & Value Enum", self.parameters_panel)
         self.tabbed_pane.addTab("Packet Grep", self.word_search_panel)
         self.tabbed_pane.addTab("Live Grep", self.live_word_watch_panel)
+        self.tabbed_pane.addTab("My Word List Grep", self.my_word_list_grep_panel)
+        self.tabbed_pane.addTab("My Word List", self.my_word_list_panel)
         self.tabbed_pane.addTab("Numbering & Grouping", self.annotations_panel)
         self.tabbed_pane.addTab("Statistics", self.statistics_panel)
         self.tabbed_pane.addTab("Decode", self.decode_panel)
         self.tabbed_pane.addTab("Color Snapshots", self.color_snapshot_panel)
         self.tabbed_pane.addTab("Comment Snapshots", self.comment_snapshot_panel)
+        self.tabbed_pane.addTab("Backup & Restore", self.settings_backup_panel)
         self.tabbed_pane.addTab("Aura Diagnostic", self.aura_audit_panel)
         self.errors_tab_index = self.tabbed_pane.getTabCount()
         self.tabbed_pane.addTab("Errors", self.errors_panel)

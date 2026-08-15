@@ -28,7 +28,7 @@ class DecodeReplaceRule(object):
 class DecodeReplaceSettings(object):
     def __init__(self):
         self.enabled = False
-        self.enabled_tool_flags = set([_PROXY_FLAG, _REPEATER_FLAG])
+        self.enabled_tool_flags = set([_REPEATER_FLAG])
         self.rules_by_path = {}  # path -> DecodeReplaceRule
 
     def get_rule(self, path):

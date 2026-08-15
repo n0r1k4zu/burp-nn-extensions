@@ -161,8 +161,16 @@ class DecodeReplacePanel(JPanel):
                                            decode_replace_settings.enabled,
                                            actionPerformed=self._on_enabled_toggle)
         self.redetect_button = JButton("Re-detect insertion points", actionPerformed=self._on_redetect)
+        self.diagnostics_checkbox = JCheckBox(
+            "Log DIAGNOSTIC entries for non-enabled tools hitting the same host/path",
+            armed_target.log_diagnostics_for_other_tools, actionPerformed=self._on_diagnostics_toggle)
+        self.lenient_checkbox = JCheckBox(
+            "Attempt lenient recovery for malformed nested JSON (experimental)",
+            armed_target.allow_lenient_json, actionPerformed=self._on_lenient_toggle)
         controls.add(self.enabled_checkbox)
         controls.add(self.redetect_button)
+        controls.add(self.diagnostics_checkbox)
+        controls.add(self.lenient_checkbox)
         top.add(controls)
 
         top.add(JLabel("Tool flags to apply this feature for (independent of Target & List Mapping's flags):"))
@@ -242,6 +250,12 @@ class DecodeReplacePanel(JPanel):
 
     def _on_enabled_toggle(self, event):
         self.settings.enabled = self.enabled_checkbox.isSelected()
+
+    def _on_diagnostics_toggle(self, event):
+        self.armed_target.log_diagnostics_for_other_tools = self.diagnostics_checkbox.isSelected()
+
+    def _on_lenient_toggle(self, event):
+        self.armed_target.allow_lenient_json = self.lenient_checkbox.isSelected()
 
     def _on_flag_toggle(self, flag, checkbox):
         if checkbox.isSelected():
