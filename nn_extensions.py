@@ -24,6 +24,11 @@ from burp import IBurpExtender
 
 EXTENSION_NAME = "NN-Extensions"
 
+# Set this to True in this file, then reload the extension, when the legacy
+# SF Helper tab/context menus are needed.  MyTools includes the migrated Aura
+# Diagnostic functionality, so SF Helper is hidden by default.
+ENABLE_SF_HELPER = False
+
 # Last-resort manual override: if neither __file__ nor sys.argv[0] resolve
 # to this file's real location, set this to this file's own directory.
 MANUAL_EXTENSION_DIR = "/Users/pentester/Desktop/Burp-NN-Extensions"
@@ -72,14 +77,15 @@ class BurpExtender(IBurpExtender):
         self.csv_list_input_extender = csv_list_input.BurpExtender()
         self.csv_list_input_extender.registerExtenderCallbacks(callbacks)
 
-        import sf_aura_burp_helper
-        self.sf_aura_extender = sf_aura_burp_helper.BurpExtender()
-        self.sf_aura_extender.registerExtenderCallbacks(callbacks)
+        self.sf_aura_extender = None
+        if ENABLE_SF_HELPER:
+            import sf_aura_burp_helper
+            self.sf_aura_extender = sf_aura_burp_helper.BurpExtender()
+            self.sf_aura_extender.registerExtenderCallbacks(callbacks)
 
         # Both sub-extensions call setExtensionName() themselves during the
         # registerExtenderCallbacks() calls above; reassert the combined
         # name last so it's what actually shows up in Burp's Extensions list.
         callbacks.setExtensionName(EXTENSION_NAME)
-        callbacks.printOutput(
-            "%s loaded: CSV List Input + SF Aura Helper (see the 'CSV List Input' "
-            "and 'SF Helper' tabs)." % EXTENSION_NAME)
+        loaded = "MyTools + SF Aura Helper (see the 'MyTools' and 'SF Helper' tabs)" if ENABLE_SF_HELPER else "MyTools (SF Helper hidden; set ENABLE_SF_HELPER = True in nn_extensions.py to show it)"
+        callbacks.printOutput("%s loaded: %s." % (EXTENSION_NAME, loaded))

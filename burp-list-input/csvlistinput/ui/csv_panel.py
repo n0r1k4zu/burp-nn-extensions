@@ -72,29 +72,33 @@ class CsvPanel(JPanel):
         self.on_loaded = on_loaded
         self.log_fn = log_fn
 
-        top = JPanel(FlowLayout(FlowLayout.LEFT))
+        top = JPanel(BorderLayout())
+        list_controls = JPanel(FlowLayout(FlowLayout.LEFT))
         self.load_button = JButton("Load CSV...", actionPerformed=self._on_load)
         self.save_button = JButton("Export CSV...", actionPerformed=self._on_save)
         self.clear_list_button = JButton("Clear list", actionPerformed=self._on_clear_list)
         self.encoding_combo = JComboBox(["utf-8", "shift_jis", "cp932", "utf-8-sig"])
-        top.add(self.load_button)
-        top.add(self.save_button)
-        top.add(self.clear_list_button)
-        top.add(JLabel("Encoding:"))
-        top.add(self.encoding_combo)
+        list_controls.add(self.load_button)
+        list_controls.add(self.save_button)
+        list_controls.add(self.clear_list_button)
+        list_controls.add(JLabel("Encoding:"))
+        list_controls.add(self.encoding_combo)
 
-        top.add(JLabel("Start row (1-based):"))
+        pointer_controls = JPanel(FlowLayout(FlowLayout.LEFT))
+        pointer_controls.add(JLabel("Start row (1-based):"))
         self.start_row_spinner = JSpinner(SpinnerNumberModel(1, 1, 1000000, 1))
-        top.add(self.start_row_spinner)
+        pointer_controls.add(self.start_row_spinner)
         self.set_start_button = JButton("Set start row", actionPerformed=self._on_set_start_row)
-        top.add(self.set_start_button)
+        pointer_controls.add(self.set_start_button)
 
         self.reset_button = JButton("Reset pointer", actionPerformed=self._on_reset)
-        top.add(self.reset_button)
+        pointer_controls.add(self.reset_button)
 
         # Retained as an internal action-status sink, but intentionally not
         # placed in the compact toolbar: the sample table is self-explanatory.
         self.status_label = JLabel("")
+        top.add(list_controls, BorderLayout.NORTH)
+        top.add(pointer_controls, BorderLayout.SOUTH)
         self.add(top, BorderLayout.NORTH)
 
         self.table_model = CsvTableModel(csv_store)

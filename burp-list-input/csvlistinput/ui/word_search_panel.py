@@ -184,8 +184,11 @@ class WordSearchPanel(JPanel):
             top.add(JLabel("Search word:"))
             self.word_field = JTextField(24)
             top.add(self.word_field)
-            query_help = JLabel("AND: hoge & piyo   OR: hoge | piyo   Literal &: Win \\& / Mac ¥&")
-            query_help.setToolTipText("Use \\| or ¥| for a literal '|', and \\\\ or ¥¥ for a literal escape character.")
+            # Explicit Unicode escapes avoid Jython/Swing treating the
+            # Japanese-Mac yen escape prefix as an ASCII byte string.
+            query_help = JLabel(u"AND: hoge & piyo   OR: hoge | piyo   Literal &: Win \\& / Mac \u00a5&")
+            query_help.setToolTipText(
+                u"Use \\| or \u00a5| for a literal '|', and \\\\ or \u00a5\u00a5 for a literal escape character.")
             top.add(query_help)
         else:
             self.word_field = None

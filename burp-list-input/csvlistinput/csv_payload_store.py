@@ -13,6 +13,8 @@ import threading
 
 from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode
 
+_DEFAULT_SAMPLE_COLUMN_NAMES = ['param1', 'param2', 'param3']
+
 
 class CsvLoadWarning(object):
     def __init__(self, row_number, message):
@@ -78,7 +80,10 @@ class CsvPayloadStore(object):
 
     def get_column_names(self):
         with self._lock:
-            return list(self.column_names)
+            # The un-loaded Target & List Mapping sample is intentionally
+            # selectable too, so its param1/param2/param3 columns are visible
+            # in the Mapped Column combo before the user imports a real CSV.
+            return list(self.column_names or _DEFAULT_SAMPLE_COLUMN_NAMES)
 
     def row_count(self):
         with self._lock:

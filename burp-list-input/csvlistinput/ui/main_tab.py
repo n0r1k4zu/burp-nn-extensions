@@ -66,7 +66,7 @@ class MainTab(ITab):
             my_word_list_store, color_snapshot_store, comment_snapshot_store,
             request_replace_store, response_replace_store, csv_store,
             on_word_list_restored=self.my_word_list_panel.refresh_from_store,
-            on_rules_restored=self.replace_panel.refresh, on_csv_restored=self.csv_panel.refresh_loaded_csv,
+            on_rules_restored=self.replace_panel.refresh, on_csv_restored=self._on_mapping_csv_restored,
             log_fn=self.log, error_fn=self.log_error)
         self.parameters_panel = ParametersPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.statistics_panel = StatisticsPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
@@ -116,6 +116,12 @@ class MainTab(ITab):
 
     def _on_log_entry(self, entry):
         SwingUtilities.invokeLater(self.csv_panel.refresh_pointer_label)
+
+    def _on_mapping_csv_restored(self):
+        """Refresh both halves of Target & List Mapping after restoring its
+        CSV, so Mapped Column editors immediately expose restored headers."""
+        self.csv_panel.refresh_loaded_csv()
+        self.insertion_point_panel.refresh()
 
     def refresh(self):
         def do_refresh():

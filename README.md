@@ -23,7 +23,11 @@ Burp Suite 用の拡張ローダーです。中身は独立して完成した**2
 1. Burp Suiteの **Extender/Extensions > Options > Python Environment** で `jython-standalone.jar` を指定する
 2. **Extender/Extensions > Extensions > Add** で Extension type を `Python` にし、このリポジトリ直下の [`nn_extensions.py`](nn_extensions.py) を選択する
    - `burp-list-input/` と `burp-sf-aura/` フォルダは `nn_extensions.py` と**同じ場所（このリポジトリのルート直下）に置いたまま**にしてください。`nn_extensions.py` はこの2フォルダを実行時にimportするため、単体では動作しません
-3. 読み込みに成功すると、Extensions一覧に **NN-Extensions** という1エントリが表示され、Burpのメインウィンドウに **CSV List Input** タブと **SF Helper** タブの両方が追加されます
+3. 読み込みに成功すると、Extensions一覧に **NN-Extensions** という1エントリと **MyTools** タブが追加されます。SF Helperは既定で非表示です。
+
+## SF Helperの表示切替
+
+`nn_extensions.py` 上部の `ENABLE_SF_HELPER` は既定で `False` です。`True` に変更して拡張をReloadすると、従来の **SF Helper** タブとその右クリックメニューも読み込みます。`False` のままではSF Helperを読み込まないため、MyToolsのみが表示されます。
 
 ## リポジトリ構成
 
