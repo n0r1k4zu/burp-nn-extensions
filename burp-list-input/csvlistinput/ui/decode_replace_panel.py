@@ -24,6 +24,7 @@ from javax.swing.table import AbstractTableModel
 
 from csvlistinput import codec_engine, detection_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
+from csvlistinput.utils import coerce_boolean
 
 COLUMNS = ["Enabled", "Insertion Points", "Type", "Original Value", "Codec", "Regex", "Find", "Replace With"]
 _EDITABLE_COLUMNS = (0, 4, 5, 6, 7)
@@ -86,11 +87,11 @@ class DecodeReplaceTableModel(AbstractTableModel):
         p = self._point(row)
         rule = self.settings.get_rule(p.path)
         if col == 0:
-            rule.enabled = value
+            rule.enabled = coerce_boolean(value)
         elif col == 4:
             rule.codec = value
         elif col == 5:
-            rule.is_regex = value
+            rule.is_regex = coerce_boolean(value)
         elif col == 6:
             rule.find = value
         elif col == 7:

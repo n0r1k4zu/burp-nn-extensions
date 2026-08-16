@@ -57,6 +57,22 @@ JSON_ESCAPE_OUT = {
 }
 
 
+def coerce_boolean(value):
+    """Return the actual value of Python or java.lang.Boolean inputs.
+
+    Jython treats a Java Boolean object as truthy even when its value is
+    false, so table checkbox edits must not use ``bool(value)`` directly.
+    """
+    if value is True:
+        return True
+    if value is False or value is None:
+        return False
+    try:
+        return unicode(value).strip().lower() in (u'1', u'true', u'yes', u'on')
+    except NameError:
+        return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
 def bytes_to_bytestring(helpers, java_bytes):
     """Java byte[] -> Jython byte-preserving string (1 char == 1 byte).
 

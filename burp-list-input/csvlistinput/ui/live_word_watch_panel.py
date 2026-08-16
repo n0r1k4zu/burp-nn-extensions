@@ -225,8 +225,9 @@ class LiveWordWatchPanel(JPanel):
         self.word_field = JTextField(settings.word, 24)
         self.word_field.getDocument().addDocumentListener(_WordFieldListener(self))
         word_row.add(self.word_field)
-        query_help = JLabel("AND: hoge & piyo   OR: hoge | piyo   Literal &: Win \\& / Mac ¥&")
-        query_help.setToolTipText("Use \\| or ¥| for a literal '|', and \\\\ or ¥¥ for a literal escape character.")
+        query_help = JLabel(u"AND: hoge & piyo   OR: hoge | piyo   Literal &: Win \\& / Mac \u00a5&")
+        query_help.setToolTipText(
+            u"Use \\| or \u00a5| for a literal '|', and \\\\ or \u00a5\u00a5 for a literal escape character.")
         word_row.add(query_help)
         word_row.add(JLabel("Chars before:"))
         self.before_spinner = JSpinner(SpinnerNumberModel(settings.before_chars, 0, 100000, 1))

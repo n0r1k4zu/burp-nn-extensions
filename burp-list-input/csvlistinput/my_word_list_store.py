@@ -4,7 +4,7 @@
 import csv
 import threading
 
-from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode
+from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode, coerce_boolean
 
 try:
     _TEXT_TYPE = unicode
@@ -24,6 +24,15 @@ def _ui_text(value):
     return _TEXT_TYPE(value)
 
 
+def is_regex_enabled(value):
+    """Normalize Python and Java Swing Boolean values.
+
+    ``bool(java.lang.Boolean(False))`` is True in Jython because it tests
+    object existence, not its boolean value.  Read the actual value instead.
+    """
+    return coerce_boolean(value)
+
+
 class MyWordListStore(object):
     def __init__(self):
         self._lock = threading.Lock()
@@ -38,7 +47,8 @@ class MyWordListStore(object):
         for row in rows:
             word = _ui_text(row.get('word', u'')).strip()
             if word:
-                normalized.append({'word': word, 'comment': _ui_text(row.get('comment', u''))})
+                normalized.append({'word': word, 'is_regex': is_regex_enabled(row.get('is_regex', False)),
+                                   'comment': _ui_text(row.get('comment', u''))})
         with self._lock:
             self._rows = normalized
 
@@ -48,6 +58,8 @@ class MyWordListStore(object):
         try:
             reader = csv.reader(Utf8CsvRecoder(f, encoding))
             first = True
+            regex_column = None
+            comment_column = 1
             for raw_row in reader:
                 values = [csv_cell_to_unicode(v) for v in raw_row]
                 if first:
@@ -56,10 +68,16 @@ class MyWordListStore(object):
                     # small one-column word lists convenient to use.
                     first_cell = values[0].strip().lower() if values else u''
                     if first_cell in (u'word', u'words', u'ワード'):
+                        headers = [value.strip().lower() for value in values]
+                        regex_column = headers.index(u'regex') if u'regex' in headers else None
+                        comment_column = headers.index(u'comment') if u'comment' in headers else (2 if regex_column == 1 else 1)
                         continue
                 if not values or not values[0].strip():
                     continue
-                rows.append({'word': values[0].strip(), 'comment': values[1] if len(values) > 1 else u''})
+                is_regex = (regex_column is not None and regex_column < len(values)
+                            and values[regex_column].strip().lower() in (u'1', u'true', u'yes', u'on'))
+                comment = values[comment_column] if comment_column < len(values) else u''
+                rows.append({'word': values[0].strip(), 'is_regex': is_regex, 'comment': comment})
         finally:
             f.close()
         self.replace(rows)

@@ -5,12 +5,14 @@ import codecs
 import csv
 
 from java.awt import BorderLayout, FlowLayout
+from java.lang import Boolean
 from javax.swing import JButton, JComboBox, JFileChooser, JLabel, JPanel, JScrollPane, JTable
 from javax.swing.table import AbstractTableModel
+from csvlistinput.my_word_list_store import is_regex_enabled
 
 
 class _WordListModel(AbstractTableModel):
-    COLUMNS = ['List No', 'Word', 'Comment']
+    COLUMNS = ['List No', 'Regex', 'Word', 'Comment']
 
     def __init__(self, store):
         AbstractTableModel.__init__(self)
@@ -34,18 +36,26 @@ class _WordListModel(AbstractTableModel):
     def getValueAt(self, row, col):
         if col == 0:
             return row + 1
-        return self.rows[row]['word' if col == 1 else 'comment']
+        if col == 1:
+            return self.rows[row].get('is_regex', False)
+        return self.rows[row]['word' if col == 2 else 'comment']
+
+    def getColumnClass(self, col):
+        return Boolean if col == 1 else str
 
     def isCellEditable(self, row, col):
-        return col in (1, 2)
+        return col in (1, 2, 3)
 
     def setValueAt(self, value, row, col):
-        if col in (1, 2):
-            self.rows[row]['word' if col == 1 else 'comment'] = value
+        if col == 1:
+            self.rows[row]['is_regex'] = is_regex_enabled(value)
+        elif col in (2, 3):
+            self.rows[row]['word' if col == 2 else 'comment'] = value
+        if col in (1, 2, 3):
             self.fireTableCellUpdated(row, col)
 
     def add_row(self):
-        self.rows.append({'word': u'', 'comment': u''})
+        self.rows.append({'word': u'', 'is_regex': False, 'comment': u''})
         self.fireTableRowsInserted(len(self.rows) - 1, len(self.rows) - 1)
 
     def remove_rows(self, rows):
@@ -114,10 +124,10 @@ class MyWordListPanel(JPanel):
         self.model.add_row()
         row = self.model.getRowCount() - 1
         self.table.setRowSelectionInterval(row, row)
-        self.table.editCellAt(row, 1)
+        self.table.editCellAt(row, 2)
 
     def _on_export(self, event):
-        """Export the visible list, including pending edits, as Word,Comment.
+        """Export the visible list, including pending edits, as Word,Regex,Comment.
 
         Export deliberately does not require Apply changes: it is useful for
         saving a draft before making it the active Grep list.
@@ -142,9 +152,10 @@ class MyWordListPanel(JPanel):
                 if encoding == 'utf-8-sig' and is_jython:
                     handle.write(codecs.BOM_UTF8)
                 writer = csv.writer(handle)
-                writer.writerow(['Word', 'Comment'])
+                writer.writerow(['Word', 'Regex', 'Comment'])
                 for row in self.model.rows:
                     writer.writerow([self._csv_bytes(row['word'], file_encoding),
+                                     '1' if row.get('is_regex', False) else '0',
                                      self._csv_bytes(row['comment'], file_encoding)])
             finally:
                 handle.close()

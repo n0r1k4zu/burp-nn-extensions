@@ -214,10 +214,16 @@ def _csv_section_rows(markdown, title):
 def _word_rows_from_csv(rows):
     if not rows:
         return []
+    header = [value.strip().lower() for value in rows[0]]
+    regex_index = header.index(u'regex') if u'regex' in header else None
+    comment_index = header.index(u'comment') if u'comment' in header else (2 if regex_index == 1 else 1)
     result = []
-    for row in rows[1:]:  # header: Word,Comment
+    for row in rows[1:]:
         if row and row[0]:
-            result.append({'word': row[0], 'comment': row[1] if len(row) > 1 else u''})
+            is_regex = (regex_index is not None and regex_index < len(row)
+                        and row[regex_index].strip().lower() in (u'1', u'true', u'yes', u'on'))
+            result.append({'word': row[0], 'is_regex': is_regex,
+                           'comment': row[comment_index] if comment_index < len(row) else u''})
     return result
 
 
@@ -242,8 +248,9 @@ def export_markdown(word_store, color_store, comment_store, request_rule_store, 
         'This is an editable Markdown backup. Edit the CSV blocks below as needed.',
         ''
     ]
-    parts.extend(_csv_markdown('My Word List', [u'Word', u'Comment'], [
-        [_json_text(row.get('word', u'')), _json_text(row.get('comment', u''))]
+    parts.extend(_csv_markdown('My Word List', [u'Word', u'Regex', u'Comment'], [
+        [_json_text(row.get('word', u'')), u'1' if row.get('is_regex', False) else u'0',
+         _json_text(row.get('comment', u''))]
         for row in word_store.snapshot()]))
     parts.extend(_csv_markdown('Request replacements', [u'Enabled', u'Regex', u'Before', u'After'], [
         [u'1' if rule.enabled else u'0', u'1' if rule.is_regex else u'0',

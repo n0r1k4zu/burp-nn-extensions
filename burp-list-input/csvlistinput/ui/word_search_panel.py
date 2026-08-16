@@ -335,6 +335,7 @@ class WordSearchPanel(JPanel):
 
     def _search_worker_run(self, word, words, before_chars, after_chars, start_packet_no, end_packet_no):
         try:
+            warnings = []
             if words is None:
                 hits = word_search_engine.search(self.callbacks, self.helpers, word, before_chars, after_chars,
                                                  start_packet_no, end_packet_no,
@@ -344,15 +345,28 @@ class WordSearchPanel(JPanel):
                 for row in words:
                     if self._cancel_requested:
                         break
-                    word_hits = word_search_engine.search(
-                        self.callbacks, self.helpers, row['word'], before_chars, after_chars,
-                        start_packet_no, end_packet_no, cancel_check=lambda: self._cancel_requested)
+                    try:
+                        # Store.replace() canonicalizes this field to a real
+                        # Python bool.  Require *that exact* True value here:
+                        # no Java Boolean/String object can accidentally turn
+                        # a Regex-OFF row into a regex search.
+                        if row.get('is_regex') is True:
+                            word_hits = word_search_engine.search_regex(
+                                self.callbacks, self.helpers, row['word'], before_chars, after_chars,
+                                start_packet_no, end_packet_no, cancel_check=lambda: self._cancel_requested)
+                        else:
+                            word_hits = word_search_engine.search_literal(
+                                self.callbacks, self.helpers, row['word'], before_chars, after_chars,
+                                start_packet_no, end_packet_no, cancel_check=lambda: self._cancel_requested)
+                    except ValueError as error:
+                        warnings.append('%s: %s' % (row['word'], error))
+                        continue
                     for hit in word_hits:
                         hit['word_list_comment'] = row.get('comment', '')
                     hits.extend(word_hits)
             SwingUtilities.invokeLater(_UiRunnable(
                 lambda: self._search_finished(hits, word, before_chars, after_chars,
-                                               start_packet_no, end_packet_no, self._cancel_requested)))
+                                               start_packet_no, end_packet_no, self._cancel_requested, warnings)))
         except Exception as e:
             SwingUtilities.invokeLater(_UiRunnable(lambda error=e: self._search_failed(error)))
 
@@ -362,7 +376,8 @@ class WordSearchPanel(JPanel):
         self.search_button.setText("My Word List Grep Start" if self.is_word_list_grep else "Search")
         self.cancel_button.setEnabled(False)
 
-    def _search_finished(self, hits, word, before_chars, after_chars, start_packet_no, end_packet_no, cancelled):
+    def _search_finished(self, hits, word, before_chars, after_chars, start_packet_no, end_packet_no, cancelled,
+                         warnings=None):
         self.table_model.set_hits(hits)
         self._show_hit(None)
         self._update_decode_preview(None)
@@ -370,10 +385,14 @@ class WordSearchPanel(JPanel):
         self._restore_search_buttons()
         prefix = "Cancelled: " if cancelled else ""
         description = 'My Word List (%d word(s))' % len(self.word_list_store.snapshot()) if self.is_word_list_grep else '"%s"' % word
-        self.status_label.setText("%s%d hit(s) found for %s in %s." % (prefix, len(hits), description, range_text))
+        warning_text = (' %d invalid regex row(s) skipped.' % len(warnings)) if warnings else ''
+        self.status_label.setText("%s%d hit(s) found for %s in %s.%s" %
+                                  (prefix, len(hits), description, range_text, warning_text))
         if self.log_fn:
             self.log_fn("%s: %d hit(s) found for %s (%s, before=%d, after=%d)" % (
                 self.grep_label, len(hits), description, range_text, before_chars, after_chars))
+        if warnings and self.error_fn:
+            self.error_fn('My Word List Grep', 'Invalid regular expression row(s): %s' % '; '.join(warnings))
 
     def _search_failed(self, error):
         self._restore_search_buttons()

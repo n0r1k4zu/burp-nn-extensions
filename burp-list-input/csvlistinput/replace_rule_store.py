@@ -9,15 +9,15 @@ import csv
 import codecs
 import threading
 
-from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode
+from csvlistinput.utils import Utf8CsvRecoder, csv_cell_to_unicode, coerce_boolean
 
 
 class ReplaceRule(object):
     def __init__(self, before=u"", after=u"", enabled=True, is_regex=False):
         self.before = before
         self.after = after
-        self.enabled = enabled
-        self.is_regex = is_regex
+        self.enabled = coerce_boolean(enabled)
+        self.is_regex = coerce_boolean(is_regex)
 
 
 _FIELDS = ("enabled", "is_regex", "before", "after")
@@ -52,6 +52,8 @@ class ReplaceRuleStore(object):
             return
         with self._lock:
             if 0 <= index < len(self.rules):
+                if field in ('enabled', 'is_regex'):
+                    value = coerce_boolean(value)
                 setattr(self.rules[index], field, value)
 
     def enabled_rules(self):

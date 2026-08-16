@@ -856,7 +856,8 @@
         <h2>Backup &amp; Restore</h2>
         <p class="section-dek">編集可能なMarkdown内CSVで、主要なリスト設定をExport／Restoreします。</p>
       </div>
-      <p><span class="k">Backup &amp; Restore</span> は、<strong>My Word List</strong>、<strong>Target &amp; List Mapping CSV</strong>、<strong>Match &amp; ReplaceのRequest replacements／Response replacements</strong>を対象にします。Markdown内ではすべて<code>csv</code>コードブロックで記載されるため、列・行を確認し必要に応じて編集できます。</p>
+      <p><span class="k">Backup &amp; Restore</span> は、<strong>My Word List</strong>、<strong>Target &amp; List Mapping CSV</strong>、<strong>Match &amp; ReplaceのRequest replacements／Response replacements</strong>を対象にします。Markdown内ではすべて<code>csv</code>コードブロックで記載されるため、列・行を確認し必要に応じて編集できます。My Word Listの列は<code>Word,Regex,Comment</code>で、Regexは<code>1</code>/<code>true</code>で有効です。</p>
+      <p><span class="k">My Word List Grep</span>は各行のRegexチェックに従い、通常のliteral検索または正規表現検索を実行します。無効な正規表現の行は検索全体を止めず、該当行だけをスキップしてErrorsタブへ記録します。</p>
       <p><strong>Color SnapshotsとComment Snapshotsは対象外</strong>です。Restoreは上記リストだけを置換し、Proxy Historyの色・Commentには触れません。Export／Restoreはバックグラウンドで実行され、ボタンが<code>Exporting...</code>／<code>Restoring...</code>になっている間もBurp UIは操作できます。</p>
     </section>
 

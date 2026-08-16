@@ -11,7 +11,7 @@ throughout.
 import re
 
 from csvlistinput import codec_engine
-from csvlistinput.utils import to_bytestring_space
+from csvlistinput.utils import to_bytestring_space, coerce_boolean
 
 try:
     _UNICODE_TYPE = unicode
@@ -59,7 +59,7 @@ def apply_rule(raw_value, rule):
                 else:
                     local_find = find
                     local_replace = replace_with
-                if rule.is_regex:
+                if coerce_boolean(rule.is_regex):
                     pattern = re.compile(local_find)
                     changed, count = pattern.subn(local_replace, token_decoded)
                 else:
@@ -80,7 +80,7 @@ def apply_rule(raw_value, rule):
         find = find.decode('latin-1')
         replace_with = replace_with.decode('latin-1')
 
-    if rule.is_regex:
+    if coerce_boolean(rule.is_regex):
         pattern = re.compile(find)
         new_decoded, hit_count = pattern.subn(replace_with, decoded)
     else:

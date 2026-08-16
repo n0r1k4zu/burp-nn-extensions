@@ -7,6 +7,8 @@ separate from the History Search tab's Swing code
 not how it's presented.
 """
 
+import re
+
 from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space, to_bytestring_space
 from csvlistinput.statistics_engine import group_display
 
@@ -241,9 +243,28 @@ def search(callbacks, helpers, word, before_chars, after_chars,
     even if Proxy history changes afterwards.  ``start_packet_no`` and
     ``end_packet_no`` are inclusive 1-based Proxy History positions; an
     omitted boundary leaves that end of the history unbounded."""
-    results = []
     terms, operator = parse_search_query(word)
     terms = terms_for_byte_text(terms)
+    return _search_terms(callbacks, helpers, terms, operator, before_chars, after_chars,
+                         start_packet_no, end_packet_no, cancel_check)
+
+
+def search_literal(callbacks, helpers, word, before_chars, after_chars,
+                   start_packet_no=None, end_packet_no=None, cancel_check=None):
+    """Search one My Word List Word literally, including ``&`` and ``|``.
+
+    Packet Grep intentionally interprets those characters as its query
+    grammar. A Regex-OFF word-list entry must instead treat every character
+    exactly as entered, so it bypasses parse_search_query().
+    """
+    terms = terms_for_byte_text([word])
+    return _search_terms(callbacks, helpers, terms, None, before_chars, after_chars,
+                         start_packet_no, end_packet_no, cancel_check)
+
+
+def _search_terms(callbacks, helpers, terms, operator, before_chars, after_chars,
+                  start_packet_no=None, end_packet_no=None, cancel_check=None):
+    results = []
     packet_no = 0
     for item in callbacks.getProxyHistory():
         packet_no += 1
@@ -271,4 +292,48 @@ def search(callbacks, helpers, word, before_chars, after_chars,
                 "request_bytes": request_bytes, "response_bytes": response_bytes,
                 "http_service": http_service,
             })
+    return results
+
+
+def search_regex(callbacks, helpers, pattern, before_chars, after_chars,
+                 start_packet_no=None, end_packet_no=None, cancel_check=None):
+    """Regex counterpart to ``search`` for one My Word List entry.
+
+    The expression is compiled in the same byte-string space as Burp HTTP
+    messages, preventing Jython from ASCII-decoding non-ASCII traffic.
+    """
+    regex_pattern = terms_for_byte_text([pattern])[0]
+    try:
+        compiled = re.compile(regex_pattern, re.IGNORECASE)
+    except Exception as error:
+        raise ValueError('Invalid regular expression: %s' % error)
+    results = []
+    packet_no = 0
+    for item in callbacks.getProxyHistory():
+        packet_no += 1
+        if cancel_check and cancel_check():
+            break
+        if start_packet_no is not None and packet_no < start_packet_no:
+            continue
+        if end_packet_no is not None and packet_no > end_packet_no:
+            break
+        request_bytes = item.getRequest()
+        response_bytes = item.getResponse()
+        http_service = item.getHttpService()
+        group = group_display(item.getComment() if hasattr(item, 'getComment') else u'')
+        for side, raw_bytes in (('Request', request_bytes), ('Response', response_bytes)):
+            text = message_text(helpers, raw_bytes) if raw_bytes is not None else ''
+            for match_obj in compiled.finditer(text):
+                start, end = match_obj.span()
+                before = text[max(0, start - before_chars):start]
+                matched = text[start:end]
+                after = text[end:end + after_chars]
+                results.append({
+                    'packet_no': packet_no, 'side': side,
+                    'before': display_text(before), 'match': display_text(matched),
+                    'after': display_text(after),
+                    'region': region_for_hit(text, before, matched, after), 'group': group,
+                    'request_bytes': request_bytes, 'response_bytes': response_bytes,
+                    'http_service': http_service,
+                })
     return results

@@ -11,7 +11,7 @@ import re
 
 from csvlistinput import packet_regions, substitution_engine
 from csvlistinput.models import Edit
-from csvlistinput.utils import bytes_to_bytestring, bytestring_to_bytes, to_bytestring_space
+from csvlistinput.utils import bytes_to_bytestring, bytestring_to_bytes, to_bytestring_space, coerce_boolean
 
 
 def _region_spans_for_scope(regions, settings):
@@ -37,7 +37,7 @@ def _apply_rules_to_text(text, rules):
         after = to_bytestring_space(rule.after)
         if not before:
             continue
-        if rule.is_regex:
+        if coerce_boolean(rule.is_regex):
             try:
                 pattern = re.compile(before)
             except re.error:
