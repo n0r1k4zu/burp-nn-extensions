@@ -85,6 +85,25 @@ class StatisticsEngineTest(unittest.TestCase):
         self.assertEqual(1, changed)
         self.assertEqual('[0001] [group="user1"] note', items[0].comment)
 
+    def test_clear_analysis_annotations_handles_non_ascii_bytes_and_legacy_forms(self):
+        items = [_Item('GET / HTTP/1.1\r\n\r\n', '',
+                       b'\xe3\x83\xa1\xe3\x83\xa2 [SPA(\xe7\x94\xbb\xe9\x9d\xa2\xe6\x9b\xb4\xe6\x96\xb0)] [\xe9\x9b\x86\xe7\xb4\x84\xe5\xaf\xbe\xe8\xb1\xa1_\xe9\x9b\x86\xe7\xb4\x84\xe5\x85\x88No1992]'),
+                 _Item('GET / HTTP/1.1\r\n\r\n', '', '[Web Screen] [Aggregation Target] note')]
+        changed = statistics_engine.clear_analysis_annotations(_Callbacks(items))
+        self.assertEqual(2, changed)
+        self.assertEqual(u'メモ', items[0].comment)
+        self.assertEqual(u'note', items[1].comment)
+
+    def test_clear_analysis_annotations_removes_current_spa_and_aggregation_tags(self):
+        items = [_Item('GET / HTTP/1.1\r\n\r\n', '', u'[SPA（画面更新）]'),
+                 _Item('GET / HTTP/1.1\r\n\r\n', '', u'[SPA（画面更新）] [集約対象]'),
+                 _Item('GET / HTTP/1.1\r\n\r\n', '', u'[0107] [集約対象_集約先No0092]')]
+        changed = statistics_engine.clear_analysis_annotations(_Callbacks(items))
+        self.assertEqual(3, changed)
+        self.assertEqual(u'', items[0].comment)
+        self.assertEqual(u'', items[1].comment)
+        self.assertEqual(u'[0107]', items[2].comment)
+
     def test_aggregation_annotation_uses_representative_leading_number(self):
         body = 'message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22aura%3A%2F%2FApexActionController%2FACTION%24execute%22%7D%5D%7D'
         items = [_Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', '[1992] representative'),

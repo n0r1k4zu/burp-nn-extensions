@@ -185,6 +185,37 @@ class _ExportPacketInsertionPointsAction(ActionListener):
                                           'MyTools: Export Packet & Insertion Point', JOptionPane.ERROR_MESSAGE)
 
 
+class _ClearSelectedHistoryFieldAction(ActionListener):
+    """Clear only the selected Proxy History packets' comment or highlight."""
+    def __init__(self, messages, field, log_fn, error_fn):
+        self.messages = list(messages)
+        self.field = field
+        self.log_fn = log_fn
+        self.error_fn = error_fn
+
+    def actionPerformed(self, event):
+        try:
+            changed = 0
+            for message in self.messages:
+                if self.field == 'comment':
+                    old = message.getComment()
+                    if old:
+                        message.setComment(u'')
+                        changed += 1
+                else:
+                    old = message.getHighlight()
+                    if old:
+                        message.setHighlight(None)
+                        changed += 1
+            label = 'Clear Comment' if self.field == 'comment' else 'Clear Color'
+            if self.log_fn:
+                self.log_fn('%s: cleared %d selected History packet(s).' % (label, changed))
+        except Exception as exc:
+            label = 'Clear Comment' if self.field == 'comment' else 'Clear Color'
+            if self.error_fn:
+                self.error_fn(label, str(exc), traceback.format_exc())
+
+
 class ContextMenuFactory(IContextMenuFactory):
     def __init__(self, callbacks, helpers, armed_target, decode_replace_target, request_replace_store,
                  response_replace_store, on_armed=None, on_replace_added=None, on_decode=None,
@@ -209,6 +240,21 @@ class ContextMenuFactory(IContextMenuFactory):
         message = messages[0]
 
         items = []
+        try:
+            is_proxy_history = (invocation.getInvocationContext() ==
+                                IContextMenuInvocation.CONTEXT_PROXY_HISTORY)
+        except Exception:
+            is_proxy_history = False
+        if is_proxy_history:
+            comment_clear_item = JMenuItem('Clear Comment')
+            comment_clear_item.addActionListener(_ClearSelectedHistoryFieldAction(
+                messages, 'comment', self.log_fn, self.error_fn))
+            items.append(comment_clear_item)
+            color_clear_item = JMenuItem('Clear Color')
+            color_clear_item.addActionListener(_ClearSelectedHistoryFieldAction(
+                messages, 'color', self.log_fn, self.error_fn))
+            items.append(color_clear_item)
+
         export_item = JMenuItem('Export Packet & Insertion Point')
         export_item.addActionListener(_ExportPacketInsertionPointsAction(
             self.callbacks, self.helpers, messages, self.log_fn, self.error_fn))
