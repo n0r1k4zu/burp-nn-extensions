@@ -339,8 +339,13 @@ def annotate_analysis(records, add_class_tags=False, add_aggregation_tags=False,
         if add_aggregation_tags and record['agg_role'] == u'target':
             representative = record['agg_rep']
             rep_number = original_numbers.get(representative['packet_no']) if representative else None
-            tag = (u'集約対象_集約先No%s' % rep_number if rep_number
-                   else u'集約対象')
+            # A representative can be outside the selected export set and
+            # therefore have no leading [number].  Never lose the destination
+            # in that case: History Packet No is stable for the current view
+            # and makes the aggregation relationship immediately traceable.
+            tag = (u'集約対象_集約先No%s' % rep_number if rep_number else
+                   (u'集約対象_集約先PacketNo%s' % representative['packet_no']
+                    if representative else u'集約対象'))
             comment = _append_tag(comment, tag)
         if comment != old:
             record['item'].setComment(comment)

@@ -123,3 +123,12 @@ class StatisticsEngineTest(unittest.TestCase):
         self.assertEqual(1, colored)
         self.assertIn(u'[集約対象_集約先No1992]', items[1].comment)
         self.assertEqual('gray', items[1].highlight)
+
+    def test_aggregation_annotation_falls_back_to_representative_packet_number(self):
+        body = 'message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22aura%3A%2F%2FApexActionController%2FACTION%24execute%22%7D%5D%7D'
+        items = [_Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', ''),
+                 _Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', '')]
+        records = statistics_engine.analyze_history(_Callbacks(items), _Helpers())
+        changed, _colored = statistics_engine.annotate_analysis(records, add_aggregation_tags=True)
+        self.assertEqual(1, changed)
+        self.assertIn(u'[集約対象_集約先PacketNo1]', items[1].comment)
