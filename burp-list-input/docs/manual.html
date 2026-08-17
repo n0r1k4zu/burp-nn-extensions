@@ -1529,8 +1529,9 @@
       </figure>
 
       <p>
-        同じ仕組みはXMLのテキスト・属性値の中に埋め込まれたJSON/XMLに対しても働きます。ネスト検出は既定で5段階まで
-        再帰します（壊れたJSON/XMLは無視して、その部分だけ検出0件になります — 拡張自体が落ちることはありません）。
+        同じ仕組みはXMLのテキスト・属性値の中に埋め込まれたJSON/XMLに対しても働きます。JSON/XML文書が文字列の中へ
+        さらに埋め込まれる連鎖は既定で16段まで再帰します。通常のJSONオブジェクト／配列の構造深さは256段までです
+        （壊れたJSON/XMLは無視して、その部分だけ検出0件になります — 拡張自体が落ちることはありません）。
       </p>
 
       <h3>「本文全体がJSON」以外の場所に埋め込まれた場合</h3>
@@ -1545,9 +1546,9 @@
         <table>
           <thead><tr><th>値の置き場所</th><th>再帰展開する前の処理</th></tr></thead>
           <tbody>
-            <tr><td>URLクエリパラメータ</td><td>URLデコードしてから中身を確認</td></tr>
-            <tr><td>Cookie</td><td>%XXエンコードのみ解除して確認（<code>+</code>はスペースに変換しない）</td></tr>
-            <tr><td>x-www-form-urlencodedの本文フィールド</td><td>URLデコードしてから中身を確認</td></tr>
+            <tr><td>URLクエリパラメータ</td><td>最大3層のpercentデコード後に中身を確認</td></tr>
+            <tr><td>Cookie</td><td>最大3層の%XXデコード後に確認（<code>+</code>はスペースに変換しない）</td></tr>
+            <tr><td>x-www-form-urlencodedの本文フィールド</td><td>最大3層のpercentデコード後に中身を確認</td></tr>
             <tr><td>ヘッダー値</td><td>デコードせずそのまま確認（ヘッダーはエンコードされないため）</td></tr>
             <tr><td>multipartの単純フィールド</td><td>デコードせずそのまま確認</td></tr>
           </tbody>
@@ -1557,6 +1558,24 @@
         どの経路で見つかった値でも、JSON/XMLとして解析できればその内部もさらに個別のInsertion Pointとして検出します
         （元の値がURLエンコードされていた場合は、デコード後の文字位置を元の生バイト列の位置へ正しく変換してから
         差し込みを行うため、置き換え時のオフセットもズレません）。
+      </p>
+
+      <h3>対応するリクエスト形式と上限</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>形式</th><th>検出する値</th><th>深さ・サイズ上限</th></tr></thead>
+          <tbody>
+            <tr><td>URL Query / Cookie / Header</td><td>各パラメータまたはヘッダー値。値内JSON/XMLも展開</td><td>値内JSONは構造256段、文書連鎖16段</td></tr>
+            <tr><td><code>application/x-www-form-urlencoded</code></td><td>各本文フィールド。値内JSON/XMLも展開</td><td>percentデコード最大3層、以降は上記と同じ</td></tr>
+            <tr><td>JSON / <code>+json</code> Body</td><td>object・array内の文字列、数値、boolean、nullの各リーフ</td><td>JSON構造256段、文書連鎖16段</td></tr>
+            <tr><td>XML / SOAP</td><td>属性値・テキストノード、および値内JSON/XML</td><td>文書連鎖16段。XML要素の構造には別の固定上限なし</td></tr>
+            <tr><td>NDJSON / JSON Lines / JSON Text Sequence</td><td>各非空行を独立したJSON文書として解析</td><td>行ごとにJSON構造256段、文書連鎖16段</td></tr>
+            <tr><td><code>multipart/form-data</code></td><td>通常フィールド、JSON/XML part、multipart属性</td><td>JSON partは構造256段、文書連鎖16段</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Body全体の解析上限は16MBです。これを超えるBodyは安全のため展開せず、URL Query・Cookie・Headerの検出は継続します。
       </p>
 
       <div class="callout update">
@@ -1885,7 +1904,7 @@
       </div>
       <ul>
         <li>Target &amp; List Mapping、Target &amp; Replace with Decode &amp; Encodeそれぞれについて、同時にarmできる対象は1つだけです（例えばTarget &amp; List Mapping単体で2つ以上の対象を並行してテストすることはできません）。この2つの機能は互いに独立しており、別々の対象をそれぞれarmできます。</li>
-        <li>Base64やURLエンコードされた中に埋め込まれたJSON/XMLは、Insertion Pointの自動検出では個別の項目に展開されません（Target &amp; Replace with Decode &amp; Encodeで、そのInsertion Point全体をデコード対象として手動指定することは可能です）。</li>
+        <li>Base64・gzip・独自暗号化・Protobuf等のエンコード済みデータ内部は、Insertion Pointの自動検出では個別の項目に展開しません。percentエンコードは最大3層まで展開します。Base64等はTarget &amp; Replace with Decode &amp; Encodeで、そのInsertion Point全体をデコード対象として手動指定できます。</li>
         <li>同じ要素内でテキストと子要素が混在するXML（mixed content）は、テキスト部分ごとに別のInsertion Pointとして扱われます。</li>
         <li>CSVの行を使い切った後は、既定では先頭に戻らず未置換のまま送信されます（<span class="k">Reset pointer</span>で明示的に戻す必要があります）。</li>
         <li>祖先・子孫関係にあるInsertion Point（入れ子のJSONとその外側）は同時にマッピングできません。</li>

@@ -23,11 +23,13 @@ Both reuse the same selection-extraction logic (_extract_selection).
 import traceback
 
 from java.awt.event import ActionListener
-from javax.swing import JMenuItem, JOptionPane
+from java.io import File
+from javax.swing import JFileChooser, JMenuItem, JOptionPane
 
 from burp import IContextMenuFactory, IContextMenuInvocation
 
 from csvlistinput import detection_engine, matching
+from csvlistinput import insertion_point_export
 from csvlistinput import statistics_engine
 from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space
 
@@ -149,10 +151,45 @@ class _AuraTargetAction(ActionListener):
             self.log_fn('Aura Diagnostic: panel is not available.')
 
 
+class _ExportPacketInsertionPointsAction(ActionListener):
+    """Save one CSV row for every insertion point of every selected packet."""
+    def __init__(self, callbacks, helpers, messages, log_fn, error_fn):
+        self.callbacks = callbacks
+        self.helpers = helpers
+        self.messages = list(messages)
+        self.log_fn = log_fn
+        self.error_fn = error_fn
+
+    def actionPerformed(self, event):
+        chooser = JFileChooser()
+        chooser.setSelectedFile(File('packet_insertion_points.csv'))
+        if chooser.showSaveDialog(None) != JFileChooser.APPROVE_OPTION:
+            return
+        try:
+            def report_detection_error(message):
+                if self.log_fn:
+                    self.log_fn('Insertion Point export: %s' % message)
+
+            rows = insertion_point_export.build_rows(
+                self.callbacks, self.helpers, self.messages, on_error=report_detection_error)
+            insertion_point_export.write_csv(chooser.getSelectedFile().getAbsolutePath(), rows)
+            message = 'Exported %d insertion point row(s) from %d selected packet(s).' % (len(rows), len(self.messages))
+            if self.log_fn:
+                self.log_fn('Insertion Point export: ' + message)
+            JOptionPane.showMessageDialog(None, message, 'MyTools: Export Packet & Insertion Point',
+                                          JOptionPane.INFORMATION_MESSAGE)
+        except Exception as exc:
+            if self.error_fn:
+                self.error_fn('Export Packet & Insertion Point', str(exc), traceback.format_exc())
+            JOptionPane.showMessageDialog(None, 'Export failed: %s' % exc,
+                                          'MyTools: Export Packet & Insertion Point', JOptionPane.ERROR_MESSAGE)
+
+
 class ContextMenuFactory(IContextMenuFactory):
-    def __init__(self, helpers, armed_target, decode_replace_target, request_replace_store,
+    def __init__(self, callbacks, helpers, armed_target, decode_replace_target, request_replace_store,
                  response_replace_store, on_armed=None, on_replace_added=None, on_decode=None,
                  on_aura_target=None, log_fn=None, error_fn=None):
+        self.callbacks = callbacks
         self.helpers = helpers
         self.armed_target = armed_target
         self.decode_replace_target = decode_replace_target
@@ -172,6 +209,11 @@ class ContextMenuFactory(IContextMenuFactory):
         message = messages[0]
 
         items = []
+        export_item = JMenuItem('Export Packet & Insertion Point')
+        export_item.addActionListener(_ExportPacketInsertionPointsAction(
+            self.callbacks, self.helpers, messages, self.log_fn, self.error_fn))
+        items.append(export_item)
+
         list_mapping_item = JMenuItem("Send to Target & List Mapping")
         list_mapping_item.addActionListener(_ArmAction(
             self.helpers, self.armed_target, message, "Target & List Mapping",

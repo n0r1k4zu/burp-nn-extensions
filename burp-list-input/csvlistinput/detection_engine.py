@@ -56,6 +56,7 @@ DEFAULT_CACHE_SIZE = 64
 DEFAULT_MAX_CACHEABLE_BYTES = 1024 * 1024
 DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024
 DEFAULT_MAX_JSON_STRUCTURE_DEPTH = 256
+DEFAULT_MAX_PERCENT_DECODE_LAYERS = 3
 
 
 def _clone_point(point):
@@ -496,9 +497,56 @@ def _add_body_fallback_params(request_info, buf, out_points, on_error=None, leni
             start=start, end=end, original_value=buf[start:end], context=EscapeMode.URL_COMPONENT)
         out_points.append(ip)
         # x-www-form-urlencoded values are percent-encoded in the raw buffer.
-        _recurse_into_leaf_value(buf, ip, lambda b, s, e: url_decode_with_map(b, s, e, True),
+        _recurse_into_leaf_value(buf, ip, lambda b, s, e: _percent_decode_with_map(b, s, e, True),
                                   out_points, on_error=on_error, lenient=lenient,
                                   max_json_structure_depth=max_json_structure_depth)
+
+
+def _detect_json_lines(buf, body_start, body_end, out_points, on_error=None, lenient=False,
+                       max_json_structure_depth=None):
+    """Detect one JSON document per non-empty NDJSON / JSON-sequence line.
+
+    A complete NDJSON body is not itself valid JSON, so feeding it to the
+    ordinary body parser loses every insertion point.  Parse individual lines
+    with an absolute offset translator and make their identity unambiguous in
+    the resulting path (``ndjson[3]$.account.id``).
+    """
+    line_no = 0
+    cursor = body_start
+    while cursor < body_end:
+        line_end = buf.find('\n', cursor, body_end)
+        if line_end == -1:
+            line_end = body_end
+        content_start = cursor
+        content_end = line_end
+        if content_end > content_start and buf[content_end - 1] == '\r':
+            content_end -= 1
+        # RFC 7464 JSON Text Sequences optionally prefix records with RS.
+        if content_start < content_end and buf[content_start] == '\x1e':
+            content_start += 1
+        while content_start < content_end and buf[content_start] in ' \t':
+            content_start += 1
+        while content_end > content_start and buf[content_end - 1] in ' \t':
+            content_end -= 1
+        text = buf[content_start:content_end]
+        if text:
+            if _json_structure_depth_exceeds(text, max_json_structure_depth):
+                _report(on_error, 'NDJSON line %d skipped: structural nesting exceeds depth limit of %d'
+                        % (line_no + 1, max_json_structure_depth))
+            else:
+                try:
+                    points = json_offset_parser.detect(
+                        buf, content_start, content_end, allow_lenient=lenient,
+                        on_recovered=_make_recovered_reporter(on_error, 'ndjson[%d]' % line_no),
+                        on_error=on_error)
+                    if points:
+                        for point in points:
+                            point.path = 'ndjson[%d]' % line_no + point.path
+                        out_points.extend(points)
+                except Exception:
+                    _report_exc(on_error, 'NDJSON line %d detection raised unexpectedly:' % (line_no + 1))
+            line_no += 1
+        cursor = line_end + 1
 
 
 def _process_body(request_info, buf, out_points, on_error=None, lenient=False,
@@ -531,6 +579,11 @@ def _process_body(request_info, buf, out_points, on_error=None, lenient=False,
                 max_json_structure_depth=max_json_structure_depth)
         except Exception:
             _report_exc(on_error, "multipart body detection raised:")
+        return
+
+    if 'ndjson' in ct_lower or 'jsonl' in ct_lower or 'json-seq' in ct_lower:
+        _detect_json_lines(buf, body_offset, body_end, out_points, on_error=on_error, lenient=lenient,
+                           max_json_structure_depth=max_json_structure_depth)
         return
 
     if 'json' in ct_lower or looks_like_json(body_text):
@@ -581,11 +634,39 @@ def _analyze_request(helpers, request_bytes, http_service):
 
 
 def _url_form_decode(buf, start, end):
-    return url_decode_with_map(buf, start, end, True)
+    return _percent_decode_with_map(buf, start, end, True)
 
 
 def _cookie_decode(buf, start, end):
-    return url_decode_with_map(buf, start, end, False)
+    return _percent_decode_with_map(buf, start, end, False)
+
+
+def _has_percent_escape(text):
+    """Whether another percent-decode pass could change ``text``."""
+    for pos in range(0, max(0, len(text) - 2)):
+        if text[pos] == '%' and text[pos + 1] in '0123456789abcdefABCDEF' and text[pos + 2] in '0123456789abcdefABCDEF':
+            return True
+    return False
+
+
+def _percent_decode_with_map(buf, start, end, plus_as_space):
+    """Decode up to three percent-encoding layers without losing offsets.
+
+    ``url_decode_with_map`` maps decoded character boundaries back to the
+    source request.  On later layers the returned map is composed with the
+    previous one, so a nested JSON leaf can still be replaced at its exact
+    original `%25...` byte range rather than merely displayed.
+    """
+    decoded, decoded_to_raw = url_decode_with_map(buf, start, end, plus_as_space)
+    for _layer in range(1, DEFAULT_MAX_PERCENT_DECODE_LAYERS):
+        if not _has_percent_escape(decoded):
+            break
+        next_decoded, next_to_previous = url_decode_with_map(decoded, 0, len(decoded), plus_as_space)
+        if next_decoded == decoded:
+            break
+        decoded_to_raw = [decoded_to_raw[local_pos] for local_pos in next_to_previous]
+        decoded = next_decoded
+    return decoded, decoded_to_raw
 
 
 def _collect_url_cookie_points(context, out_points):

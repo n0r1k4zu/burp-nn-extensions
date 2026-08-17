@@ -84,7 +84,12 @@ class BurpParamType(object):
     JSON = 6
 
 
-MAX_NEST_DEPTH = 5
+# Maximum number of *serialized document* boundaries to follow.  This is
+# distinct from normal JSON object/array structural depth (bounded at 256 in
+# detection_engine).  Real-world API wrappers often place JSON in a JSON
+# string several times (framework envelope -> action -> params -> payload),
+# so five layers was unnecessarily shallow while sixteen remains bounded.
+MAX_NEST_DEPTH = 16
 
 # JSON pointer-ish path used to tag the synthetic root of a sniffed-and-recursed
 # nested document embedded inside a string leaf.

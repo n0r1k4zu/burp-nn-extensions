@@ -6,7 +6,8 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 
 ## 主な機能
 
-- **Insertion Pointの自動検出** — Burp Scanner相当以上の粒度。URL/Cookie/ヘッダー/`x-www-form-urlencoded`のフィールド/multipartの単純フィールドいずれの値であっても、JSON文字列内に埋め込まれたJSONのような入れ子構造を再帰的に展開して個別の項目として検出します（URLエンコードされている場合も対応）。
+- **Insertion Pointの自動検出** — URL/Cookie/ヘッダー/`x-www-form-urlencoded`のフィールド/multipartの単純フィールド、JSON・XML・SOAP・NDJSON/JSON Lines本文を検出します。各値内のJSON/XMLは再帰的に展開し、URL／フォーム／Cookie値は最大3層のpercentエンコードを復元して内部リーフも個別に識別します。通常JSONの構造深さは256、JSON/XML文書が文字列へ埋め込まれる連鎖は16段までです。
+- **Packet & Insertion Point Export** — HTTP Historyでパケットを選択して右クリックの **Export Packet & Insertion Point** を選ぶと、同じ検出器で識別した全Insertion Pointを1点1行のCSV（`No, Packet No, URL, Type, Insertion Point, Comment`）として出力します。`Type`には`COOKIE`、`JSON_LEAF_NESTED`などの検出種別が入ります。
 - **CSVペイロードリスト** — `No, 項目1, 項目2, ...` 形式（列数可変）を読み込み、検出したInsertion Pointへ手動で列を割り当てます。読み込み後の値はその場で直接編集可能です。
 - **自動差し込み** — Active化してRepeaterから送信するたびに、CSVの次の行を消費して差し込みます。開始行の指定・ポインタのリセットに対応。
 - **送信ログ** — 実際に送信されたリクエストと、返ってきたレスポンスの両方を確認できます。`#`列の次の**Packet No**列で、その送信がBurpのProxy History上で何番目かも確認できます（Proxyツールを経由しない送信では`-`表示になります）。
@@ -40,7 +41,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 
 ## 使い方（概要）
 
-Target & List MappingとTarget & Replace with Decode & Encodeは、**それぞれ別々にarmします**（右クリックメニューに専用の項目があります）。同じリクエストを両方に送ってもよいですし、まったく別々のリクエストをそれぞれの機能に割り当てることもできます。
+Target & List MappingとTarget & Replace with Decode & Encodeは、**それぞれ別々にarmします**（右クリックメニューに専用の項目があります）。同じリクエストを両方に送ってもよいですし、まったく別々のリクエストをそれぞれの機能に割り当てることもできます。HTTP Historyで選択したパケットの構造だけを棚卸ししたい場合は、右クリックの **Export Packet & Insertion Point** を使います。CSVは各Insertion Pointを別行に出力し、Packet NoはHTTP Historyの1始まりの行番号です。
 
 1. テストしたいリクエストをProxy履歴やRepeaterで右クリックし、**Send to Target & List Mapping** でarmする
 2. **Target & List Mapping** タブで検出されたInsertion Points一覧を確認する
@@ -164,7 +165,7 @@ testdata/                      # 動作確認用のサンプルリクエスト�
 ## 制限事項
 
 - Target & List Mapping、Target & Replace with Decode & Encode、それぞれについて同時にarmできる対象は1つだけです（例えばTarget & List Mappingで2つ以上の対象を並行してテストすることはできません。ただし2つの機能同士は互いに独立しているので、Target & List Mapping用に1つ、Target & Replace with Decode & Encode用に別の1つ、という組み合わせは可能です）
-- Base64やURLエンコードされた中に、さらに奥にJSON/XMLが埋め込まれている場合、Insertion Point検出はそれを自動では個別の項目に展開しません（Target & Replace with Decode & Encodeで、そのInsertion Point全体をデコード→置換→再エンコード対象として手動指定することは可能です）
+- Base64・gzip・独自暗号化・Protobuf等の内部に埋め込まれたJSON/XMLは、Insertion Point検出では自動展開しません。URL／フォーム／Cookieのpercentエンコードは最大3層まで展開します。その他のエンコード値はTarget & Replace with Decode & Encodeで、そのInsertion Point全体をデコード→置換→再エンコード対象として手動指定できます
 - 壊れたJSONの寛容モードは実験的機能で、真の入れ子構造までは保証されません
 - 同じ要素内でテキストと子要素が混在するXML（mixed content）は、テキスト部分ごとに別のInsertion Pointとして扱われます
 - Target & Replace with Decode & Encodeは、armした自分自身の対象にのみ適用されます（Match & Replaceのようなトラフィック全体への適用はしません）

@@ -12,23 +12,24 @@ selection) is also independent of Target & List Mapping's own Active
 toggle and flags, matching the pattern established by Match & Replace.
 """
 
+import re
 import traceback
 
 from java.awt import BorderLayout, Dimension, FlowLayout, GridLayout
 from java.awt.event import ActionListener
-from java.lang import Boolean, String
+from java.lang import Boolean, Integer, String
 from javax.swing import (BoxLayout, DefaultCellEditor, JButton, JCheckBox, JComboBox, JLabel, JPanel,
-                          JScrollPane, JSplitPane, JTable, JTextArea, ListSelectionModel)
-from javax.swing.event import ListSelectionListener, TableModelListener
-from javax.swing.table import AbstractTableModel
+                          JScrollPane, JSplitPane, JTable, JTextArea, JTextField, ListSelectionModel, RowFilter)
+from javax.swing.event import DocumentListener, ListSelectionListener, TableModelListener
+from javax.swing.table import AbstractTableModel, TableRowSorter
 
 from csvlistinput import codec_engine, detection_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
 from csvlistinput.utils import coerce_boolean
 
-COLUMNS = ["Enabled", "Insertion Points", "Type", "Original Value", "Codec", "Regex", "Find", "Replace With"]
-_EDITABLE_COLUMNS = (0, 4, 5, 6, 7)
-_BOOLEAN_COLUMNS = (0, 5)
+COLUMNS = ["Enabled", "Insertion Points", "Type", "Nesting", "Original Value", "Codec", "Regex", "Find", "Replace With"]
+_EDITABLE_COLUMNS = (0, 5, 6, 7, 8)
+_BOOLEAN_COLUMNS = (0, 6)
 
 _NOT_ARMED_TEXT = ("No target armed. Right-click a request in Repeater / Proxy history and choose "
                     "'Send to Target & Replace with Decode & Encode'.")
@@ -50,6 +51,8 @@ class DecodeReplaceTableModel(AbstractTableModel):
         return COLUMNS[col]
 
     def getColumnClass(self, col):
+        if col == 3:
+            return Integer
         return Boolean if col in _BOOLEAN_COLUMNS else String
 
     def _point(self, row):
@@ -65,18 +68,20 @@ class DecodeReplaceTableModel(AbstractTableModel):
         if col == 2:
             return (p.type + " (recovered)") if p.recovered else p.type
         if col == 3:
+            return Integer(p.nesting_depth)
+        if col == 4:
             preview = p.original_value if p.original_value is not None else ""
             preview = preview.replace("\n", "\\n").replace("\r", "\\r")
             if len(preview) > 80:
                 preview = preview[:77] + "..."
             return preview
-        if col == 4:
-            return rule.codec
         if col == 5:
-            return rule.is_regex
+            return rule.codec
         if col == 6:
-            return rule.find
+            return rule.is_regex
         if col == 7:
+            return rule.find
+        if col == 8:
             return rule.replace_with
         return None
 
@@ -88,13 +93,13 @@ class DecodeReplaceTableModel(AbstractTableModel):
         rule = self.settings.get_rule(p.path)
         if col == 0:
             rule.enabled = coerce_boolean(value)
-        elif col == 4:
-            rule.codec = value
         elif col == 5:
-            rule.is_regex = coerce_boolean(value)
+            rule.codec = value
         elif col == 6:
-            rule.find = value
+            rule.is_regex = coerce_boolean(value)
         elif col == 7:
+            rule.find = value
+        elif col == 8:
             rule.replace_with = value
         self.fireTableCellUpdated(row, col)
 
@@ -132,6 +137,20 @@ class _TableChangeListener(TableModelListener):
 
     def tableChanged(self, event):
         self.panel._refresh_detail()
+
+
+class _FilterListener(DocumentListener):
+    def __init__(self, panel):
+        self.panel = panel
+
+    def insertUpdate(self, event):
+        self.panel._apply_filter()
+
+    def removeUpdate(self, event):
+        self.panel._apply_filter()
+
+    def changedUpdate(self, event):
+        self.panel._apply_filter()
 
 
 def _make_detail_area():
@@ -188,10 +207,20 @@ class DecodeReplacePanel(JPanel):
 
         self.table_model = DecodeReplaceTableModel(armed_target, decode_replace_settings)
         self.table = JTable(self.table_model)
+        self.row_sorter = TableRowSorter(self.table_model)
+        self.table.setRowSorter(self.row_sorter)
         self.table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.table.getSelectionModel().addListSelectionListener(_RowSelectionListener(self))
         self.table_model.addTableModelListener(_TableChangeListener(self))
         self._configure_editors()
+
+        filter_row = JPanel(FlowLayout(FlowLayout.LEFT))
+        filter_row.add(JLabel("Filter (path contains):"))
+        self.filter_field = JTextField(30)
+        self.filter_field.getDocument().addDocumentListener(_FilterListener(self))
+        filter_row.add(self.filter_field)
+        self.match_count_label = JLabel("")
+        filter_row.add(self.match_count_label)
 
         # Selecting a row shows its full Original Value alongside a live
         # preview of that value decoded with the row's current Codec
@@ -239,15 +268,34 @@ class DecodeReplacePanel(JPanel):
         detail_panel.add(selection_panel, BorderLayout.SOUTH)
         detail_panel.setPreferredSize(Dimension(100, 245))
 
-        main_split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(self.table), detail_panel)
+        table_panel = JPanel(BorderLayout())
+        table_panel.add(filter_row, BorderLayout.NORTH)
+        table_panel.add(JScrollPane(self.table), BorderLayout.CENTER)
+        main_split = JSplitPane(JSplitPane.VERTICAL_SPLIT, table_panel, detail_panel)
         main_split.setResizeWeight(0.7)
         self.add(main_split, BorderLayout.CENTER)
+        self._apply_filter()
 
     def _configure_editors(self):
-        codec_col = self.table.getColumnModel().getColumn(4)
+        codec_col = self.table.getColumnModel().getColumn(5)
         codec_combo = JComboBox(list(codec_engine.CODEC_NAMES))
         codec_combo.setEditable(True)
         codec_col.setCellEditor(DefaultCellEditor(codec_combo))
+
+    def _apply_filter(self):
+        text = self.filter_field.getText() if self.filter_field.getText() else ""
+        if not text:
+            self.row_sorter.setRowFilter(None)
+        else:
+            try:
+                self.row_sorter.setRowFilter(RowFilter.regexFilter("(?i)" + re.escape(text), 1))
+            except Exception:
+                self.row_sorter.setRowFilter(None)
+        self._update_match_count()
+
+    def _update_match_count(self):
+        self.match_count_label.setText("%d / %d rows" % (
+            self.table.getRowCount(), self.table_model.getRowCount()))
 
     def _on_enabled_toggle(self, event):
         self.settings.enabled = self.enabled_checkbox.isSelected()
@@ -287,7 +335,10 @@ class DecodeReplacePanel(JPanel):
             self.original_value_detail.setText("")
             self.decoded_value_detail.setText("")
             return
-        p = self.armed_target.template_points[row]
+        model_row = self.table.convertRowIndexToModel(row)
+        if not (0 <= model_row < len(self.armed_target.template_points)):
+            return
+        p = self.armed_target.template_points[model_row]
         rule = self.settings.get_rule(p.path)
         original = p.original_value if p.original_value is not None else u""
         self.original_value_detail.setText(original)
@@ -334,4 +385,5 @@ class DecodeReplacePanel(JPanel):
         else:
             self.summary_label.setText(_NOT_ARMED_TEXT)
         self.table_model.refresh()
+        self._apply_filter()
         self._refresh_detail()
