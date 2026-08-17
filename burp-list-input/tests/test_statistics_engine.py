@@ -72,6 +72,14 @@ class StatisticsEngineTest(unittest.TestCase):
         self.assertEqual(2, statistics_engine.clear_bracket_tags(callbacks))
         self.assertNotIn('[', items[0].comment)
 
+    def test_number_selected_numbers_only_selected_items_and_replaces_old_number(self):
+        items = [_Item('GET / HTTP/1.1\r\n\r\n', '', '[0009] keep'),
+                 _Item('GET / HTTP/1.1\r\n\r\n', '', 'untouched')]
+        changed = statistics_engine.number_selected([items[0]], 1, 4)
+        self.assertEqual(1, changed)
+        self.assertEqual('[0001] keep', items[0].comment)
+        self.assertEqual('untouched', items[1].comment)
+
     def test_group_names_accept_history_comment_variants(self):
         self.assertEqual(['alpha', 'beta', 'gamma'], statistics_engine.group_names(
             '[group="alpha"] note [ GROUP = \'beta\' ] [group=gamma]'))

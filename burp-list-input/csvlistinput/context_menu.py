@@ -185,6 +185,76 @@ class _ExportPacketInsertionPointsAction(ActionListener):
                                           'MyTools: Export Packet & Insertion Point', JOptionPane.ERROR_MESSAGE)
 
 
+class _ExportPacketInsertionPointsWithStatisticsAction(ActionListener):
+    """Number, annotate, then export only the selected HTTP History items."""
+    def __init__(self, callbacks, helpers, messages, log_fn, error_fn):
+        self.callbacks = callbacks
+        self.helpers = helpers
+        self.messages = list(messages)
+        self.log_fn = log_fn
+        self.error_fn = error_fn
+
+    def actionPerformed(self, event):
+        chooser = JFileChooser()
+        chooser.setSelectedFile(File('packet_insertion_points_statistics.csv'))
+        if chooser.showSaveDialog(None) != JFileChooser.APPROVE_OPTION:
+            return
+        try:
+            # Keep the exact original Java/Python comment value.  If the user
+            # chooses cleanup after a successful export, restoration is safer
+            # than trying to infer which old number/tag was already present.
+            original_comments = [(message, message.getComment()) for message in self.messages]
+            # The Numbering & Grouping tab's defaults are Start=1, Digits=4.
+            numbered = statistics_engine.number_selected(self.messages, 1, 4)
+            selected_numbers = set(no for no in insertion_point_export._packet_numbers(
+                self.callbacks, self.messages) if no != '')
+            # Build aggregation against the whole History so an Aura target
+            # selected alone still receives the same classification/role it
+            # has in the Statistics tab.  Only selected records are changed.
+            all_records = statistics_engine.analyze_history(self.callbacks, self.helpers)
+            selected_records = [record for record in all_records
+                                if record['packet_no'] in selected_numbers]
+            annotated, _colored = statistics_engine.annotate_analysis(
+                selected_records, add_class_tags=True, add_aggregation_tags=True)
+
+            def report_detection_error(message):
+                if self.log_fn:
+                    self.log_fn('Insertion Point export: %s' % message)
+
+            rows = insertion_point_export.build_rows(
+                self.callbacks, self.helpers, self.messages, on_error=report_detection_error)
+            insertion_point_export.write_csv(chooser.getSelectedFile().getAbsolutePath(), rows)
+            message = ('Numbered %d and added Statistics tags to %d selected packet(s); '
+                       'exported %d insertion point row(s).'
+                       % (numbered, annotated, len(rows)))
+            if self.log_fn:
+                self.log_fn('Export Packet & Insertion Point with Statistics comment: ' + message)
+            JOptionPane.showMessageDialog(
+                None, message, 'MyTools: Export Packet & Insertion Point with Statistics comment',
+                JOptionPane.INFORMATION_MESSAGE)
+            cleanup = JOptionPane.showConfirmDialog(
+                None,
+                'Remove the numbering and Statistics comments added for this export?\n'
+                'Yes restores each selected packet comment to its state before this export.\n'
+                'No keeps the added comments.',
+                'MyTools: Keep or remove export comments',
+                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE)
+            if cleanup == JOptionPane.YES_OPTION:
+                restored = 0
+                for selected_message, original_comment in original_comments:
+                    selected_message.setComment(original_comment)
+                    restored += 1
+                if self.log_fn:
+                    self.log_fn('Export Packet & Insertion Point with Statistics comment: '
+                                'restored comments for %d selected packet(s).' % restored)
+        except Exception as exc:
+            if self.error_fn:
+                self.error_fn('Export Packet & Insertion Point with Statistics comment', str(exc), traceback.format_exc())
+            JOptionPane.showMessageDialog(
+                None, 'Export failed: %s' % exc,
+                'MyTools: Export Packet & Insertion Point with Statistics comment', JOptionPane.ERROR_MESSAGE)
+
+
 class _ClearSelectedHistoryFieldAction(ActionListener):
     """Clear only the selected Proxy History packets' comment or highlight."""
     def __init__(self, messages, field, log_fn, error_fn):
@@ -259,6 +329,11 @@ class ContextMenuFactory(IContextMenuFactory):
         export_item.addActionListener(_ExportPacketInsertionPointsAction(
             self.callbacks, self.helpers, messages, self.log_fn, self.error_fn))
         items.append(export_item)
+        if is_proxy_history:
+            export_statistics_item = JMenuItem('Export Packet & Insertion Point with Statistics comment')
+            export_statistics_item.addActionListener(_ExportPacketInsertionPointsWithStatisticsAction(
+                self.callbacks, self.helpers, messages, self.log_fn, self.error_fn))
+            items.append(export_statistics_item)
 
         list_mapping_item = JMenuItem("Send to Target & List Mapping")
         list_mapping_item.addActionListener(_ArmAction(

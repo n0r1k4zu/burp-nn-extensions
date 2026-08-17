@@ -397,6 +397,26 @@ def number_all(callbacks, start_number, digits):
     return changed
 
 
+def number_selected(messages, start_number=1, digits=4):
+    """Apply the standard leading-number format to selected History items.
+
+    This is the selected-packet counterpart of ``number_all``.  Existing
+    leading numbers are replaced rather than stacked; every other comment
+    tag/value is preserved for the subsequent Statistics annotation step.
+    """
+    changed = 0
+    number = start_number
+    for item in messages:
+        old = _comment_text(item.getComment() or u'')
+        rest = _LEADING_NUMBER_RE.sub(u'', old).lstrip()
+        new = (u'[%0*d]' % (digits, number)) + (u' ' + rest if rest else u'')
+        if new != old:
+            item.setComment(new)
+            changed += 1
+        number += 1
+    return changed
+
+
 def remove_numbering(callbacks):
     changed = 0
     for item in callbacks.getProxyHistory():

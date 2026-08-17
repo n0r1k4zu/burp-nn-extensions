@@ -8,6 +8,7 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 
 - **Insertion Pointの自動検出** — URL/Cookie/ヘッダー/`x-www-form-urlencoded`のフィールド/multipartの単純フィールド、JSON・XML・SOAP・NDJSON/JSON Lines本文を検出します。各値内のJSON/XMLは再帰的に展開し、URL／フォーム／Cookie値は最大3層のpercentエンコードを復元して内部リーフも個別に識別します。通常JSONの構造深さは256、JSON/XML文書が文字列へ埋め込まれる連鎖は16段までです。
 - **Packet & Insertion Point Export** — HTTP Historyでパケットを選択して右クリックの **Export Packet & Insertion Point** を選ぶと、同じ検出器で識別した全Insertion Pointを1点1行のCSV（`No, Packet No, URL, Type, Insertion Point, Comment`）として出力します。`Type`には`COOKIE`、`JSON_LEAF_NESTED`などの検出種別が入ります。
+- **Statisticsコメント付きExport** — HTTP Historyの右クリック **Export Packet & Insertion Point with Statistics comment** は、選択パケットだけへ既定の採番（`[0001]`から4桁）とStatisticsの分類・集約タグを追加してから、同じInsertion Point CSVを出力します。出力成功後は、追加した採番・タグを残すか、処理前のCommentへ復元するかを選べます。Auraの集約判定はHistory全体を参照しますが、Comment変更とCSV対象は選択パケットだけです。
 - **CSVペイロードリスト** — `No, 項目1, 項目2, ...` 形式（列数可変）を読み込み、検出したInsertion Pointへ手動で列を割り当てます。読み込み後の値はその場で直接編集可能です。
 - **自動差し込み** — Active化してRepeaterから送信するたびに、CSVの次の行を消費して差し込みます。開始行の指定・ポインタのリセットに対応。
 - **送信ログ** — 実際に送信されたリクエストと、返ってきたレスポンスの両方を確認できます。`#`列の次の**Packet No**列で、その送信がBurpのProxy History上で何番目かも確認できます（Proxyツールを経由しない送信では`-`表示になります）。

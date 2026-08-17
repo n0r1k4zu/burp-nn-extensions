@@ -1500,6 +1500,15 @@
         Commentを空にし、Clear Colorは同じく選択したパケットだけのHighlight色を解除します。採番・Group・Statistics
         タグを含めComment全体を消す操作なので、必要なCommentはComment Snapshots等で保存してから実行してください。
       </p>
+      <p>
+        <span class="k">Export Packet &amp; Insertion Point with Statistics comment</span> は、選択パケットに既定の
+        採番（開始1、4桁の<code>[0001]</code>形式）を付け、<span class="k">Add class [tag] to comments</span> と
+        <span class="k">Add aggregation [tag] to comments</span> と同じStatisticsタグを追加してから、Insertion Pointを
+        1行ずつCSVへ出力します。Aura集約の判定はHTTP History全体を参照しますが、採番・Comment更新・CSV出力は選択
+        パケットだけに限定されます。既存の先頭採番は置換し、他のComment・Groupタグは維持します。CSV出力成功後には
+        今回の採番・Statisticsタグを残すか確認するダイアログが表示されます。<strong>はい</strong>を選ぶと、選択
+        パケットのComment全体を処理前の状態へ復元し、<strong>いいえ</strong>を選ぶと付与したCommentを残します。
+      </p>
 
       <h3>入れ子構造の再帰的な展開</h3>
       <p>
