@@ -112,19 +112,40 @@ def _comment_text(comment):
     if comment is None:
         return u''
     try:
+        unicode
+        is_jython = True
+    except NameError:
+        is_jython = False
+    if is_jython:
+        # Jython 2's ``str``/``bytes`` is raw byte-string space.  Decode it
+        # explicitly before unicode() can attempt its implicit ASCII path.
+        if isinstance(comment, str):
+            try:
+                return comment.decode('utf-8')
+            except Exception:
+                return comment.decode('latin-1')
+    else:
         if isinstance(comment, bytes):
             try:
                 return comment.decode('utf-8')
             except Exception:
                 return comment.decode('latin-1')
-    except NameError:
-        pass
     try:
         return unicode(comment)
     except NameError:
         return str(comment)
     except Exception:
-        return u'%s' % comment
+        # Some Java-backed String proxies do not satisfy str/unicode in
+        # Jython.  Their textual representation is still recoverable, but
+        # must follow the same explicit byte decoding discipline.
+        try:
+            raw = str(comment)
+            try:
+                return raw.decode('utf-8')
+            except Exception:
+                return raw.decode('latin-1')
+        except Exception:
+            return u''
 
 
 def _text(helpers, value):

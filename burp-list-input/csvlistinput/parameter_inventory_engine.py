@@ -26,8 +26,15 @@ def _display_value(value):
         return value
     try:
         return value.decode('utf-8')
-    except UnicodeDecodeError:
-        return value.decode('latin-1')
+    except (UnicodeDecodeError, AttributeError):
+        try:
+            return value.decode('latin-1')
+        except AttributeError:
+            # Java String proxies need unicode() rather than decode().
+            try:
+                return _UNICODE_TYPE(value)
+            except (UnicodeDecodeError, UnicodeEncodeError):
+                return _UNICODE_TYPE(str(value), 'latin-1')
 
 
 # These names are useful leads during authorized testing, not vulnerability
@@ -132,7 +139,10 @@ def collect(callbacks, helpers, start_packet_no=None, end_packet_no=None, detect
             continue
         groups = statistics_engine.group_names(item.getComment() if hasattr(item, 'getComment') else u'')
         for point in points:
-            path = point.path
+            # JSON keys and XML names can contain UTF-8 bytes.  Normalize
+            # paths as well as values before using them as dict/table keys;
+            # Swing otherwise triggers Jython's implicit ASCII conversion.
+            path = _display_value(point.path)
             row = rows.get(path)
             if row is None:
                 row = {'path': path, 'count': 0, 'packet_nos': set(), 'groups': set(), 'regions': set(),
