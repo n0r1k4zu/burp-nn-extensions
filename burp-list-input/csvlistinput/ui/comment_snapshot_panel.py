@@ -10,6 +10,7 @@ from javax.swing import (JButton, JLabel, JOptionPane, JPanel, JScrollPane, JTab
 from javax.swing.table import AbstractTableModel, TableRowSorter
 
 from csvlistinput import comment_snapshot_engine
+from csvlistinput.utils import to_display_text
 
 COLUMNS = ['#', 'Time', 'Snapshot note', 'Comments / Total']
 
@@ -27,7 +28,7 @@ class _Model(AbstractTableModel):
         entry = self.rows[row]
         if col == 0: return Integer(entry.seq_id)
         if col == 1: return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(entry.timestamp)) if entry.timestamp else ''
-        if col == 2: return entry.comment or ''
+        if col == 2: return to_display_text(entry.comment)
         return '%d / %d' % (entry.nonempty_count, entry.total)
 
 
@@ -61,12 +62,12 @@ class CommentSnapshotPanel(JPanel):
     def _on_take(self, event):
         try:
             comments, total, nonempty = comment_snapshot_engine.take_snapshot(self.callbacks, self.helpers)
-            entry = self.store.append(self.note_field.getText(), comments, total, nonempty)
+            entry = self.store.append(to_display_text(self.note_field.getText()), comments, total, nonempty)
             self.note_field.setText('')
             self.status.setText('Snapshot #%d taken: %d of %d packet comments are non-empty.' % (entry.seq_id, nonempty, total))
         except Exception as error:
-            self.status.setText('Snapshot failed: %s' % error)
-            if self.error_fn: self.error_fn('Comment Snapshots', str(error))
+            self.status.setText(u'Snapshot failed: %s' % to_display_text(error))
+            if self.error_fn: self.error_fn('Comment Snapshots', to_display_text(error))
 
     def _on_restore(self, event):
         entry = self._selected()
@@ -79,8 +80,8 @@ class CommentSnapshotPanel(JPanel):
             restored, skipped = comment_snapshot_engine.restore_snapshot(self.callbacks, self.helpers, entry.comments)
             self.status.setText('Snapshot #%d restored: %d updated, %d skipped.' % (entry.seq_id, restored, skipped))
         except Exception as error:
-            self.status.setText('Restore failed: %s' % error)
-            if self.error_fn: self.error_fn('Comment Snapshots', str(error))
+            self.status.setText(u'Restore failed: %s' % to_display_text(error))
+            if self.error_fn: self.error_fn('Comment Snapshots', to_display_text(error))
 
     def _on_delete(self, event):
         entry = self._selected()

@@ -18,7 +18,7 @@ class _Point(object):
 class _Item(object):
     def getRequest(self): return 'request'
     def getHttpService(self): return None
-    def getComment(self): return '注釈 [group="日本語"]'.encode('utf-8')
+    def getComment(self): return u'注釈 [group="日本語"]'.encode('utf-8')
 
 
 class _Callbacks(object):
@@ -33,7 +33,7 @@ class ParameterInventoryRiskTest(unittest.TestCase):
         self.assertEqual('high', parameter_inventory_engine.risk_level('userPreferences', True))
 
     def test_collect_normalizes_non_ascii_paths_values_and_comments(self):
-        points = [_Point('$.日本語'.encode('utf-8'), '値'.encode('utf-8'))]
+        points = [_Point(u'$.日本語'.encode('utf-8'), u'値'.encode('utf-8'))]
         rows = parameter_inventory_engine.collect(
             _Callbacks(), object(), detector=lambda helpers, request, service: points)
         self.assertEqual(u'$.日本語', rows[0]['path'])

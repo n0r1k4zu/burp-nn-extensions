@@ -31,7 +31,7 @@ from burp import IContextMenuFactory, IContextMenuInvocation
 from csvlistinput import detection_engine, matching
 from csvlistinput import insertion_point_export
 from csvlistinput import statistics_engine
-from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space
+from csvlistinput.utils import bytes_to_bytestring, from_bytestring_space, to_display_text
 
 _REQUEST_CONTEXTS = set([
     IContextMenuInvocation.CONTEXT_MESSAGE_EDITOR_REQUEST,
@@ -85,7 +85,7 @@ class _ArmAction(ActionListener):
             if self.log_fn:
                 self.log_fn("%s: failed to arm target: %s" % (self.feature_label, e))
             if self.error_fn:
-                self.error_fn("%s: Send to..." % self.feature_label, str(e), traceback.format_exc())
+                self.error_fn("%s: Send to..." % self.feature_label, to_display_text(e), traceback.format_exc())
 
 
 class _AddSelectionToReplaceAction(ActionListener):
@@ -135,7 +135,7 @@ class _GroupHistoryAction(ActionListener):
                 self.log_fn('Statistics: added group [%s] to %d selected packet(s).' % (name, changed))
         except Exception as e:
             if self.error_fn:
-                self.error_fn('Statistics: Group selected packets', str(e), traceback.format_exc())
+                self.error_fn('Statistics: Group selected packets', to_display_text(e), traceback.format_exc())
 
 
 class _AuraTargetAction(ActionListener):
@@ -180,7 +180,7 @@ class _ExportPacketInsertionPointsAction(ActionListener):
                                           JOptionPane.INFORMATION_MESSAGE)
         except Exception as exc:
             if self.error_fn:
-                self.error_fn('Export Packet & Insertion Point', str(exc), traceback.format_exc())
+                self.error_fn('Export Packet & Insertion Point', to_display_text(exc), traceback.format_exc())
             JOptionPane.showMessageDialog(None, 'Export failed: %s' % exc,
                                           'MyTools: Export Packet & Insertion Point', JOptionPane.ERROR_MESSAGE)
 
@@ -249,7 +249,7 @@ class _ExportPacketInsertionPointsWithStatisticsAction(ActionListener):
                                 'restored comments for %d selected packet(s).' % restored)
         except Exception as exc:
             if self.error_fn:
-                self.error_fn('Export Packet & Insertion Point with Statistics comment', str(exc), traceback.format_exc())
+                self.error_fn('Export Packet & Insertion Point with Statistics comment', to_display_text(exc), traceback.format_exc())
             JOptionPane.showMessageDialog(
                 None, 'Export failed: %s' % exc,
                 'MyTools: Export Packet & Insertion Point with Statistics comment', JOptionPane.ERROR_MESSAGE)
@@ -283,7 +283,7 @@ class _ClearSelectedHistoryFieldAction(ActionListener):
         except Exception as exc:
             label = 'Clear Comment' if self.field == 'comment' else 'Clear Color'
             if self.error_fn:
-                self.error_fn(label, str(exc), traceback.format_exc())
+                self.error_fn(label, to_display_text(exc), traceback.format_exc())
 
 
 class ContextMenuFactory(IContextMenuFactory):

@@ -15,6 +15,7 @@ from javax.swing.table import TableRowSorter
 
 from csvlistinput import color_snapshot_engine
 from csvlistinput.ui.sort_helpers import NumericSequenceComparator
+from csvlistinput.utils import to_display_text
 
 COLUMNS = ["#", "Time", "Comment", "Colored / Total"]
 
@@ -53,7 +54,7 @@ class ColorSnapshotTableModel(AbstractTableModel):
         if col == 1:
             return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(e.timestamp)) if e.timestamp else ""
         if col == 2:
-            return e.comment or ""
+            return to_display_text(e.comment)
         if col == 3:
             return "%d / %d" % (e.colored_count, e.total)
         return None
@@ -113,20 +114,20 @@ class ColorSnapshotPanel(JPanel):
         return self.table_model.entry_at(model_row)
 
     def _on_take(self, event):
-        comment = self.comment_field.getText()
+        comment = to_display_text(self.comment_field.getText())
         try:
             colors, total, colored_count = color_snapshot_engine.take_snapshot(self.callbacks, self.helpers)
         except Exception as e:
-            self.status_label.setText("Snapshot failed: %s" % e)
+            self.status_label.setText(u"Snapshot failed: %s" % to_display_text(e))
             if self.error_fn:
-                self.error_fn("Color Snapshots", "Failed to take snapshot: %s" % e)
+                self.error_fn("Color Snapshots", u"Failed to take snapshot: %s" % to_display_text(e))
             return
         entry = self.store.append(comment, colors, total, colored_count)
         self.comment_field.setText("")
         self.status_label.setText(
             "Snapshot #%d taken: %d of %d packet(s) currently have a color." % (entry.seq_id, colored_count, total))
         if self.log_fn:
-            suffix = (" -- %s" % comment) if comment else ""
+            suffix = (u" -- %s" % comment) if comment else u""
             self.log_fn("Color snapshot #%d taken (%d/%d packets colored)%s" % (
                 entry.seq_id, colored_count, total, suffix))
 
@@ -142,7 +143,7 @@ class ColorSnapshotPanel(JPanel):
             "when this snapshot was taken (%d packets) back to its state at that time, including "
             "clearing packets that had no color. Packets added since then are left untouched.\n\n"
             "This cannot be undone -- take a fresh snapshot first if you want to be able to get back "
-            "to the current colors." % (entry.seq_id, entry.comment or "no comment", entry.total),
+            "to the current colors." % (entry.seq_id, to_display_text(entry.comment) or "no comment", entry.total),
             "Restore Color Snapshot #%d" % entry.seq_id,
             JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE)
         if ret != JOptionPane.YES_OPTION:
@@ -150,7 +151,7 @@ class ColorSnapshotPanel(JPanel):
         try:
             restored, skipped = color_snapshot_engine.restore_snapshot(self.callbacks, self.helpers, entry.colors)
         except Exception as e:
-            self.status_label.setText("Restore failed: %s" % e)
+            self.status_label.setText(u"Restore failed: %s" % to_display_text(e))
             if self.error_fn:
                 self.error_fn("Color Snapshots", "Failed to restore snapshot #%d: %s" % (entry.seq_id, e))
             return
@@ -181,9 +182,9 @@ class ColorSnapshotPanel(JPanel):
         try:
             cleared = color_snapshot_engine.clear_all(self.callbacks)
         except Exception as e:
-            self.status_label.setText("Clear failed: %s" % e)
+            self.status_label.setText(u"Clear failed: %s" % to_display_text(e))
             if self.error_fn:
-                self.error_fn("Color Snapshots", "Failed to clear all colors: %s" % e)
+                self.error_fn("Color Snapshots", u"Failed to clear all colors: %s" % to_display_text(e))
             return
         self.status_label.setText("Cleared the color of %d packet(s)." % cleared)
         if self.log_fn:

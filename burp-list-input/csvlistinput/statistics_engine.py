@@ -10,6 +10,8 @@ import hashlib
 import json
 import re
 
+from csvlistinput.utils import to_display_text
+
 try:
     from urllib import unquote_plus
 except ImportError:
@@ -58,6 +60,9 @@ _STATISTICS_TAG_RE = re.compile(
     r')\s*\]\s*', re.IGNORECASE)
 _STATISTICS_EXACT_TAGS = (
     u'[Web画面]', u'[Web個別パーツ取得]', u'[SPA（画面）]', u'[SPA（画面更新）]', u'[API]',
+    # Historical/manual tags often use ASCII parentheses instead of the
+    # full-width form emitted by the current UI.
+    u'[SPA(画面)]', u'[SPA(画面更新)]',
     u'[集約対象]',
 )
 _STATISTICS_LABELS = set(tag[1:-1] for tag in _STATISTICS_EXACT_TAGS if tag != u'[集約対象]')
@@ -207,12 +212,12 @@ def _aura_key(path, body, headers):
     def collect_objects(value, key=''):
         if isinstance(value, dict):
             for child_key, child_value in value.items():
-                collect_objects(child_value, str(child_key))
+                collect_objects(child_value, to_display_text(child_key))
         elif isinstance(value, list):
             for child_value in value:
                 collect_objects(child_value, key)
-        elif str(key).lower() in _OBJECT_KEYS and value:
-            objects.append(str(value))
+        elif to_display_text(key).lower() in _OBJECT_KEYS and value:
+            objects.append(to_display_text(value))
     try:
         actions = json.loads(message).get('actions', [])
         for action in actions:

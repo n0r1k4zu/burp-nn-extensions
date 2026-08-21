@@ -15,6 +15,8 @@ elsewhere (see utils.py's module docstring).
 import base64
 import re
 
+from csvlistinput.utils import to_display_text
+
 try:
     import htmlentitydefs  # Jython 2 / CPython 2
 except ImportError:
@@ -215,5 +217,5 @@ def run_all(text, enabled_labels=None):
             out = fn(text)
             results.append(DecodeResult(label, text=out))
         except Exception as e:
-            results.append(DecodeResult(label, error=str(e)))
+            results.append(DecodeResult(label, error=to_display_text(e)))
     return results

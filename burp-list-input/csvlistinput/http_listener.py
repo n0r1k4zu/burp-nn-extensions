@@ -58,7 +58,8 @@ from burp import IHttpListener
 from csvlistinput import decode_replace_engine, detection_engine, matching, replace_engine, substitution_engine
 from csvlistinput.constants import EscapeMode, PointStatus, SendStatus, TOOL_FLAG_LABELS
 from csvlistinput.models import Edit, LogEntry, PointResult
-from csvlistinput.utils import bytes_to_bytestring, bytestring_to_bytes, escape_bytestring_for_context
+from csvlistinput.utils import (bytes_to_bytestring, bytestring_to_bytes, escape_bytestring_for_context,
+                                to_display_text)
 
 
 def tool_label(tool_flag):
@@ -127,7 +128,7 @@ class HttpListener(IHttpListener):
                 pass
             if self.error_store is not None:
                 self.error_store.append("HttpListener.processHttpMessage (tool=%s)" % tool_label(toolFlag),
-                                         str(e), detail=tb)
+                                         to_display_text(e), detail=tb)
 
     def _handle_request_phase(self, toolFlag, messageInfo):
         entry = LogEntry()
@@ -400,7 +401,8 @@ class HttpListener(IHttpListener):
             try:
                 new_raw_value, hit_count = decode_replace_engine.apply_rule(point.original_value, rule)
             except Exception as e:
-                results.append(PointResult(path, rule.codec, PointStatus.SKIPPED_DECODE_ERROR, preview_value=str(e)))
+                results.append(PointResult(path, rule.codec, PointStatus.SKIPPED_DECODE_ERROR,
+                                           preview_value=to_display_text(e)))
                 continue
             if not hit_count:
                 results.append(PointResult(path, rule.codec, PointStatus.SKIPPED_NO_MATCH))

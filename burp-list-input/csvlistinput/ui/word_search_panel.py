@@ -19,6 +19,7 @@ from javax.swing import RowFilter
 from burp import IMessageEditorController
 
 from csvlistinput import decode_engine, word_search_engine
+from csvlistinput.utils import to_display_text
 
 COLUMNS = ["List No", "Packet No", "Group", "Req/Resp", "Region", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
@@ -321,7 +322,7 @@ class WordSearchPanel(JPanel):
                     and start_packet_no > end_packet_no):
                 raise ValueError("Start Packet No must not exceed End Packet No.")
         except ValueError as e:
-            self.status_label.setText(str(e))
+            self.status_label.setText(to_display_text(e))
             return
         self.search_button.setEnabled(False)
         self.search_button.setText("Searching...")
@@ -434,7 +435,7 @@ class WordSearchPanel(JPanel):
         self.status_label.setText("Cleared.")
 
     def _apply_result_filter(self):
-        query = str(self.result_filter_field.getText())
+        query = to_display_text(self.result_filter_field.getText())
         if not query:
             self.result_sorter.setRowFilter(None)
             return
@@ -467,7 +468,7 @@ class WordSearchPanel(JPanel):
         if value is None:
             return
         try:
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(str(value)), None)
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(to_display_text(value)), None)
             self.status_label.setText("Copied selected cell.")
         except Exception as e:
             self.status_label.setText("Copy failed: %s" % e)

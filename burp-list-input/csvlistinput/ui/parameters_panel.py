@@ -15,6 +15,7 @@ from javax.swing.table import AbstractTableModel, DefaultTableCellRenderer, Tabl
 from javax.swing import RowFilter
 
 from csvlistinput import codec_engine, parameter_inventory_engine
+from csvlistinput.utils import to_display_text
 
 COLUMNS = ["#", "Group", "Region", "Identified Parameter", "Occurrences", "Packet No"]
 VALUE_COLUMNS = ["#", "Group", "Region", "Value", "Occurrences", "Packet No"]
@@ -364,7 +365,7 @@ class ParametersPanel(JPanel):
                     and start_packet_no > end_packet_no):
                 raise ValueError("Start Packet No must not exceed End Packet No.")
         except ValueError as e:
-            return None, None, str(e)
+            return None, None, to_display_text(e)
         return start_packet_no, end_packet_no, None
 
     def _on_all_history(self, event):
@@ -566,7 +567,7 @@ class ParametersPanel(JPanel):
             try:
                 return value.decode('latin-1')
             except Exception:
-                return str(value)
+                return to_display_text(value)
 
     def _apply_filter(self, which):
         self._pending_filters.add(which)
@@ -587,4 +588,4 @@ class ParametersPanel(JPanel):
             return
         # Treat text literally, so a parameter value such as ``[1]`` or
         # ``?`` never becomes an invalid Java regular expression.
-        sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(str(query))))
+        sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(to_display_text(query))))

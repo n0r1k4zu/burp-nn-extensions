@@ -25,7 +25,7 @@ from javax.swing.table import AbstractTableModel, TableRowSorter
 
 from csvlistinput import codec_engine, detection_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
-from csvlistinput.utils import coerce_boolean
+from csvlistinput.utils import coerce_boolean, to_display_text
 
 COLUMNS = ["Enabled", "Insertion Points", "Type", "Nesting", "Original Value", "Codec", "Regex", "Find", "Replace With"]
 _EDITABLE_COLUMNS = (0, 5, 6, 7, 8)
@@ -375,7 +375,7 @@ class DecodeReplacePanel(JPanel):
             if self.log_fn:
                 self.log_fn("Re-detect failed: %s" % e)
             if self.error_fn:
-                self.error_fn("Target & Replace with Decode & Encode: Re-detect", str(e), traceback.format_exc())
+                self.error_fn("Target & Replace with Decode & Encode: Re-detect", to_display_text(e), traceback.format_exc())
 
     def refresh(self):
         target = self.armed_target

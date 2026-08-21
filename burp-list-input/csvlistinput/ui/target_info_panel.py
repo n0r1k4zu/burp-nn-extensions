@@ -11,6 +11,7 @@ from javax.swing import BoxLayout, JButton, JCheckBox, JComboBox, JLabel, JPanel
 
 from csvlistinput import detection_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
+from csvlistinput.utils import to_display_text
 
 
 class _FlagToggleListener(ActionListener):
@@ -130,7 +131,7 @@ class TargetInfoPanel(JPanel):
             if self.log_fn:
                 self.log_fn("Re-detect failed: %s" % e)
             if self.error_fn:
-                self.error_fn("Target & List Mapping: Re-detect", str(e), traceback.format_exc())
+                self.error_fn("Target & List Mapping: Re-detect", to_display_text(e), traceback.format_exc())
 
     def refresh(self):
         target = self.armed_target

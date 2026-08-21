@@ -83,7 +83,7 @@ class StatisticsEngineTest(unittest.TestCase):
     def test_group_names_accept_history_comment_variants(self):
         self.assertEqual(['alpha', 'beta', 'gamma'], statistics_engine.group_names(
             '[group="alpha"] note [ GROUP = \'beta\' ] [group=gamma]'))
-        self.assertEqual(['日本語'], statistics_engine.group_names(
+        self.assertEqual([u'日本語'], statistics_engine.group_names(
             b'comment [group="\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e"]'))
 
     def test_clear_analysis_annotations_preserves_groups_and_numbering(self):
@@ -132,3 +132,12 @@ class StatisticsEngineTest(unittest.TestCase):
         changed, _colored = statistics_engine.annotate_analysis(records, add_aggregation_tags=True)
         self.assertEqual(1, changed)
         self.assertIn(u'[集約対象_集約先PacketNo1]', items[1].comment)
+
+    def test_aura_aggregation_accepts_japanese_json_keys_and_values(self):
+        body = ('message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22aura%3A%2F%2F'
+                'ApexActionController%2FACTION%24execute%22%2C%22params%22%3A%7B%22objectName%22%3A'
+                '%22%E9%A1%A7%E5%AE%A2%22%2C%22%E5%90%8D%E5%89%8D%22%3A%22%E5%B1%B1%E7%94%B0%22%7D%7D%5D%7D')
+        items = [_Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', ''),
+                 _Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', '')]
+        records = statistics_engine.analyze_history(_Callbacks(items), _Helpers())
+        self.assertEqual(u'target', records[1]['agg_role'])

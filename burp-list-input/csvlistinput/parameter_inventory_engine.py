@@ -11,30 +11,12 @@ import re
 
 from csvlistinput import detection_engine, statistics_engine
 from csvlistinput.constants import InsertionPointType
-
-try:
-    _UNICODE_TYPE = unicode
-except NameError:  # CPython test runtime
-    _UNICODE_TYPE = str
+from csvlistinput.utils import to_display_text
 
 
 def _display_value(value):
     """Safely make a parser's byte-string value suitable for a Swing cell."""
-    if value is None:
-        return u""
-    if isinstance(value, _UNICODE_TYPE):
-        return value
-    try:
-        return value.decode('utf-8')
-    except (UnicodeDecodeError, AttributeError):
-        try:
-            return value.decode('latin-1')
-        except AttributeError:
-            # Java String proxies need unicode() rather than decode().
-            try:
-                return _UNICODE_TYPE(value)
-            except (UnicodeDecodeError, UnicodeEncodeError):
-                return _UNICODE_TYPE(str(value), 'latin-1')
+    return to_display_text(value)
 
 
 # These names are useful leads during authorized testing, not vulnerability

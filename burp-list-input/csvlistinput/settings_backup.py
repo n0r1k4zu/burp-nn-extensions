@@ -9,6 +9,7 @@ import time
 from csvlistinput.color_snapshot_store import ColorSnapshotEntry
 from csvlistinput.comment_snapshot_store import CommentSnapshotEntry
 from csvlistinput.replace_rule_store import ReplaceRule
+from csvlistinput.utils import to_display_text
 
 FORMAT_VERSION = 1
 _SECTIONS = ('My Word List', 'Request replacements', 'Response replacements', 'Target & List Mapping CSV')
@@ -22,15 +23,7 @@ def _json_text(value):
     makes Jython attempt an ASCII decode. Latin-1 is lossless for such byte
     strings; normal Swing/CSV Unicode stays unchanged and editable.
     """
-    try:
-        # unicode(value) is important for java.lang.String proxy objects:
-        # str(value) triggers Jython's implicit ASCII conversion first.
-        return unicode(value)
-    except UnicodeDecodeError:
-        # A genuine raw Python/Jython byte-string: Latin-1 is lossless.
-        return value.decode('latin-1')
-    except NameError:  # CPython
-        return str(value)
+    return to_display_text(value)
 
 
 def _json_document_text(value):
@@ -283,7 +276,7 @@ def _optional_section_payload(markdown, title, expected_type=list):
         result = _section_payload(markdown, title, expected_type)
         return result
     except ValueError as error:
-        if str(error).startswith('Missing JSON section:'):
+        if to_display_text(error).startswith('Missing JSON section:'):
             return None
         raise
 

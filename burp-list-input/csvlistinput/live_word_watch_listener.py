@@ -15,6 +15,7 @@ calls every registered IHttpListener for the same event).
 from burp import IHttpListener
 
 from csvlistinput import word_search_engine
+from csvlistinput.utils import to_display_text
 from csvlistinput.constants import TOOL_FLAG_LABELS
 from csvlistinput.live_word_watch_store import LiveWordHit
 
@@ -68,7 +69,7 @@ class LiveWordWatchListener(IHttpListener):
             except ValueError as e:
                 # Do not flood the Errors tab once per message while the
                 # user is still editing an invalid expression.
-                message = str(e)
+                message = to_display_text(e)
                 if self.error_fn and message != self._last_query_error:
                     self.error_fn("Live Word Watch query", message)
                 self._last_query_error = message
@@ -91,7 +92,8 @@ class LiveWordWatchListener(IHttpListener):
                 self._scan(toolFlag, messageInfo, side, raw_bytes, terms, operator)
         except Exception as e:
             if self.error_fn:
-                self.error_fn("LiveWordWatchListener.processHttpMessage (tool=%s)" % _tool_label(toolFlag), str(e))
+                self.error_fn("LiveWordWatchListener.processHttpMessage (tool=%s)" % _tool_label(toolFlag),
+                              to_display_text(e))
 
     def _in_scope(self, messageInfo):
         # Checked before any body conversion -- cuts out third-party/

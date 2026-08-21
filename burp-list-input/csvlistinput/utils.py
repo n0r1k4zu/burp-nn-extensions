@@ -73,6 +73,44 @@ def coerce_boolean(value):
         return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
 
 
+def to_display_text(value, encoding='utf-8'):
+    """Swing表示・検索・コピー用に値を安全なUnicode文字列へ変換する。
+
+    Jythonで任意の値へ``str()``を呼ぶと、UTF-8の生パケット文字列や
+    日本語のJava Stringに暗黙ASCII変換がかかることがある。これは表示専用
+    の変換であり、HTTPバイトオフセットを扱う処理には使わない。
+    """
+    if value is None:
+        return u''
+    try:
+        unicode
+        is_jython = True
+    except NameError:
+        is_jython = False
+    if is_jython:
+        if isinstance(value, unicode):
+            return value
+        if isinstance(value, str):
+            try:
+                return value.decode(encoding)
+            except (UnicodeDecodeError, LookupError):
+                return value.decode('latin-1')
+        try:
+            return unicode(value)
+        except Exception:
+            try:
+                raw = str(value)
+                return raw.decode(encoding)
+            except Exception:
+                return u''
+    if isinstance(value, bytes):
+        try:
+            return value.decode(encoding)
+        except (UnicodeDecodeError, LookupError):
+            return value.decode('latin-1')
+    return str(value)
+
+
 def bytes_to_bytestring(helpers, java_bytes):
     """Java byte[] -> Jython byte-preserving string (1 char == 1 byte).
 

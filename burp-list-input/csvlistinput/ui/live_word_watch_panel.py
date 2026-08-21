@@ -21,6 +21,7 @@ from burp import IMessageEditorController
 
 from csvlistinput import decode_engine
 from csvlistinput.constants import TOOL_FLAG_LABELS
+from csvlistinput.utils import to_display_text
 
 COLUMNS = ["List No", "Packet No", "Region", "Req/Resp", "Before", "Match", "After"]
 _EMPTY_BYTES = jarray.zeros(0, 'b')
@@ -319,7 +320,7 @@ class LiveWordWatchPanel(JPanel):
         self.settings.scope_only = self.scope_only_checkbox.isSelected()
 
     def _on_word_changed(self):
-        self.settings.word = self.word_field.getText()
+        self.settings.word = to_display_text(self.word_field.getText())
 
     def _on_context_changed(self, which):
         if which == "before":
@@ -378,7 +379,7 @@ class LiveWordWatchPanel(JPanel):
         if value is None:
             return
         try:
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(str(value)), None)
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(to_display_text(value)), None)
             self.status_label.setText("Copied selected cell.")
         except Exception as e:
             self.status_label.setText("Copy failed: %s" % e)
