@@ -425,6 +425,7 @@
         <a href="#history-search">History Search（ワード検索）</a>
         <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
         <a href="#parameters">Parameters（パラメータ棚卸し）</a>
+        <a href="#authorization-planning">Authorization Planning（認可テスト計画）</a>
         <a href="#statistics">Statistics（分類・集約）</a>
         <a href="#numbering-grouping">Numbering &amp; Grouping</a>
         <a href="#ui-reference">画面の見方</a>
@@ -1031,6 +1032,56 @@
       <p>上段の一覧は <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> を表示します。上下それぞれのFind欄で全列を絞り込め、列見出しクリックでソートできます（番号・出現回数・Packet No群は数値として比較）。下段の値を選び、<span class="k">Outer</span> と <span class="k">Inner</span> の2段Codec（None/URL/Base64/Hex/HTML Entity/Unicode/ROT13）を選ぶと、URL→Base64など入れ子のデコード結果を確認できます。<span class="k">Focus</span>（初期OFF）は候補の色付け、<span class="k">Aggressive</span>（初期OFF）はuser/account/owner/認証/権限/金銭/PII関連の部分文字列まで候補を広げる判定です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
     </section>
 
+    <section class="doc-section" id="authorization-planning">
+      <div class="section-head">
+        <p class="section-eyebrow">Usage</p>
+        <h2>Authorization Planning（認可テスト計画の見える化）</h2>
+        <p class="section-dek">指定範囲のHTTP Historyを受動解析し、Subject（利用者）× Operation（操作）× Resource（対象資源）のテスト計画を作るための観測情報を整理します。</p>
+      </div>
+      <p><span class="k">Packet No range</span>へ開始・終了番号を入力するか<span class="k">All</span>を選び、<span class="k">Build planning catalog</span>を押します。Build開始時には前回の全体／各表のFind条件を解除し、古い絞り込みによって新しいOperationが未検出に見える状態を防ぎます。<span class="k">Target scope only (Burp Target scope)</span>は初期OFFで、ONにすると選択範囲のうちBurp Target scope内のURLだけを解析します。Overviewには範囲内件数、実解析件数、Scope外除外件数、Scope判定失敗件数を分けて表示します。Scope判定不能な通信は結果へ混ぜず、Technical Gapsへ記録します。処理はバックグラウンドで動き、ボタンの状態と進捗が更新されます。長い処理は<span class="k">Cancel</span>で停止でき、<span class="k">Clear</span>で表示結果だけを消去できます。この機能からHTTP通信を再送したり、HistoryのCommentや色を変更したりすることはありません。</p>
+      <p><span class="k">Destination rule</span>は任意です。<code>Label | Host regex | Path regex</code>形式で、仕様書等に基づく宛先ラベルを設定します。例は<code>On-prem | ^example\.my\.site\.com$ | ^/web11/.+/(Login|Entry|Message)$</code>です。HostまたはPathの一方は空欄にできます。ここで付くOn-prem等は利用者定義の注釈であり、HTTP通信だけから物理的な配置を推測した結果ではありません。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>サブタブ</th><th>確認できる情報</th></tr></thead>
+          <tbody>
+            <tr><td>Overview</td><td>範囲／Scopeの母集団、解析パケット数、ホスト、Operation、Aura action、Insertion Point、レスポンス項目、Resource候補、Session、Technical／Planning Gapの件数と分類内訳。</td></tr>
+            <tr><td>Operation Catalog</td><td>REST、GraphQL、UI API、Aura等の操作単位。Aura batchはactionごとに分離します。Origin（実装由来）とData Interaction（データ操作）、CRUD意図、GraphQL情報、Salesforce機能を別列で表示し、選択行のParameters、Response Fields、代表Request/Responseを下段で確認できます。</td></tr>
+            <tr><td>Operation x Subject</td><td>Session指紋／GroupとOperationの組合せのうち、選択範囲で実際に観測した組合せだけを表示します。表示のない組合せは未観測であり、Deniedを意味しません。</td></tr>
+            <tr><td>Objects &amp; Fields</td><td>Aura params、GraphQL selection set、Insertion Point、レスポンス構造から推定したObject／Fieldを、Operation、Data Interaction、CRUD意図、Packet No、根拠とともに表示します。</td></tr>
+            <tr><td>Apps &amp; Endpoints</td><td><span class="k">Aura Applications</span>はAura contextのapplication descriptorを表示します。<span class="k">All HTTP Endpoints</span>はAuraに限らず、Host、Method、正規化Path、Route分類、宛先ラベル、Content-Type、Status、Parameter、Operation、Packet Noを一覧化します。<span class="k">Packet Coverage</span>では、解析対象になった各PacketがどのOperationへ入ったか確認できます。</td></tr>
+            <tr><td>Test Plan</td><td>所有者・テナント・レコードID・金銭・PII・権限・状態遷移等の候補に、P0〜P3の調査優先度、根拠、推奨する確認観点を付けた一覧。</td></tr>
+            <tr><td>Sessions</td><td>Cookie／Authorization等をSHA-256化したSession指紋、認証種別、Group、Host、Packet No。認証値をカタログ列へ複製しません。代表Request/ResponseのBurpビューアには元のHistory通信がそのまま表示されます。</td></tr>
+            <tr><td>Planning Coverage</td><td>Guest／認証済みSubject、複数の明示Group、App、write操作、GraphQL mutation、Subject間の役割・所有・テナント関係など、テスト計画を完成させるために不足する観測／定義を表示します。</td></tr>
+            <tr><td>Technical Gaps</td><td>レスポンス欠落、壊れたAura/JSON、binary response、Scope判定やInsertion Point検出器の例外など、機械解析上の未解析箇所を表示します。Planning Coverageとは分離されています。</td></tr>
+            <tr><td>Resource Corpus</td><td>リクエストとレスポンスから観測したレコードID等を、出所、Group、構造パス、Operation、Packet Noとともに横断整理した候補集。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>AuraのOrigin（標準／カスタム）分類基準</h3>
+      <p>Originは、Aura actionの<span class="k">descriptor</span>と、汎用Apex入口で観測できる<span class="k">params</span>から付ける通信上のヒューリスティック（経験則）です。Salesforceの組織設定、インストール済みパッケージ、Apexソースコードは参照しないため、分類だけで標準機能・カスタム実装・脆弱性を確定するものではありません。<span class="k">Origin reason</span>と<span class="k">Origin confidence</span>を確認し、必要に応じてSalesforce設定およびApex実装と照合してください。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Origin</th><th>通信上の判定基準</th><th>Confidence</th><th>例</th></tr></thead>
+          <tbody>
+            <tr><td>Salesforce Standard</td><td><code>aura://</code>または<code>servicecomponent://</code> scheme。ただし汎用Apex入口は次の個別判定を優先します。</td><td>high</td><td><code>aura://RecordUiController/ACTION$getRecord</code></td></tr>
+            <tr><td>Org Custom Apex</td><td><code>apex://</code>のcontroller、または汎用Apex入口のclass名に明示namespaceがない。</td><td>medium</td><td><code>apex://AccountController/ACTION$getAccount</code></td></tr>
+            <tr><td>Managed or Namespaced Apex</td><td>class名または<code>params.namespace</code>に明示namespaceがあり、代表的なSalesforce namespaceには一致しない。</td><td>medium</td><td><code>apex://pkg.OrderController/ACTION$saveOrder</code></td></tr>
+            <tr><td>Salesforce Standard</td><td>明示namespaceが<code>lightning</code>、<code>ui</code>、<code>force</code>、<code>communities</code>、<code>community</code>、<code>siteforce</code>、<code>visualforce</code>、<code>applauncher</code>、<code>salesforce</code>、<code>sfdc</code>の代表集合に一致。</td><td>medium</td><td><code>apex://ui.RecordController/ACTION$get</code></td></tr>
+            <tr><td>Unknown</td><td>descriptor schemeが欠落・未認識、または汎用Apex入口でclass／namespaceが得られない。</td><td>low</td><td>壊れた<code>message</code>、class情報のない<code>ApexActionController</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>aura://ApexActionController/ACTION$execute</code>は汎用Apex入口です。この場合は<code>params.classname</code>、<code>params.apexClass</code>、<code>params.className</code>、<code>params.namespace</code>でOriginを判定し、<code>params.method</code>または<code>params.methodName</code>はOperation名の補助情報として使います。<code>callingDescriptor</code>とaction IDはOperationの識別・追跡には使いますが、Origin判定の決め手ではありません。</p>
+      <p><span class="k">high</span>はdescriptor schemeから直接分類できたこと、<span class="k">medium</span>はApex class／namespaceの文字列から推定したこと、<span class="k">low</span>は情報不足または未認識であることを表します。これは分類根拠の強さであり、Salesforce設定や認可実装が安全である確率ではありません。代表namespace集合は完全な公式一覧ではないため、mediumの結果も確認対象として扱ってください。OriginはTest Planのリスクスコアへ加点しません。同じResource証拠とData Interactionであれば、標準とカスタムで同じスコアになります。日本語のURL、Comment、Group名、JSONキー／値はUnicodeへ正規化して表示し、UTF-8 byte列がJythonの暗黙ASCII変換へ入らないようにしています。</p>
+      <h3>GraphQL・Data Interaction・Coverageの解釈</h3>
+      <p>Auraの<code>executeGraphQL</code>および通常のGraphQL requestでは、多重URLエンコードを復号し、query／mutation、operation名、selection set、Object、Field、filter、pagination、Read/List/Create/Update/Deleteの意図を抽出します。inline literalの値はpreviewから除去し、秘密値をcatalogへ複製しません。<span class="k">Data Interaction</span>はRecord Read、Record List/Search、Record Create/Update/Delete、Metadata/Schema、Authentication/Self-registration、Navigation/Admin Surface、UI Definition、Unknownに分類します。これは通信から観測した挙動であり、認可の許可／拒否判定ではありません。</p>
+      <p>Operation x Subjectは観測済みの疎な行列です。Historyにない組合せを自動生成せず、<code>Denied</code>も表示しません。<code>[group="user1"]</code>等のGroupはSubject識別用のラベルであり、同一ロール、別Account、別Tenant、所有関係を証明しません。これらの関係が未定義であることはPlanning Coverageへ常に明示し、テスターが検証済みのユーザー／データ関係を補ってから再送計画を立てます。</p>
+      <div class="callout warn">
+        <span class="callout-label">結果の意味</span>
+        <p>この画面のP0〜P3はテスト順の提案であり、脆弱性の検出結果ではありません。選択範囲で観測していないユーザー、権限、画面、Apex分岐は見えません。異なる権限・同一権限の別ユーザーで必要な通信を収集し、Planning Coverage、Technical Gaps、分類根拠を確認してから、許可された診断範囲内で手動検証してください。</p>
+      </div>
+    </section>
+
     <section class="doc-section" id="statistics">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
@@ -1333,6 +1384,22 @@
             <tr><td><span class="k">Clear</span></td><td>パラメータ一覧と、選択行に対応する下段の値一覧を消去します。</td></tr>
             <tr><td>一覧の列</td><td><span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span>。</td></tr>
             <tr><td>赤 / 黄の行</td><td>赤は認可・アカウント・金銭関連、黄はトークン・識別子・PII候補です。脆弱性の検出結果ではなく、診断上の優先確認用の目印です。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Authorization Planning タブ</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>説明</th></tr></thead>
+          <tbody>
+            <tr><td><span class="k">Packet No range</span> / <span class="k">All</span></td><td>解析するHTTP Historyの開始・終了番号を指定します。Allは全範囲です。</td></tr>
+            <tr><td><span class="k">Target scope only</span></td><td>初期OFF。ONにすると指定Packet No範囲のうちBurp Target scope内のURLだけを解析します。判定不能はTechnical Gapsへ記録して除外します。</td></tr>
+            <tr><td><span class="k">Destination rule</span></td><td><code>Label | Host regex | Path regex</code>で仕様書に基づく宛先ラベルを設定します。HTTPだけでオンプレ等を自動断定する機能ではありません。</td></tr>
+            <tr><td><span class="k">Build planning catalog</span></td><td>Historyのスナップショットをバックグラウンド解析し、10個のサブタブを更新します。</td></tr>
+            <tr><td><span class="k">Cancel</span> / <span class="k">Clear</span></td><td>Cancelは解析をpacket境界で停止し、Clearは表示結果を消去します。</td></tr>
+            <tr><td><span class="k">Find in results</span></td><td>各表の表示結果を全列横断で絞り込みます。列見出しクリックでは数値列を数値としてソートします。</td></tr>
+            <tr><td>Operation行の選択</td><td>対応するInsertion Point、レスポンス構造、代表Request/Responseを下段に表示します。</td></tr>
           </tbody>
         </table>
       </div>
@@ -1929,6 +1996,7 @@
         <li>Match &amp; Replaceは<span class="k">Transfer-Encoding: chunked</span>のレスポンスに対して、Content-Lengthの自動調整を行いません（そのヘッダー自体が無いため）。chunkの境界自体を書き換える機能ではありません。</li>
         <li>Match &amp; Replace・Target &amp; Replace with Decode &amp; Encodeの正規表現はPythonの<code>re</code>モジュール準拠です（後方参照は<code>\1</code>形式）。不正な正規表現を入力した行は無視され、拡張はクラッシュしません。</li>
         <li>Target &amp; Replace with Decode &amp; EncodeのHTML Entityエンコード（再エンコード時）は<code>&amp;&lt;&gt;"'</code>の5文字のみを再エスケープします。デコード時に解釈した名前付き実体・数値文字参照すべてを同じ形式で書き戻すわけではありません。</li>
+        <li>Authorization Planningは、選択範囲のHTTP Historyに現れた通信だけを受動解析します。未操作の機能や別権限でしか現れない操作は補完しません。Aura originと優先度はヒューリスティックであり、Salesforce設定やApexコードを確認せずに脆弱性を確定するものではありません。</li>
       </ul>
     </section>
 

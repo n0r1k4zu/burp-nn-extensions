@@ -24,10 +24,27 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **My Word List / My Word List Grep** — `Word,Regex,Comment` のCSVをロード／編集／Exportし、各行ごとに通常検索または正規表現検索を選択して、Packet Grepと同じ条件・範囲・プレビュー・Decode機能で一括検索します。Regex列は`1`/`true`で有効です。無効な正規表現行は他の行の検索を止めずにスキップされ、Errorsタブへ記録されます。結果の末尾にはMy Word ListのCommentを表示します。
 - **Backup & Restore** — My Word List（Regex列を含む）、Target & List MappingのCSV、Match & ReplaceのRequest／Responseルールを、編集可能なMarkdown内のCSVコードブロックとしてExport／Restoreします。Color SnapshotsとComment Snapshotsは対象外です。処理はバックグラウンドで行われ、実行中のボタン表示で進行状況を確認できます。
 - **Packet Grep** — 指定したワードでHTTP History全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索し、ヒットした前後を指定文字数（既定30文字）だけ切り出して一覧表示します。各行にヒット領域（Path / Header / Bodyなど）を表示します。検索後は`Find in results`で出力結果だけを再検索できます（新しいPacket Grepは実行しません）。`hoge & piyo`で同じPacket Noに両方ある通信、`hoge | piyo`でどちらかがある通信を検索できます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします（`&`と`|`の混在は不可）。Packet Noの開始・終了を指定すれば、その範囲だけを検索できます（空欄なら全件）。同じパケット内に複数ヒットがあれば、それぞれ別の行として表示されます。Before / Match / Afterはセル単位で選択でき、右クリックからコピーできます。行を選択すると、該当パケットのリクエスト/レスポンスをその場でプレビューでき、リスト下部のプルダウン（既定URL Decode、Noneも選択可）で選んだ方式を選択中の行のBefore/Match/Afterへその場で適用して確認できます。
-- **Parameters Enum** — Proxy HTTP Historyのリクエストを、Target & List Mappingと同じJSON/XML・ネスト値対応パーサーで解析し、構造パスごとに重複なく一覧化します。Groupの次にPath / Query、Header、Body、Cookie、Multipart bodyなどのRegion列を表示します。Find in resultsは入力後に遅延適用して軽快に動作します。History Searchと同じPacket No rangeで範囲を指定でき、`All`で全件に戻せます。`Clear`で上下の結果を消去します。上下それぞれに検索欄があり、列見出しクリックでソートできます（件数・番号は数値順）。上段のパラメータを選ぶと、下段に値ごとの出現回数・Packet No群を表示し、値を選択してOuter / Innerの2段Codec（None/URL/Base64/Hex/HTML Entity/Unicode/ROT13）を選べば、URL→Base64など入れ子のデコード結果を確認できます。Decoded Value欄はSplitterで高さを調整でき、さらに下部のManual Decodeでは左側に任意文字列を貼り付け、右側へ2段Codecの結果を表示できます。`Focus`（初期OFF）をONにすると候補を色付けし、`Aggressive`（初期OFF）をONにするとuser/account/owner/権限/金銭/認証/PIIに関連する部分文字列まで広く候補化します。結果は手動確認が必要です。
+- **Parameter & Value Enum** — Proxy HTTP Historyのリクエストを、Target & List Mappingと同じJSON/XML・ネスト値対応パーサーで解析し、構造パスごとに重複なく一覧化します。Groupの次にPath / Query、Header、Body、Cookie、Multipart bodyなどのRegion列を表示します。Find in resultsは入力後に遅延適用して軽快に動作します。Packet No rangeで範囲を指定でき、`All`で全件に戻せます。`Clear`で上下の結果を消去します。上下それぞれに検索欄があり、列見出しクリックでソートできます（件数・番号は数値順）。上段のパラメータを選ぶと、下段に値ごとの出現回数・Packet No群を表示し、値を選択してOuter / Innerの2段Codec（None/URL/Base64/Hex/HTML Entity/Unicode/ROT13）を選べば、URL→Base64など入れ子のデコード結果を確認できます。Decoded Value欄はSplitterで高さを調整でき、さらに下部のManual Decodeでは左側に任意文字列を貼り付け、右側へ2段Codecの結果を表示できます。`Focus`（初期OFF）をONにすると候補を色付けし、`Aggressive`（初期OFF）をONにするとuser/account/owner/権限/金銭/認証/PIIに関連する部分文字列まで広く候補化します。結果は手動確認が必要です。
+- **Authorization Planning** — 指定したPacket No範囲またはHTTP History全体を受動解析し、認可テスト計画に必要な情報を10画面（Overview / Operation Catalog / Operation x Subject / Objects & Fields / Apps & Endpoints / Test Plan / Sessions / Planning Coverage / Technical Gaps / Resource Corpus）へ整理します。`Target scope only`（初期OFF）をONにすると、選択範囲をBurp Target scope内の通信だけへ限定できます。Auraだけでなく、`/web11/.../Login`等の通常HTTP／対象システム固有バックエンド経路もOperation CatalogとApps & Endpoints内の`All HTTP Endpoints`へ必ず棚卸しし、`Packet Coverage`で各解析PacketがどのOperationへ入ったか確認できます。通常のREST・GraphQL・UI API等に加え、Aura batch内のaction、`executeGraphQL`、`getConfigData`、`getItems`等を識別し、実装由来（標準／カスタム／名前空間付き）とデータ操作種別（Read/List/Create/Update/Delete等）を別々の根拠・確信度で表示します。任意の`Destination rule`へ`Label | Host regex | Path regex`を入力すると、仕様書に基づく`On-prem`等の宛先ラベルを付けられます。これは利用者定義の注釈であり、HTTP通信だけから物理基盤を断定した結果ではありません。通信の再送・変更は行わず、未観測のSubject×OperationをDeniedとは判定しません。
 - **Statistics** — 指定Packet No範囲（`All`対応）のHistoryを、Web画面／Web個別パーツ取得／SPA（画面）／SPA（画面更新）／APIに分類して件数表示します。AuraのSPA画面更新は、SF Helperと同じく安全な集約キーと履歴順の連続性で代表・集約対象を判定し、集約対象を含む件数／除く件数を比較できます。明示操作で分類・集約タグをCommentへ追記、集約対象へ色付け（既定gray）できます。集約対象には代表の採番があれば`[集約対象_集約先No0001]`、なければHistory番号を示す`[集約対象_集約先PacketNo123]`を付けます。`Clear annotations`でStatisticsが追加した分類・集約タグだけを削除でき、採番・グループ・その他のタグは保持します。通信は送信しません。
 - **Numbering & Grouping** — 採番、採番解除、範囲内のグループ／`[]`タグ削除をStatisticsから分離した専用タブで実行します。右クリックで選択Historyへ`[group="user1"]`形式のグループ定義を追加できます。グループ定義はParametersとHistory Searchの専用Group列へ表示されます。
 - **Live Grep** — Packet Grepと同じ形式（List No / Packet No / Region / Req/Resp / Before / Match / After、選択行のプレビュー、Decodeプルダウンでのその場デコード）で、既存のhistoryをまとめて検索するのではなく、**選択したツールを通るリアルタイムの通信**を監視し、指定したワードがヒットした瞬間に1行ずつ追加していきます。Live GrepはCommentを持たないため、Group列は表示しません。`&`による同一Packet No内のAND検索、`|`によるOR検索を使えます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします。Before / Match / Afterはセル単位で選択し、右クリックからコピーできます。DecodeはNone（変換なし）も選択可能です。armは不要で、Match & Replaceと同様に「Enabled」と対象ツールフラグで動作します。**Scope only**での絞り込み、1通信あたり200件のヒット上限、5MB超の本文のスキップにより、Burp全体への負荷を抑えています。
+
+## Authorization PlanningのAura origin分類
+
+`Authorization Planning`のOriginは、Aura actionの`descriptor`と、汎用Apex入口で観測できる`params`から付ける**通信上のヒューリスティック（経験則）**です。Salesforceの組織設定、インストール済みパッケージ、Apexソースコードを参照しないため、分類だけで標準機能・カスタム実装・脆弱性を確定するものではありません。Operation Catalogの`Origin reason`と`Origin confidence`を確認し、必要に応じてSalesforce設定およびApex実装と照合してください。
+
+| Origin | 通信上の判定基準 | Confidence | 例 |
+|---|---|---|---|
+| Salesforce Standard | `aura://`または`servicecomponent://` scheme。ただし次の汎用Apex入口は先に個別判定する | high | `aura://RecordUiController/ACTION$getRecord` |
+| Org Custom Apex | `apex://`のcontroller、または汎用Apex入口のclass名に明示namespaceがない | medium | `apex://AccountController/ACTION$getAccount` |
+| Managed or Namespaced Apex | class名または`params.namespace`に明示namespaceがあり、下記の代表的なSalesforce namespaceには該当しない | medium | `apex://pkg.OrderController/ACTION$saveOrder` |
+| Salesforce Standard | 明示namespaceが`lightning`、`ui`、`force`、`communities`、`community`、`siteforce`、`visualforce`、`applauncher`、`salesforce`、`sfdc`の代表集合に一致 | medium | `apex://ui.RecordController/ACTION$get` |
+| Unknown | descriptor schemeが欠落・未認識、または汎用Apex入口でclass／namespaceが得られない | low | 壊れた`message`、`aura://ApexActionController/ACTION$execute`でclass情報なし |
+
+`aura://ApexActionController/ACTION$execute`は汎用Apex入口です。この場合は`params.classname`、`params.apexClass`、`params.className`、`params.namespace`を使ってOriginを判定し、`params.method`または`params.methodName`をOperation名の補助情報として表示します。`callingDescriptor`とaction IDはOperationの識別・追跡には利用しますが、Origin判定の決め手ではありません。
+
+`high`はdescriptor schemeから直接分類できたこと、`medium`はApex class／namespaceの文字列から推定したこと、`low`は情報不足または未認識であることを表します。これは分類根拠の強さであり、Salesforce側の設定や認可実装が安全である確率ではありません。代表namespace集合は完全な公式一覧ではないため、`medium`の結果も確認対象として扱ってください。
 
 ## 必要環境
 
@@ -135,6 +152,7 @@ csvlistinput/               # 拡張の実装本体 -- csv_list_input.py と同�
   xml_offset_scanner.py     # XMLのオフセット付きスキャナー
   multipart_decomposer.py   # multipart/form-data の分解
   detection_engine.py       # Insertion Point検出の統括
+  authorization_planning_engine.py # Historyから認可テスト計画用カタログを構築する受動解析
   substitution_engine.py    # 差し替え（バイト列スプライシング）
   matching.py                # arm時テンプレートとlive送信のpathベース突き合わせ
   csv_payload_store.py       # CSV読み込み・行ポインタ管理
@@ -159,7 +177,7 @@ csvlistinput/               # 拡張の実装本体 -- csv_list_input.py と同�
   live_word_watch_store.py                    # Live Word Watch: ヒット履歴の保持
   live_word_watch_listener.py                  # Live Word Watch: IHttpListener実装（ライブ通信の監視・ヒット検出）
   utils.py                       # バイト列/文字列境界の処理・エスケープ
-  ui/                              # Swing UI（Target & List Mapping / Target & Replace with Decode & Encode / Match & Replace / Log / Color Snapshots / History Search / Live Word Watch / Decode / Errors タブ）
+  ui/                              # Swing UI（Authorization Planningを含むMyTools各タブ）
 docs/manual.html              # 利用マニュアル（HTML）
 testdata/                      # 動作確認用のサンプルリクエスト・CSV
 ```
@@ -171,5 +189,6 @@ testdata/                      # 動作確認用のサンプルリクエスト�
 - 壊れたJSONの寛容モードは実験的機能で、真の入れ子構造までは保証されません
 - 同じ要素内でテキストと子要素が混在するXML（mixed content）は、テキスト部分ごとに別のInsertion Pointとして扱われます
 - Target & Replace with Decode & Encodeは、armした自分自身の対象にのみ適用されます（Match & Replaceのようなトラフィック全体への適用はしません）
+- Authorization Planningが示すOperation・Resource・優先度は、選択範囲のHTTP Historyで観測できた証拠に限られます。未操作の画面・権限・条件分岐は自動的には補完されません。Auraの標準／カスタム分類もdescriptor等に基づくヒューリスティック（経験則）です。Originはリスクスコアへ加点しません。Planning Coverage、Technical Gaps、Data Interactionと各根拠列を確認し、Salesforce設定・Apex実装・対象業務を手動で照合してください
 
 詳しくは [docs/manual.html](docs/manual.html) の「制限事項」を参照してください。

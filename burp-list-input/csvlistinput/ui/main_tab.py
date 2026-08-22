@@ -21,6 +21,7 @@ from csvlistinput.ui.insertion_point_panel import InsertionPointPanel
 from csvlistinput.ui.live_word_watch_panel import LiveWordWatchPanel
 from csvlistinput.ui.log_panel import LogPanel
 from csvlistinput.ui.parameters_panel import ParametersPanel
+from csvlistinput.ui.authorization_planning_panel import AuthorizationPlanningPanel
 from csvlistinput.ui.replace_panel import ReplacePanel
 from csvlistinput.ui.statistics_panel import StatisticsPanel
 from csvlistinput.ui.annotations_panel import AnnotationsPanel
@@ -69,6 +70,8 @@ class MainTab(ITab):
             on_rules_restored=self.replace_panel.refresh, on_csv_restored=self._on_mapping_csv_restored,
             log_fn=self.log, error_fn=self.log_error)
         self.parameters_panel = ParametersPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
+        self.authorization_planning_panel = AuthorizationPlanningPanel(
+            callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.statistics_panel = StatisticsPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.annotations_panel = AnnotationsPanel(callbacks, log_fn=self.log, error_fn=self.log_error)
         self.aura_audit_panel = AuraAuditPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
@@ -88,6 +91,7 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Match & Replace", self.replace_panel)
         self.tabbed_pane.addTab("Log", self.log_panel)
         self.tabbed_pane.addTab("Parameter & Value Enum", self.parameters_panel)
+        self.tabbed_pane.addTab("Authorization Planning", self.authorization_planning_panel)
         self.tabbed_pane.addTab("Packet Grep", self.word_search_panel)
         self.tabbed_pane.addTab("Live Grep", self.live_word_watch_panel)
         self.tabbed_pane.addTab("My Word List Grep", self.my_word_list_grep_panel)
