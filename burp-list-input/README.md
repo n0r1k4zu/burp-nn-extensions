@@ -32,6 +32,10 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 
 ## Authorization PlanningのAura origin分類
 
+`Authorization Planning`の全サブタブ・全列・分類・Destination rule・Coverageの具体的な読み方は、[manual.html の Authorization Planning 節](docs/manual.html#authorization-planning)にまとめています。初めて使う場合は、まずその節の「最初に何をすればよいか」から確認してください。
+
+Salesforce / Experience Cloud / Auraが初めての場合は、先に[Salesforce / Aura 入門ガイド](docs/salesforce_aura_guide.md)を参照してください。Aura、Apex、通常HTTP、オンプレ中継候補の違いと、Aura requestの`message`、`aura.context`、`aura.pageURI`、`aura.token`を説明しています。
+
 `Authorization Planning`のOriginは、Aura actionの`descriptor`と、汎用Apex入口で観測できる`params`から付ける**通信上のヒューリスティック（経験則）**です。Salesforceの組織設定、インストール済みパッケージ、Apexソースコードを参照しないため、分類だけで標準機能・カスタム実装・脆弱性を確定するものではありません。Operation Catalogの`Origin reason`と`Origin confidence`を確認し、必要に応じてSalesforce設定およびApex実装と照合してください。
 
 | Origin | 通信上の判定基準 | Confidence | 例 |

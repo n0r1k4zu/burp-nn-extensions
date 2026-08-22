@@ -425,6 +425,7 @@
         <a href="#history-search">History Search（ワード検索）</a>
         <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
         <a href="#parameters">Parameters（パラメータ棚卸し）</a>
+        <a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>
         <a href="#authorization-planning">Authorization Planning（認可テスト計画）</a>
         <a href="#statistics">Statistics（分類・集約）</a>
         <a href="#numbering-grouping">Numbering &amp; Grouping</a>
@@ -1032,12 +1033,26 @@
       <p>上段の一覧は <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> を表示します。上下それぞれのFind欄で全列を絞り込め、列見出しクリックでソートできます（番号・出現回数・Packet No群は数値として比較）。下段の値を選び、<span class="k">Outer</span> と <span class="k">Inner</span> の2段Codec（None/URL/Base64/Hex/HTML Entity/Unicode/ROT13）を選ぶと、URL→Base64など入れ子のデコード結果を確認できます。<span class="k">Focus</span>（初期OFF）は候補の色付け、<span class="k">Aggressive</span>（初期OFF）はuser/account/owner/認証/権限/金銭/PII関連の部分文字列まで候補を広げる判定です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
     </section>
 
+    <section class="doc-section" id="salesforce-aura-guide">
+      <div class="section-head">
+        <p class="section-eyebrow">Salesforce Knowledge</p>
+        <h2>Salesforce / Aura 入門ガイド</h2>
+        <p class="section-dek">Aura、Apex、通常HTTP、オンプレ中継候補と、Aura requestの代表パラメータを平易に説明します。</p>
+      </div>
+      <p>初めて使う場合は、詳細な<a href="salesforce_aura_guide.md">Salesforce / Experience Cloud / Aura 通信ガイド</a>を先に読んでください。Aura requestの<code>message</code>、<code>aura.context</code>、<code>aura.pageURI</code>、<code>aura.token</code>、Apexとの関係、<code>/web11/...</code>の通常HTTP経路、認可テスト時の注意点をまとめています。</p>
+      <div class="callout warn">
+        <span class="callout-label">短い要点</span>
+        <p>Aura通信、Apex、オンプレAPIは別物です。<code>message</code>はactionと引数、<code>aura.context</code>はFramework文脈、<code>aura.pageURI</code>は画面URI、<code>aura.token</code>はFramework保護用の値です。いずれも単独では認可可否や物理宛先を確定しません。</p>
+      </div>
+    </section>
+
     <section class="doc-section" id="authorization-planning">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
         <h2>Authorization Planning（認可テスト計画の見える化）</h2>
         <p class="section-dek">指定範囲のHTTP Historyを受動解析し、Subject（利用者）× Operation（操作）× Resource（対象資源）のテスト計画を作るための観測情報を整理します。</p>
       </div>
+      <p>Salesforce / Experience Cloud / Auraそのものが初めての場合は、先に<a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>を読んでください。</p>
       <p><span class="k">Packet No range</span>へ開始・終了番号を入力するか<span class="k">All</span>を選び、<span class="k">Build planning catalog</span>を押します。Build開始時には前回の全体／各表のFind条件を解除し、古い絞り込みによって新しいOperationが未検出に見える状態を防ぎます。<span class="k">Target scope only (Burp Target scope)</span>は初期OFFで、ONにすると選択範囲のうちBurp Target scope内のURLだけを解析します。Overviewには範囲内件数、実解析件数、Scope外除外件数、Scope判定失敗件数を分けて表示します。Scope判定不能な通信は結果へ混ぜず、Technical Gapsへ記録します。処理はバックグラウンドで動き、ボタンの状態と進捗が更新されます。長い処理は<span class="k">Cancel</span>で停止でき、<span class="k">Clear</span>で表示結果だけを消去できます。この機能からHTTP通信を再送したり、HistoryのCommentや色を変更したりすることはありません。</p>
       <p><span class="k">Destination rule</span>は任意です。<code>Label | Host regex | Path regex</code>形式で、仕様書等に基づく宛先ラベルを設定します。例は<code>On-prem | ^example\.my\.site\.com$ | ^/web11/.+/(Login|Entry|Message)$</code>です。HostまたはPathの一方は空欄にできます。ここで付くOn-prem等は利用者定義の注釈であり、HTTP通信だけから物理的な配置を推測した結果ではありません。</p>
       <div class="table-wrap">
@@ -1054,6 +1069,114 @@
             <tr><td>Planning Coverage</td><td>Guest／認証済みSubject、複数の明示Group、App、write操作、GraphQL mutation、Subject間の役割・所有・テナント関係など、テスト計画を完成させるために不足する観測／定義を表示します。</td></tr>
             <tr><td>Technical Gaps</td><td>レスポンス欠落、壊れたAura/JSON、binary response、Scope判定やInsertion Point検出器の例外など、機械解析上の未解析箇所を表示します。Planning Coverageとは分離されています。</td></tr>
             <tr><td>Resource Corpus</td><td>リクエストとレスポンスから観測したレコードID等を、出所、Group、構造パス、Operation、Packet Noとともに横断整理した候補集。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>最初に何をすればよいか</h3>
+      <p>この機能は「脆弱性を見つけた」と表示する機能ではありません。先に通信を見やすく整理し、どの利用者が、どの操作で、どのデータを扱っているかを確認して、後から許可済みの手動テスト計画を作るための機能です。</p>
+      <ol class="steps">
+        <li class="step"><h4>比較に使う通信を集める</h4><p>少なくともGuest（未ログイン）、一般ユーザー、比較対象の別ユーザーの通信をProxy Historyへ集めます。比較対象の2ユーザーには、Commentへ<code>[group="user1"]</code>、<code>[group="user2"]</code>のような別々のGroupを付けます。</p></li>
+        <li class="step"><h4>対象範囲を決める</h4><p>Packet No rangeで範囲を指定します。対象ホストだけを解析したいときだけTarget scope onlyをONにします。ONにするとScope外の通信は解析結果に入りません。</p></li>
+        <li class="step"><h4>全体像を見る</h4><p>Overviewで、範囲内件数と実解析件数が想定どおりか確認します。Packets excluded by Target scopeが多い場合は、Scope設定を確認します。</p></li>
+        <li class="step"><h4>操作と経路を確認する</h4><p>Operation CatalogとAll HTTP Endpointsで、Auraだけでなく通常のAPI、画面遷移、オンプレ中継候補を確認します。<code>/web11/...</code>のような通常HTTP経路もここに出ます。</p></li>
+        <li class="step"><h4>比較可能な組合せを確認する</h4><p>Operation x Subjectで、同じOperationが別Group／別Sessionでも観測されているか確認します。Planning Coverageの不足を埋めてから、テスト対象を選びます。</p></li>
+        <li class="step"><h4>Test Planを調査順に使う</h4><p>P0〜P3は確認の優先順位です。各行のReasonとRecommended Testsを読み、所有者・テナント・権限関係を確認した上で、許可された方法で手動検証します。</p></li>
+      </ol>
+      <h3>画面共通の言葉</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>言葉</th><th>かんたんな意味</th><th>注意点</th></tr></thead>
+          <tbody>
+            <tr><td>Packet No</td><td>Proxy HTTP Historyの上から何番目の通信か。</td><td>範囲指定・元通信の確認に使います。通信の固有IDではありません。</td></tr>
+            <tr><td>Operation</td><td>認可を考えるときの「ひとつの操作」。Auraはactionごと、通常HTTPはMethod＋正規化Pathごとにまとめます。</td><td>同じPathでもGraphQLのquery fingerprintなどで別Operationになることがあります。</td></tr>
+            <tr><td>Subject</td><td>通信を行った利用者・セッションのこと。</td><td>Cookie等の生値は表示せず、Session Fingerprintで区別します。</td></tr>
+            <tr><td>Resource</td><td>操作の対象になり得るレコード、ID、金額、PII、権限、状態など。</td><td>候補であって、必ずしもSalesforce Recordとは限りません。</td></tr>
+            <tr><td>Group</td><td>Comment内の<code>[group="..."]</code>から読んだ利用者識別用ラベル。</td><td>Group名だけでは同一ロール、別テナント、所有者かどうかは分かりません。</td></tr>
+            <tr><td>Evidence</td><td>その分類・ラベルを付けた根拠の短文。</td><td>推定結果は必ずEvidenceとConfidenceを読んでください。</td></tr>
+            <tr><td>Confidence</td><td>分類根拠の直接性。highほど通信上の明示的な印があることを示します。</td><td>脆弱性の確率、安全性、影響度ではありません。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>上部の入力欄・ボタン</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>項目</th><th>意味</th><th>使いどころ</th></tr></thead>
+          <tbody>
+            <tr><td>Packet No range / All</td><td>解析するHistoryの開始・終了番号。Allは全History。</td><td>特定の画面操作やログイン後の一連の通信だけを分析したいときに範囲を絞ります。</td></tr>
+            <tr><td>Target scope only</td><td>Burp Target scope内のURLだけを残します。初期値はOFF。</td><td>Scope外のCDNや他サービスを除きたい場合にONにします。ONで消えた通信は「安全」ではなく、単に解析対象外です。</td></tr>
+            <tr><td>Destination rule</td><td><code>Label | Host regex | Path regex</code>で付ける利用者定義ラベル。</td><td>仕様書に「このPathはオンプレ」とある場合、例のように<code>On-prem</code>を付けます。HostかPathのどちらかは空欄にできます。</td></tr>
+            <tr><td>Build planning catalog</td><td>指定条件で受動解析を開始します。</td><td>通信の再送やHistory変更はしません。開始時にFind条件をクリアするため、前回の検索条件で新しい行が隠れることを防ぎます。</td></tr>
+            <tr><td>Cancel</td><td>現在のPacketの処理後に停止します。</td><td>停止後も部分結果を確認できます。結果は完全な範囲を表さないため、Overviewのcancelledを確認します。</td></tr>
+            <tr><td>Clear</td><td>このタブの表示結果だけを消します。</td><td>Proxy History、Comment、Color、Destination rule入力欄は消しません。</td></tr>
+            <tr><td>Find in results / Find in this table</td><td>表示済みの表を文字列で絞り込みます。</td><td>Build時は全Findを自動解除します。列見出しのクリックは並び替え、セル選択はコピーに使えます。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Overviewの見方</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>表示項目</th><th>意味</th><th>異常・注意の目安</th></tr></thead>
+          <tbody>
+            <tr><td>Packets selected by Packet No range</td><td>番号範囲だけで選ばれた件数。</td><td>期待より少ない場合、開始・終了番号を確認します。</td></tr>
+            <tr><td>Packets considered for Target scope filtering</td><td>範囲内でScope判定まで進んだ件数。</td><td>通常は範囲選択件数と同じです。</td></tr>
+            <tr><td>Packets analyzed</td><td>実際にOperation等の解析対象へ入った件数。</td><td>Scope ON時は範囲選択件数より少なくなります。</td></tr>
+            <tr><td>Packets excluded by Target scope</td><td>Scope ON時に除外された件数。</td><td>対象通信まで除外されていないか確認します。</td></tr>
+            <tr><td>Target scope lookup failures</td><td>URLを得られずScope判定できなかった件数。</td><td>該当PacketはTechnical Gapsに出て、安全側に除外されます。</td></tr>
+            <tr><td>Operations / HTTP endpoints / Aura actions</td><td>まとめられた操作、全HTTP経路、Aura actionの件数。</td><td>HTTP endpointsはAura以外も含みます。</td></tr>
+            <tr><td>Objects / Fields / Resource candidates</td><td>推定Object、Field、認可上注目しやすい値の候補数。</td><td>数が0でも対象にデータがないとは断定できません。</td></tr>
+            <tr><td>Technical gaps / Planning coverage gaps</td><td>機械解析の欠落と、テスト計画上の不足。</td><td>両者は意味が違うため、別々に確認します。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Operation Catalog：列の意味</h3>
+      <p>ここが中心の一覧です。1行は「通信の塊」ではなく、認可テストで比較したいOperationです。Aura batchの場合、同じHTTP Packet内でもactionごとに別行になります。行を選択すると下部にParameters、Response Fields、代表Request、代表Responseが表示されます。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>列</th><th>意味</th></tr></thead>
+          <tbody>
+            <tr><td>Protocol</td><td>Aura、GraphQL、UI API、REST、Web、File、Otherの通信形式です。RESTはJSON等の形からの分類であり、Salesforce標準APIとは限りません。</td></tr>
+            <tr><td>Route Classification / Route Confidence / Route Evidence</td><td>Salesforce Aura、Salesforce UI API、Salesforce REST API、GraphQL、Custom same-origin/backend route、External/cross-host routeなどの経路分類と根拠です。<code>/web11/...</code>のようなSalesforce標準マーカーのない経路は通常Custom routeになります。</td></tr>
+            <tr><td>Destination Label / Confidence / Source</td><td>Destination ruleに一致したラベルと出所です。例のOn-premは仕様書に基づく注釈です。空欄は物理宛先が不明という意味で、Salesforce宛てという意味ではありません。</td></tr>
+            <tr><td>Group / Traffic Class</td><td>CommentのGroupとStatisticsによる通信分類です。Groupは主体の識別補助、Traffic ClassはWeb画面・SPA更新等の整理用です。</td></tr>
+            <tr><td>Origin / Origin Confidence / Origin Reason</td><td>Aura descriptorから見たSalesforce標準、組織カスタムApex、名前空間付きApex、不明の由来です。非Aura通信は通常Unknownになります。リスク判定ではありません。</td></tr>
+            <tr><td>Host / Method / Path / Operation/Descriptor / Calling Descriptor</td><td>どこへ、どのHTTP Methodで、どのPathを呼び、Auraならどのdescriptor／呼び出し元だったかです。Path内の数値ID、Salesforce ID、UUID等は正規化して同型操作をまとめます。</td></tr>
+            <tr><td>Behavior / Data Interaction / CRUD Intents</td><td>BehaviorはRead/Write等の大まかな向き、Data InteractionはRecord Read、List/Search、Create、Update、Delete、Metadata、Authentication、Navigation、UI Definition、Unknown等の分類、CRUD Intentsはその根拠となる操作意図です。</td></tr>
+            <tr><td>Interaction Confidence / Reasons</td><td>Data Interactionを付けた文字列上・GraphQL上の根拠です。パス名だけの推定もあるため、必ず代表Requestで確認します。</td></tr>
+            <tr><td>GraphQL Kind / Operation / Metadata</td><td>query、mutation、GraphQL operation名、Object／Field／filter／pagination等の抽出情報です。表示用previewからinline literalの値は除きます。</td></tr>
+            <tr><td>Salesforce Features</td><td>getItems、getConfigData、Self-registration、GraphQL Pagination等、観測された特徴のタグです。</td></tr>
+            <tr><td>Request/Response Content Types / Status</td><td>観測したContent-TypeとHTTPステータスの集合です。同一Operationで複数種類・複数Statusがあれば併記されます。</td></tr>
+            <tr><td>Occurrences / Packet No</td><td>観測回数と元のHistory番号群です。Packet Noを使って元通信へ戻れます。</td></tr>
+            <tr><td>Parameters / Candidates</td><td>抽出済みパラメータ数とResource候補数です。0は「存在しない」の断定ではなく、受動解析で見つからなかったことを示します。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>Operation行を選択した下部表示</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>表示</th><th>意味</th></tr></thead>
+          <tbody>
+            <tr><td>Parameters</td><td>Region（Path／Query／Header／Cookie／Body等）、Type、Nesting、構造Path、値の例、候補分類を表示します。Aura action内の値はaction相対Pathへ結び付けます。</td></tr>
+            <tr><td>Response Fields</td><td>レスポンスJSON／Aura responseから得た構造Path、型、出現回数、値の例です。binaryや壊れたJSONはTechnical Gapsを確認します。</td></tr>
+            <tr><td>Representative Request / Response</td><td>Historyにある代表通信をBurp標準ビューアで表示します。カタログ列では秘密値を伏せますが、このビューアは元のHistoryをそのまま表示するため取り扱いに注意してください。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>そのほかのサブタブ：列の意味と使い方</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>サブタブ</th><th>主な列</th><th>何を確認するか</th></tr></thead>
+          <tbody>
+            <tr><td>Operation x Subject</td><td>Subject/Context、Auth Kind、Groups、Operation、Occurrences、Packet No、State、Evidence</td><td>同じOperationを誰のセッションで観測したか。StateはObservedであり許可結果ではありません。行がない組合せはDeniedではなく未観測です。</td></tr>
+            <tr><td>Objects</td><td>Object、Kind、Data Interactions、CRUD Intents、Operations、Fields、Groups、Auth Kinds、Confidence、Packet No、Reasons</td><td>GraphQL、UI API、REST path、Object名パラメータから得た対象Object候補。Object名の推定根拠をReasonsで確認します。</td></tr>
+            <tr><td>Fields</td><td>Object、Field、Kind/Type、Focus Type、Sources、CRUD Intents、Operations、Groups、Auth Kinds、Confidence、Packet No、Reasons</td><td>Object配下のField候補。Focus TypeはPII、金額、認可、状態等の注目理由です。</td></tr>
+            <tr><td>Aura Applications</td><td>App ID、Host、Default App、Features、Endpoints、Operations、Groups、Sessions、Packet No</td><td>Aura contextで分かったExperience Cloud Appの候補。loaded componentをAppと誤認しないよう、application descriptorだけを対象にします。</td></tr>
+            <tr><td>All HTTP Endpoints</td><td>Route分類、Destination、Protocol、Host、Method、Normalized Path、Data Interaction、Content-Type、Status、Parameters、Operations、Groups、Sessions、Occurrences、Packet No</td><td>Aura以外を含む全経路の棚卸し。オンプレ中継候補やカスタムAPIを見つける入口です。Normalized PathはID部分を置換して同型URLを集約します。</td></tr>
+            <tr><td>Packet Coverage</td><td>Packet No、Route分類、Destination、Protocol、Host、Method、Normalized Path、Status、Group、Operations、Operation Count</td><td>解析対象の各PacketがどのOperationへ入ったかの監査表です。Operation Countが0ならTechnical Gapsの<code>operation_catalog</code>を確認します。</td></tr>
+            <tr><td>Test Plan</td><td>Priority、Score、Origin、Operation、Candidate Path、Type、Sample Values、Packet No、Reasons、Recommended Tests</td><td>調査順の提案表です。PriorityはP0が最優先、P3が低めです。脆弱性の有無・攻撃成功を表す列ではありません。</td></tr>
+            <tr><td>Sessions</td><td>Fingerprint、Auth Kind、Groups、Hosts、Occurrences、Packet No</td><td>秘密値を出さずに同じセッションらしい通信をまとめます。Fingerprintが違っても利用者・権限が違うとは断定できません。</td></tr>
+            <tr><td>Planning Coverage</td><td>Category、Severity、Scope、Operation、State、Reason、Recommendation、Evidence</td><td>Guest未観測、比較用Subject不足、所有関係未定義、write操作未観測等、テスト計画を作る前に埋めるべき不足です。</td></tr>
+            <tr><td>Technical Gaps</td><td>Packet No、Stage、Reason</td><td>壊れたJSON、レスポンス欠落、binary、Scope判定失敗、パーサ例外、Operation未到達等の機械処理上の不足です。脆弱性の証拠ではありません。</td></tr>
+            <tr><td>Resource Corpus</td><td>Score、Type、Source、Value、Groups、Paths、Operations、Occurrences、Packet No、Reasons</td><td>同じID・金額・所有者・テナント等がどこに現れたかを横断で確認します。Valueは秘密・token類を表示対象から除外します。</td></tr>
           </tbody>
         </table>
       </div>
