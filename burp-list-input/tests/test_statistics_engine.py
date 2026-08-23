@@ -45,6 +45,45 @@ class StatisticsEngineTest(unittest.TestCase):
         self.assertEqual(statistics_engine.API,
                          statistics_engine.classify_packet('/api/users', '', '{}', 'application/json'))
 
+    def test_statistics2_enriches_traffic_class_category_and_protocol(self):
+        aura_body = ('message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22apex%3A%2F%2F'
+                     'OrderController%2FACTION%24getOrder%22%7D%5D%7D')
+        items = [
+            _Item('POST /s/sfsites/aura HTTP/1.1\r\n\r\n' + aura_body, ''),
+            _Item('GET /services/apexrest/orders HTTP/1.1\r\n\r\n',
+                  'HTTP/1.1 200\r\nContent-Type: application/json\r\n\r\n{}'),
+            _Item('GET /services/data/v60.0/sobjects/Account HTTP/1.1\r\n\r\n',
+                  'HTTP/1.1 200\r\nContent-Type: application/json\r\n\r\n{}'),
+        ]
+        records = statistics_engine.analyze_history_v2(_Callbacks(items), _Helpers())
+        observed = set((row['traffic_class'], row['category'], row['protocol']) for row in records)
+        self.assertIn((statistics_engine.SPA_UPDATE, u'Apexカスタム', u'Aura'), observed)
+        self.assertIn((statistics_engine.API, u'ApexREST', u'REST'), observed)
+        self.assertIn((statistics_engine.API, u'SalesforceREST', u'REST'), observed)
+        rows = statistics_engine.summary_rows_v2(records)
+        self.assertEqual(3, sum(row['including_aggregated'] for row in rows))
+        self.assertIn(u'通信', rows[0]['definition'])
+        self.assertIn(u' / ', rows[0]['definition'])
+
+    def test_statistics2_annotations_prepend_all_dimensions_and_clear(self):
+        body = ('message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22apex%3A%2F%2F'
+                'OrderController%2FACTION%24getOrder%22%7D%5D%7D')
+        items = [_Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', '[0001] existing comment'),
+                 _Item('POST /aura HTTP/1.1\r\n\r\n' + body, '', 'existing target')]
+        callbacks = _Callbacks(items)
+        records = statistics_engine.analyze_history_v2(callbacks, _Helpers())
+        changed, _colored = statistics_engine.annotate_analysis_v2(
+            records, add_dimension_tags=True, add_aggregation_tags=True)
+        self.assertEqual(2, changed)
+        self.assertTrue(items[0].comment.startswith(
+            u'[Protocol=Aura] [Traffic Class=SPA（画面更新）] [Category=Apexカスタム] [0001]'))
+        self.assertTrue(items[1].comment.startswith(
+            u'[Protocol=Aura] [Traffic Class=SPA（画面更新）] [Category=Apexカスタム] '
+            u'[集約対象_集約先No0001] existing target'))
+        self.assertEqual(2, statistics_engine.clear_analysis_annotations(callbacks))
+        self.assertEqual(u'[0001] existing comment', items[0].comment)
+        self.assertEqual(u'existing target', items[1].comment)
+
     def test_adjacent_aura_runs_only_mark_later_packets_as_targets(self):
         body = 'message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22aura%3A%2F%2FApexActionController%2FACTION%24execute%22%7D%5D%7D&aura.pageURI=%2Fhome'
         items = [_Item('POST /s/sfsites/aura HTTP/1.1\r\nCookie: x=1\r\n\r\n' + body, ''),

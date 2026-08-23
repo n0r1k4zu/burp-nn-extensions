@@ -43,6 +43,7 @@ class _Item(object):
     def getRequest(self): return self.request
     def getResponse(self): return self.response
     def getComment(self): return self.comment
+    def setComment(self, value): self.comment = value
     def getHighlight(self): return self.highlight
     def getHttpService(self): return self.service
     def getUrl(self): return self.url
@@ -184,6 +185,22 @@ class AuthorizationPlanningEngineTest(unittest.TestCase):
         self.assertEqual(set([u'1;a', u'2;a', u'3;a', u'4;a']), set(
             row['representative_action_id'] for row in result['operations']))
         self.assertIn(standard['origin_confidence'], (u'low', u'medium', u'high'))
+        categories = dict((row['operation_name'], row['origin_category'])
+                          for row in result['operations'])
+        self.assertEqual(u'Salesforce標準', categories[u'getRecord'])
+        self.assertEqual(u'Apexカスタム', categories[u'getAccount'])
+        self.assertEqual(u'Apexカスタム', categories[u'saveOrder'])
+
+    def test_origin_category_distinguishes_apex_rest_salesforce_rest_and_unknown(self):
+        result = self._analyze([
+            _Item(_request(u'GET', u'/services/apexrest/orders'), _response(body=u'{}')),
+            _Item(_request(u'GET', u'/services/data/v60.0/sobjects/Account'), _response(body=u'{}')),
+            _Item(_request(u'GET', u'/custom/route'), _response(body=u'<html></html>', content_type=u'text/html')),
+        ])
+        categories = dict((row['path'], row['origin_category']) for row in result['operations'])
+        self.assertEqual(u'ApexREST', categories[u'/services/apexrest/orders'])
+        self.assertEqual(u'SalesforceREST', categories[u'/services/data/v60.0/sobjects/Account'])
+        self.assertEqual(u'Unknown', categories[u'/custom/route'])
 
     def test_aura_cmp_def_query_is_retained_in_operation_catalog_path(self):
         """GET auraCmpDefはqueryの_defを捨てず、定義ごとにCatalogへ出す。"""
@@ -251,6 +268,32 @@ class AuthorizationPlanningEngineTest(unittest.TestCase):
         operation = self._analyze(items)['operations'][0]
         self.assertEqual([], operation['exact_duplicate_packet_nos'])
         self.assertEqual(2, operation['test_variants'])
+
+    def test_packet_comment_annotations_and_export_rows_include_deduplication(self):
+        action = {'id': '1;a', 'descriptor': 'apex://OrderController/ACTION$getOrder',
+                  'params': {'recordId': '801000000000001'}}
+        items = [
+            _Item(_request(u'POST', u'/s/sfsites/aura', _aura_body([action]),
+                           [u'Content-Type: application/x-www-form-urlencoded']), _response(body=u'{}'),
+                  comment=u'[group="user1"] keep this'),
+            _Item(_request(u'POST', u'/s/sfsites/aura', _aura_body([dict(action, id='2;a')]),
+                           [u'Content-Type: application/x-www-form-urlencoded']), _response(body=u'{}')),
+        ]
+        result = self._analyze(items)
+        updated, skipped = authorization_planning_engine.apply_packet_comment_annotations(result)
+        self.assertEqual(2, updated)
+        self.assertEqual(0, skipped)
+        self.assertTrue(items[0].getComment().startswith(u'[AP:Protocol=Aura]'))
+        self.assertIn(u'[group="user1"] keep this', items[0].getComment())
+        self.assertIn(u'[AP:Protocol=Aura]', items[0].getComment())
+        self.assertIn(u'[AP:Duplicate=Yes;RepresentativePacketNo=1]', items[1].getComment())
+        rows = authorization_planning_engine.export_rows(result)
+        self.assertEqual(set([u'Operation', u'Packet']), set(row['Record Type'] for row in rows))
+        self.assertTrue(all(row['Origin'] in (u'Salesforce標準', u'Apexカスタム', u'ApexREST',
+                                              u'SalesforceREST', u'Unknown') for row in rows))
+        self.assertTrue(any(row['Record Type'] == u'Packet' and
+                            row['Deduplication'] == u'Yes;RepresentativePacketNo=1'
+                            for row in rows))
 
     def test_generic_apex_controller_uses_class_namespace_and_method(self):
         actions = [

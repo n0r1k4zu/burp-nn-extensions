@@ -23,7 +23,7 @@ from csvlistinput.ui.log_panel import LogPanel
 from csvlistinput.ui.parameters_panel import ParametersPanel
 from csvlistinput.ui.authorization_planning_panel import AuthorizationPlanningPanel
 from csvlistinput.ui.replace_panel import ReplacePanel
-from csvlistinput.ui.statistics_panel import StatisticsPanel
+from csvlistinput.ui.statistics_panel import StatisticsPanel, Statistics2Panel
 from csvlistinput.ui.annotations_panel import AnnotationsPanel
 from csvlistinput.ui.aura_audit_panel import AuraAuditPanel
 from csvlistinput.ui.target_info_panel import TargetInfoPanel
@@ -72,7 +72,9 @@ class MainTab(ITab):
         self.parameters_panel = ParametersPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.authorization_planning_panel = AuthorizationPlanningPanel(
             callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
-        self.statistics_panel = StatisticsPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
+        # 旧Statisticsは互換性のため保持するが、MyToolsの画面には出さない。
+        self.statistics_old_panel = StatisticsPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
+        self.statistics_panel = Statistics2Panel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.annotations_panel = AnnotationsPanel(callbacks, log_fn=self.log, error_fn=self.log_error)
         self.aura_audit_panel = AuraAuditPanel(callbacks, helpers, log_fn=self.log, error_fn=self.log_error)
         self.errors_panel = ErrorsPanel(error_store)

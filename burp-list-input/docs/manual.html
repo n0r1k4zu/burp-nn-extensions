@@ -427,7 +427,7 @@
         <a href="#parameters">Parameters（パラメータ棚卸し）</a>
         <a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>
         <a href="#authorization-planning">Authorization Planning for Aura（認可テスト計画）</a>
-        <a href="#statistics">Statistics（分類・集約）</a>
+        <a href="#statistics2">Statistics（Protocol / Traffic Class / Category）</a>
         <a href="#numbering-grouping">Numbering &amp; Grouping</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
@@ -1067,6 +1067,7 @@
       </div>
       <p>Salesforce / Experience Cloud / Auraそのものが初めての場合は、先に<a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>を読んでください。</p>
       <p><span class="k">Packet No range</span>へ開始・終了番号を入力するか<span class="k">All</span>を選び、<span class="k">Build planning catalog</span>を押します。Build開始時には前回の全体／各表のFind条件を解除し、古い絞り込みによって新しいOperationが未検出に見える状態を防ぎます。<span class="k">Target scope only (Burp Target scope)</span>は初期OFFで、ONにすると選択範囲のうちBurp Target scope内のURLだけを解析します。Overviewには範囲内件数、実解析件数、Scope外除外件数、Scope判定失敗件数を分けて表示します。Scope判定不能な通信は結果へ混ぜず、Technical Gapsへ記録します。処理はバックグラウンドで動き、ボタンの状態と進捗が更新されます。長い処理は<span class="k">Cancel</span>で停止でき、<span class="k">Clear</span>で表示結果だけを消去できます。この機能からHTTP通信を再送したり、HistoryのCommentや色を変更したりすることはありません。</p>
+      <p>Build後の<span class="k">Export CSV...</span>は、Operation行とPacket行を1つのUTF-8 CSVへ出力します。生Request/Response、Cookie、Authorization、token等の秘密値はCSVへ含めません。<span class="k">Add planning tags to comments</span>は、解析対象Packetの既存Commentを残したまま、<code>[AP:Protocol=...]</code>、<code>[AP:TrafficClass=...]</code>、<code>[AP:Origin=...]</code>、<code>[AP:Duplicate=...]</code>を追記します。AP Originは次の簡潔な5分類です：<code>Salesforce標準</code>、<code>Apexカスタム</code>、<code>ApexREST</code>、<code>SalesforceREST</code>、<code>Unknown</code>。再実行時はこの4種類のAPタグだけを更新するため、Group、採番、手入力Commentは保持されます。<code>Duplicate=Yes;RepresentativePacketNo=123</code>は、そのPacketがPacket No 123の完全重複候補であることを示します。</p>
       <p><span class="k">Destination rule</span>は任意です。<code>Label | Host regex | Path regex</code>形式で、仕様書等に基づく宛先ラベルを設定します。例は<code>On-prem | ^example\.my\.site\.com$ | ^/web11/.+/(Login|Entry|Message)$</code>です。HostまたはPathの一方は空欄にできます。ここで付くOn-prem等は利用者定義の注釈であり、HTTP通信だけから物理的な配置を推測した結果ではありません。</p>
       <div class="table-wrap">
         <table>
@@ -1151,7 +1152,7 @@
             <tr><td>Route Classification / Route Confidence / Route Evidence</td><td>Salesforce Aura、Salesforce UI API、Salesforce REST API、GraphQL、Custom same-origin/backend route、External/cross-host routeなどの経路分類と根拠です。<code>/web11/...</code>のようなSalesforce標準マーカーのない経路は通常Custom routeになります。</td></tr>
             <tr><td>Destination Label / Confidence / Source</td><td>Destination ruleに一致したラベルと出所です。例のOn-premは仕様書に基づく注釈です。空欄は物理宛先が不明という意味で、Salesforce宛てという意味ではありません。</td></tr>
             <tr><td>Group / Traffic Class</td><td>CommentのGroupとStatisticsによる通信分類です。Groupは主体の識別補助、Traffic ClassはWeb画面・SPA更新等の整理用です。</td></tr>
-            <tr><td>Origin / Origin Confidence / Origin Reason</td><td>Aura descriptorから見たSalesforce標準、組織カスタムApex、名前空間付きApex、不明の由来です。非Aura通信は通常Unknownになります。リスク判定ではありません。</td></tr>
+            <tr><td>Origin / Origin Category / Origin Confidence / Origin Reason</td><td>OriginはAura descriptorから見た詳細な由来、Origin Categoryは一覧・CSV・Commentで使う5分類です。<code>Salesforce標準</code>は標準Controller、<code>Apexカスタム</code>は組織または名前空間付きApex、<code>ApexREST</code>は<code>/services/apexrest/...</code>、<code>SalesforceREST</code>は<code>/services/data/...</code>等のSalesforce REST API、<code>Unknown</code>は通信だけでは安全に判別できないものです。リスク判定ではありません。</td></tr>
             <tr><td>Host / Method / Path / Operation/Descriptor / Calling Descriptor</td><td>どこへ、どのHTTP Methodで、どのPathを呼び、Auraならどのdescriptor／呼び出し元だったかです。Path内の数値ID、Salesforce ID、UUID等は正規化して同型操作をまとめます。</td></tr>
             <tr><td>Behavior / Data Interaction / CRUD Intents</td><td>BehaviorはRead/Write等の大まかな向き、Data InteractionはRecord Read、List/Search、Create、Update、Delete、Metadata、Authentication、Navigation、UI Definition、Unknown等の分類、CRUD Intentsはその根拠となる操作意図です。</td></tr>
             <tr><td>Interaction Confidence / Reasons</td><td>Data Interactionを付けた文字列上・GraphQL上の根拠です。パス名だけの推定もあるため、必ず代表Requestで確認します。</td></tr>
@@ -1222,12 +1223,25 @@
     <section class="doc-section" id="statistics">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
-        <h2>Statistics（分類・集約）</h2>
+        <h2>Statistics_old（旧機能・画面非表示）</h2>
         <p class="section-dek">選択したProxy Historyを受動的に分類・集約し、Commentと色で整理します。HTTP通信は送信しません。</p>
       </div>
       <p><span class="k">Packet No range</span>を入力するか<span class="k">All</span>を選び、<span class="k">Build statistics</span>を押します。分類は、(1) SPAでないHTMLレスポンス＝Web画面、(2) JavaScript/CSS/画像/フォント等＝Web個別パーツ取得、(3) SPA起動マーカーを含むHTML＝SPA（画面）、(4) Aura path / <code>message=</code> / <code>aura.context=</code>＝SPA（画面更新）、(5) それ以外＝API、の優先順です。</p>
       <p>Aura集約はSPA（画面更新）だけが対象です。同一のAura descriptor・page URI・認証状態を持つ通信を比較し、descriptorのないコンポーネント取得は内容全体が一致した場合だけ対象にします。履歴順で同じキーが連続するグループの先頭を代表、それ以外を集約対象とし、他の種類の通信は集約しません。表の「including」は履歴上の全件、「excluding」は集約対象を除いた件数です。</p>
+      <h3>集約判定の条件</h3>
+      <p>これは「同じ業務操作らしいAura更新を、テスト候補として一度だけ確認しやすくする」ための<strong>候補化</strong>です。完全な同一性・認可の安全性を証明するものではありません。代表Packetと集約対象を確認したうえで、重要なID、金額、状態、権限、入力値が異なる通信は必ず個別にテストしてください。</p>
+      <ol>
+        <li><strong>対象になる通信</strong>：Traffic Classが<strong>SPA（画面更新）</strong>のものだけです。Aura path、<code>message=</code>、または<code>aura.context=</code>を含む通信が該当します。Web画面、静的ファイル、通常API、Apex REST、Salesforce RESTは集約しません。</li>
+        <li><strong>Aura actionが読める場合の比較項目</strong>：リクエストpath、<code>message</code>内のaction descriptor一覧、<code>params</code>内のオブジェクト名系キー（<code>objectApiName</code>、<code>objectType</code>、<code>sObjectType</code>、<code>entityName</code>、<code>objectName</code>）、<code>ApexActionController</code>のclass/method、<code>aura.pageURI</code>、認証情報の有無（CookieまたはAuthorization headerあり／なし）が全て同じ場合に同じ集約キーです。</li>
+        <li><strong>action descriptorが読めない場合</strong>：コンポーネント定義・リソース取得等は安全側に寄せ、path、リクエストbody全体、認証情報の有無のSHA-1値が完全一致する場合だけ同じキーです。</li>
+        <li><strong>代表と集約対象</strong>：同じキーの連続グループの最初のSPA更新が代表、2件目以降が集約対象です。別のAura集約キーが現れた時点で新しいグループを開始します。途中にWeb画面やAPI等の<strong>非SPA更新通信だけ</strong>が挟まっても、Aura更新の連続性は切りません。</li>
+        <li><strong>集約しない・信用しすぎない条件</strong>：descriptor、対象オブジェクト、Apex class/method、page URI、認証状態のいずれかが違えば別グループです。一方で、一般的な<code>params</code>の値（record ID、金額、状態、検索条件等）は現在の集約キーに含めません。そのため、これらの値が異なる通信でも同じ候補になる場合があります。認可テストでは集約対象を機械的に除外せず、値の差分を確認してください。</li>
+      </ol>
       <p><span class="k">Apply selected annotations</span>では、分類を<code>[Web画面]</code>等で追記、集約対象を<code>[集約対象]</code>で追記できます。代表パケットのComment先頭に<code>[1992]</code>のような採番がある場合は、集約対象へ<code>[集約対象_集約先No1992]</code>を追記します。<span class="k">Clear annotations</span>はStatisticsが追加した分類・集約タグだけを削除し、採番・グループ・その他のタグは残します。</p>
+      <h2 id="statistics2">Statistics（Protocol / Traffic Class / Category）</h2>
+      <p>Statisticsは、範囲指定、<span class="k">All</span>、Aura集約、色付け、Commentへの注釈、注釈の消去を使います。通信を再送・変更することはありません。集約の判定条件と注意点は直前の「集約判定の条件」と同一です。集計表では、<strong>Protocol</strong>、<strong>Traffic Class</strong>、<strong>Category</strong>の3軸ごとに、集約対象を含む件数と除いた件数を表示します。</p>
+      <p><strong>Traffic Class</strong>は既存Statisticsの通信分類（Web画面、Web個別パーツ取得、SPA（画面）、SPA（画面更新）、API）です。<strong>Category</strong>は認可テスト計画と同じ由来分類で、<code>Salesforce標準</code>、<code>Apexカスタム</code>、<code>ApexREST</code>、<code>SalesforceREST</code>、<code>Unknown</code>を表示します。<strong>Protocol</strong>は通信の形を示し、Aura、GraphQL、UI API、REST、Web、File、Otherに分類します。Definitionは、たとえば<code>Aura通信 / SPA更新 / Apexカスタム（推定）</code>のように、この3項目の意味を短く示します。CategoryとProtocolはHTTP通信からの推定であり、確定できない場合はUnknownまたはOtherです。</p>
+      <p><span class="k">Add Protocol / Traffic Class / Category [tags] to comments</span>は、既存Commentの先頭へ<code>[Protocol=Aura]</code>、<code>[Traffic Class=SPA（画面更新）]</code>、<code>[Category=Apexカスタム]</code>をこの順で追加します。集約対象には従来どおり<code>[集約対象_集約先No0001]</code>等も追加します。<span class="k">Clear annotations</span>を使うと、Statisticsが追加した分類・集約タグだけを消去できます。</p>
       <h2 id="numbering-grouping">Numbering &amp; Grouping</h2>
       <p>採番・採番解除・グループ削除・ブラケットタグ削除は専用タブへ分離しました。全HTTP HistoryのComment先頭へ指定桁数・開始番号で<code>[0001]</code>のように付与し、採番解除で先頭番号だけを外します。Proxy Historyで複数パケットを選択し、右クリックの<span class="k">MyTools: Group selected History packets</span>からグループ名を入力すると、各Commentへ<code>[group="user1"]</code>形式の明示的なグループ定義を追加します。この定義はParameters上下のGroup列とHistory SearchのGroup列へ表示されます。範囲指定で特定グループだけを削除でき、<span class="k">Clear all [tags] in range</span>は範囲内のすべての<code>[...]</code>タグを削除します。</p>
     </section>
@@ -1705,13 +1719,13 @@
         タグを含めComment全体を消す操作なので、必要なCommentはComment Snapshots等で保存してから実行してください。
       </p>
       <p>
-        <span class="k">Export Packet &amp; Insertion Point with Statistics comment</span> は、選択パケットに既定の
-        採番（開始1、4桁の<code>[0001]</code>形式）を付け、<span class="k">Add class [tag] to comments</span> と
-        <span class="k">Add aggregation [tag] to comments</span> と同じStatisticsタグを追加してから、Insertion Pointを
-        1行ずつCSVへ出力します。Aura集約の判定はHTTP History全体を参照しますが、採番・Comment更新・CSV出力は選択
-        パケットだけに限定されます。集約対象には、代表に採番があれば<code>[集約対象_集約先No0001]</code>、代表が
-        未選択などで採番がなければ<code>[集約対象_集約先PacketNo123]</code>のように集約先を明記します。既存の先頭採番は置換し、他のComment・Groupタグは維持します。CSV出力成功後には
-        今回の採番・Statisticsタグを残すか確認するダイアログが表示されます。<strong>はい</strong>を選ぶと、選択
+        <span class="k">Export Packet &amp; Insertion Point with Statistics comment</span> は、選択パケットへ現在のStatisticsと同じ
+        <code>[Protocol=...] [Traffic Class=...] [Category=...]</code>と集約タグを追加してから、Insertion Pointを
+        1行ずつCSVへ出力します。自動採番は行いません。Aura集約の判定はHTTP History全体を参照しますが、Comment更新・CSV出力は選択
+        パケットだけに限定されます。集約対象には、代表Commentに既存の採番があれば<code>[集約対象_集約先No0001]</code>、それ以外は
+        <code>[集約対象_集約先PacketNo123]</code>のようにPacket Noで集約先を明記します。既存Comment・Groupタグは維持し、
+        Statisticsタグは既存Commentがあっても必ず先頭へ追加します。CSV出力成功後には
+        今回のStatisticsタグを残すか確認するダイアログが表示されます。<strong>はい</strong>を選ぶと、選択
         パケットのComment全体を処理前の状態へ復元し、<strong>いいえ</strong>を選ぶと付与したCommentを残します。
       </p>
 

@@ -3,14 +3,17 @@
 
 import re
 import time
+import csv
+import codecs
 from threading import Thread
 
 from java.awt import BorderLayout, Color, FlowLayout
 from java.awt.event import ActionListener, MouseAdapter
+from java.io import File
 from java.lang import Integer, Runnable
 from java.util import Comparator
 from java.util.regex import Pattern
-from javax.swing import (BorderFactory, JButton, JCheckBox, JLabel, JPanel, JProgressBar,
+from javax.swing import (BorderFactory, BoxLayout, JButton, JCheckBox, JFileChooser, JLabel, JPanel, JProgressBar,
                          JScrollPane, JSplitPane, JTabbedPane, JTable, JTextArea, JTextField,
                          ListSelectionModel, RowFilter, SwingUtilities, Timer)
 from javax.swing.event import DocumentListener, ListSelectionListener
@@ -316,8 +319,8 @@ class AuthorizationPlanningPanel(JPanel):
 
     OPERATION_COLUMNS = [u'#', u'Protocol', u'Route Classification', u'Route Confidence', u'Route Evidence',
                          u'Destination Label', u'Destination Confidence', u'Destination Source',
-                         u'Group', u'Traffic Class', u'Origin', u'Origin Confidence',
-                         u'Origin Reason', u'Host', u'Method', u'Path', u'Operation/Descriptor',
+                         u'Group', u'Traffic Class', u'Origin', u'Origin Category',
+                         u'Origin Confidence', u'Origin Reason', u'Host', u'Method', u'Path', u'Operation/Descriptor',
                          u'Calling Descriptor', u'Behavior', u'Data Interaction',
                          u'Interaction Confidence', u'Interaction Reasons', u'CRUD Intents',
                          u'GraphQL Kind', u'GraphQL Operation', u'GraphQL Metadata', u'Salesforce Features',
@@ -364,6 +367,7 @@ class AuthorizationPlanningPanel(JPanel):
         self._cancel_requested = False
         self._last_progress_update = 0.0
         self._packet_items = {}
+        self._last_result = None
         self._sorters = []
         self._local_filter_bindings = []
         self._local_queries = {}
@@ -398,41 +402,57 @@ class AuthorizationPlanningPanel(JPanel):
         self.add(bottom, BorderLayout.SOUTH)
 
     def _build_toolbar(self):
-        panel = JPanel(FlowLayout(FlowLayout.LEFT))
-        panel.add(JLabel(u'Packet No range:'))
+        # FlowLayout一行へ全操作を置くと、狭いBurp画面では折り返し行が親Panelに
+        # 収まらず、Export/Comment操作が見えなくなる。入力と実行操作を明示的に
+        # 2段へ分ける。
+        panel = JPanel()
+        panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
+        criteria_row = JPanel(FlowLayout(FlowLayout.LEFT))
+        action_row = JPanel(FlowLayout(FlowLayout.LEFT))
+        criteria_row.add(JLabel(u'Packet No range:'))
         self.start_field = JTextField(6)
         self.start_field.setToolTipText(u'Start packet number (blank: first packet)')
-        panel.add(self.start_field)
-        panel.add(JLabel(u'to'))
+        criteria_row.add(self.start_field)
+        criteria_row.add(JLabel(u'to'))
         self.end_field = JTextField(6)
         self.end_field.setToolTipText(u'End packet number (blank: last packet)')
-        panel.add(self.end_field)
+        criteria_row.add(self.end_field)
         self.all_button = JButton(u'All', actionPerformed=self._on_all)
-        panel.add(self.all_button)
+        criteria_row.add(self.all_button)
         self.scope_only_checkbox = JCheckBox(u'Target scope only (Burp Target scope)', False)
         self.scope_only_checkbox.setToolTipText(
             u'ONの場合、BurpのTarget scopeに含まれるHTTP Historyだけを受動解析します。'
             u'リクエストは送信しません。既定はOFFです。')
-        panel.add(self.scope_only_checkbox)
-        panel.add(JLabel(u'Destination rule:'))
+        criteria_row.add(self.scope_only_checkbox)
+        criteria_row.add(JLabel(u'Destination rule:'))
         self.destination_rules_field = JTextField(26)
         self.destination_rules_field.setToolTipText(
             u'Optional: Label | Host regex | Path regex. Example: '
             u'On-prem | ^portal\\.example\\.test$ | ^/web11/.+/(Login|Entry|Message)$ . '
             u'Labels are user annotations based on specifications; HTTP alone does not prove physical destination.')
-        panel.add(self.destination_rules_field)
+        criteria_row.add(self.destination_rules_field)
         self.build_button = JButton(u'Build planning catalog', actionPerformed=self._on_build)
-        panel.add(self.build_button)
+        action_row.add(self.build_button)
         self.cancel_button = JButton(u'Cancel', actionPerformed=self._on_cancel)
         self.cancel_button.setEnabled(False)
-        panel.add(self.cancel_button)
+        action_row.add(self.cancel_button)
         self.clear_button = JButton(u'Clear', actionPerformed=self._on_clear)
-        panel.add(self.clear_button)
-        panel.add(JLabel(u'Find in results:'))
+        action_row.add(self.clear_button)
+        self.export_button = JButton(u'Export CSV...', actionPerformed=self._on_export_csv)
+        self.export_button.setEnabled(False)
+        action_row.add(self.export_button)
+        self.annotate_button = JButton(u'Add planning tags to comments', actionPerformed=self._on_annotate_comments)
+        self.annotate_button.setEnabled(False)
+        self.annotate_button.setToolTipText(
+            u'Adds/updates [AP:Protocol], [AP:TrafficClass], [AP:Origin], and [AP:Duplicate] on analyzed Packets.')
+        action_row.add(self.annotate_button)
+        action_row.add(JLabel(u'Find in results:'))
         self.find_field = JTextField(22)
         self.find_field.setToolTipText(u'Filter all catalog tables without rebuilding the analysis.')
         self.find_field.getDocument().addDocumentListener(_FindDocumentListener(self))
-        panel.add(self.find_field)
+        action_row.add(self.find_field)
+        panel.add(criteria_row)
+        panel.add(action_row)
         return panel
 
     def _new_table(self, model, packet_columns=None, priority=False, semantic=None):
@@ -494,8 +514,8 @@ class AuthorizationPlanningPanel(JPanel):
         return panel
 
     def _build_operations(self):
-        self.operation_model = _RowsModel(self.OPERATION_COLUMNS, [0, 29, 31, 33, 34, 36, 37])
-        self.operation_table = self._new_table(self.operation_model, [30, 31, 32], semantic=(10, 19))
+        self.operation_model = _RowsModel(self.OPERATION_COLUMNS, [0, 30, 32, 34, 35, 37, 38])
+        self.operation_table = self._new_table(self.operation_model, [31, 32, 33], semantic=(10, 20))
         self.operation_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.operation_table.getSelectionModel().addListSelectionListener(_OperationSelectionListener(self))
         self.operation_table.addMouseListener(_OperationMouseListener(self))
@@ -673,6 +693,8 @@ class AuthorizationPlanningPanel(JPanel):
         self.cancel_button.setEnabled(True)
         self.cancel_button.setText(u'Cancel')
         self.clear_button.setEnabled(False)
+        self.export_button.setEnabled(False)
+        self.annotate_button.setEnabled(False)
         self.scope_only_checkbox.setEnabled(False)
         self.destination_rules_field.setEnabled(False)
         self.progress.setIndeterminate(True)
@@ -745,6 +767,8 @@ class AuthorizationPlanningPanel(JPanel):
         self.cancel_button.setEnabled(False)
         self.cancel_button.setText(u'Cancel')
         self.clear_button.setEnabled(True)
+        self.export_button.setEnabled(self._last_result is not None)
+        self.annotate_button.setEnabled(self._last_result is not None)
         self.scope_only_checkbox.setEnabled(True)
         self.destination_rules_field.setEnabled(True)
         self.progress.setIndeterminate(False)
@@ -759,6 +783,9 @@ class AuthorizationPlanningPanel(JPanel):
         self.progress.setString(u'Stopping after current packet...')
 
     def _build_finished(self, result, cancelled, start, end, prepared_v2=None, scope_only=False):
+        # _restore_buttonsは_last_resultを見てExport/Comment操作の有効状態を決める。
+        # 先に結果を保持しないと、別タブ表示中の完了後も無効のまま残る。
+        self._last_result = result
         self._restore_buttons()
         operations = result.get('operations') or []
         sessions = result.get('sessions') or []
@@ -808,6 +835,100 @@ class AuthorizationPlanningPanel(JPanel):
                         (len(operations), len(plan_rows), len(resources), self._range_label(start, end),
                          scope_text,
                          u' (cancelled; partial)' if cancelled else u''))
+
+    def _csv_text(self, value):
+        value = _text(value)
+        try:
+            return value.encode('utf-8') if isinstance(value, unicode) else str(value)
+        except NameError:
+            return value
+
+    def _on_export_csv(self, event):
+        if not self._last_result:
+            self.status_label.setText(u'Build the planning catalog before exporting CSV.')
+            return
+        chooser = JFileChooser()
+        chooser.setSelectedFile(File('authorization_planning_for_aura.csv'))
+        if chooser.showSaveDialog(self) != JFileChooser.APPROVE_OPTION:
+            return
+        path = chooser.getSelectedFile().getAbsolutePath()
+        self.export_button.setEnabled(False)
+        self.export_button.setText(u'Exporting...')
+        self.status_label.setText(u'Exporting planning catalog CSV in the background...')
+        worker = Thread(target=self._export_csv_worker, args=(path, self._last_result))
+        worker.setDaemon(True)
+        worker.start()
+
+    def _export_csv_worker(self, path, result):
+        try:
+            rows = authorization_planning_engine.export_rows(result)
+            columns = [u'Record Type', u'Packet No', u'Host', u'Method', u'Path', u'Protocol',
+                       u'Traffic Class', u'Origin', u'Origin Detail', u'Operation', u'Descriptor', u'Group', u'Status',
+                       u'Representative Packet No', u'Exact Duplicate Packet Nos', u'Test Variants',
+                       u'Duplicate Groups', u'Deduplication']
+            handle = open(path, 'wb')
+            try:
+                # Excel等でも日本語列名・値をUTF-8として開けるようBOMを付ける。
+                handle.write(codecs.BOM_UTF8)
+                writer = csv.writer(handle)
+                writer.writerow([self._csv_text(column) for column in columns])
+                for row in rows:
+                    writer.writerow([self._csv_text(row.get(column, u'')) for column in columns])
+            finally:
+                handle.close()
+            SwingUtilities.invokeLater(_UiRunnable(
+                lambda: self._export_csv_finished(path, len(rows), None)))
+        except Exception as error:
+            SwingUtilities.invokeLater(_UiRunnable(
+                lambda caught=error: self._export_csv_finished(path, 0, caught)))
+
+    def _export_csv_finished(self, path, count, error):
+        self.export_button.setEnabled(self._last_result is not None)
+        self.export_button.setText(u'Export CSV...')
+        if error is None:
+            self.status_label.setText(u'Exported %d analysis row(s) to CSV.' % count)
+            if self.log_fn:
+                self.log_fn(u'Authorization Planning: exported %d CSV row(s) to %s' % (count, path))
+        else:
+            message = u'Authorization Planning CSV export failed: ' + _text(error)
+            self.status_label.setText(message)
+            if self.error_fn:
+                self.error_fn(u'Authorization Planning', message)
+
+    def _on_annotate_comments(self, event):
+        if not self._last_result:
+            self.status_label.setText(u'Build the planning catalog before adding comment tags.')
+            return
+        self.annotate_button.setEnabled(False)
+        self.annotate_button.setText(u'Adding tags...')
+        self.status_label.setText(u'Adding Authorization Planning tags to analyzed Packet comments in the background...')
+        worker = Thread(target=self._annotate_comments_worker, args=(self._last_result,))
+        worker.setDaemon(True)
+        worker.start()
+
+    def _annotate_comments_worker(self, result):
+        try:
+            updated, skipped = authorization_planning_engine.apply_packet_comment_annotations(result)
+            SwingUtilities.invokeLater(_UiRunnable(
+                lambda: self._annotate_comments_finished(updated, skipped, None)))
+        except Exception as error:
+            SwingUtilities.invokeLater(_UiRunnable(
+                lambda caught=error: self._annotate_comments_finished(0, 0, caught)))
+
+    def _annotate_comments_finished(self, updated, skipped, error):
+        self.annotate_button.setEnabled(self._last_result is not None)
+        self.annotate_button.setText(u'Add planning tags to comments')
+        if error is None:
+            self.status_label.setText(
+                u'Updated planning tags on %d Packet comment(s)%s.' %
+                (updated, (u'; %d packet(s) skipped' % skipped) if skipped else u''))
+            if self.log_fn:
+                self.log_fn(u'Authorization Planning: updated %d Packet comment(s)' % updated)
+        else:
+            message = u'Authorization Planning comment annotation failed: ' + _text(error)
+            self.status_label.setText(message)
+            if self.error_fn:
+                self.error_fn(u'Authorization Planning', message)
 
     def _build_failed(self, error):
         self._restore_buttons()
@@ -895,7 +1016,8 @@ class AuthorizationPlanningPanel(JPanel):
                 _text(entry.get('destination_confidence')), _text(entry.get('destination_source')),
                 _join(entry.get('observed_groups') or entry.get('groups')),
                 _join(entry.get('traffic_classes') or entry.get('traffic_class')), _text(entry.get('origin')),
-                _text(entry.get('origin_confidence')), _text(entry.get('origin_reason')),
+                _text(entry.get('origin_category')), _text(entry.get('origin_confidence')),
+                _text(entry.get('origin_reason')),
                 _text(entry.get('host')), _text(entry.get('method')), _text(entry.get('path')),
                 operation, _text(entry.get('calling_descriptor')), _text(entry.get('behavior')),
                 _text(entry.get('data_interaction')), _text(entry.get('data_interaction_confidence')),
@@ -1375,6 +1497,9 @@ class AuthorizationPlanningPanel(JPanel):
                       self.plan_model, self.session_model, self.gap_model, self.resource_model):
             model.set_rows([])
         self._packet_items = {}
+        self._last_result = None
+        self.export_button.setEnabled(False)
+        self.annotate_button.setEnabled(False)
         self.find_field.setText(u'')
         for binding in self._local_filter_bindings:
             binding.field.setText(u'')

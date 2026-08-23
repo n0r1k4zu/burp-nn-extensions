@@ -81,7 +81,9 @@ def _is_statistics_label(label):
     lowered = compact.lower()
     return (compact.startswith(u'集約対象') or lowered in (
         u'webscreen', u'webpart', u'spascreen', u'spaupdate', u'aggregationtarget') or
-        lowered.startswith(u'mytools:statistics:'))
+        lowered.startswith(u'mytools:statistics:') or
+        lowered.startswith(u'trafficclass=') or lowered.startswith(u'category=') or
+        lowered.startswith(u'protocol='))
 
 
 def _strip_statistics_tags(comment):
@@ -325,6 +327,156 @@ def summary_rows(records):
     return rows
 
 
+def _v2_origin_category(path, body):
+    """Statistics2用の5分類。通信から確定できないものは安全側でUnknown。"""
+    lowered_path = (path or u'').lower()
+    if lowered_path.startswith(u'/services/apexrest/'):
+        return u'ApexREST'
+    if (lowered_path.startswith(u'/services/data/') or lowered_path.startswith(u'/services/connect/') or
+            lowered_path.startswith(u'/services/async/') or lowered_path.startswith(u'/services/soap/')):
+        return u'SalesforceREST'
+    if u'message=' not in (body or u'').lower():
+        return u'Unknown'
+    message = u''
+    for pair in (body or u'').split(u'&'):
+        key, separator, value = pair.partition(u'=')
+        if separator and key == u'message':
+            message = unquote_plus(value)
+            break
+    try:
+        actions = json.loads(message).get('actions', [])
+    except Exception:
+        actions = []
+    categories = set()
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        descriptor = to_display_text(action.get('descriptor', u''))
+        scheme, separator, controller = descriptor.partition(u'://')
+        if not separator:
+            continue
+        lowered_scheme = scheme.lower()
+        lowered_controller = controller.lower()
+        if lowered_scheme == u'apex':
+            categories.add(u'Apexカスタム')
+        elif lowered_scheme in (u'aura', u'servicecomponent'):
+            if lowered_controller.endswith(u'apexactioncontroller/action$execute'):
+                params = action.get('params') or {}
+                class_name = to_display_text(params.get('classname') or params.get('apexClass') or
+                                              params.get('className') or u'')
+                if class_name:
+                    categories.add(u'Apexカスタム')
+                else:
+                    categories.add(u'Unknown')
+            else:
+                categories.add(u'Salesforce標準')
+    if len(categories) == 1:
+        return next(iter(categories))
+    return u'Unknown'
+
+
+def _v2_protocol(path, body, response, response_mime, traffic_class):
+    lowered_path = (path or u'').lower()
+    lowered_body = (body or u'').lower()
+    lowered_response = (response or u'').lower()
+    mime = (response_mime or u'').lower()
+    if traffic_class == SPA_UPDATE:
+        return u'Aura'
+    if u'graphql' in lowered_path or u'"query"' in lowered_body or u'query{' in lowered_body:
+        return u'GraphQL'
+    if u'/ui-api/' in lowered_path or u'/uiapi/' in lowered_path:
+        return u'UI API'
+    if (lowered_path.startswith(u'/services/') or lowered_path.startswith(u'/api/') or
+            u'/rest/' in lowered_path or u'json' in mime or u'json' in lowered_body):
+        return u'REST'
+    if any(lowered_path.endswith(u'.' + extension) for extension in _STATIC_EXTS):
+        return u'File'
+    if u'html' in mime or u'<html' in lowered_response:
+        return u'Web'
+    return u'Other'
+
+
+def analyze_history_v2(callbacks, helpers, start_packet_no=None, end_packet_no=None, cancel_check=None):
+    """Statisticsの集約規則を保ったままTraffic Class/Category/Protocolを付与する。"""
+    records = analyze_history(callbacks, helpers, start_packet_no, end_packet_no, cancel_check)
+    for record in records:
+        response = _text(helpers, record['item'].getResponse())
+        response_mime = _header(_headers(response), 'Content-Type')
+        record['traffic_class'] = record['class']
+        record['category'] = _v2_origin_category(record['path'], record['body'])
+        record['protocol'] = _v2_protocol(record['path'], record['body'], response,
+                                          response_mime, record['traffic_class'])
+    return records
+
+
+def summary_rows_v2(records):
+    """Traffic Class × Category × Protocol単位で、集約前後の件数を返す。"""
+    grouped = {}
+    for record in records:
+        traffic_class = record.get('traffic_class') or record.get('class') or API
+        key = (traffic_class, record.get('category') or u'Unknown', record.get('protocol') or u'Other')
+        current = grouped.setdefault(key, {'traffic_class': traffic_class, 'category': key[1],
+                                           'protocol': key[2], 'including_aggregated': 0,
+                                           'excluding_aggregated': 0,
+                                           'definition': _v2_definition(traffic_class, key[1], key[2])})
+        current['including_aggregated'] += 1
+        if record.get('agg_role') != u'target':
+            current['excluding_aggregated'] += 1
+    return sorted(grouped.values(), key=lambda row: (
+        CLASS_ORDER.index(row['traffic_class']) if row['traffic_class'] in CLASS_ORDER else len(CLASS_ORDER),
+        row['category'], row['protocol']))
+
+
+_CATEGORY_DEFINITIONS_V2 = {
+    u'Salesforce標準': u'Salesforce標準機能・標準Aura actionと推定。',
+    u'Apexカスタム': u'組織または管理パッケージのApex actionと推定。',
+    u'ApexREST': u'/services/apexrest/ のApex REST endpoint。',
+    u'SalesforceREST': u'/services/data/等のSalesforce REST API。',
+    u'Unknown': u'通信だけではSalesforce/Apex由来を確定できない。',
+}
+_PROTOCOL_DEFINITIONS_V2 = {
+    u'Aura': u'Aura message/contextを使う通信。',
+    u'GraphQL': u'GraphQL queryまたはmutationを含む通信。',
+    u'UI API': u'Salesforce UI API endpoint。',
+    u'REST': u'JSON中心のREST形式通信。',
+    u'Web': u'HTML画面の取得。',
+    u'File': u'静的ファイル・メディアの取得。',
+    u'Other': u'上記のプロトコルを判定できない通信。',
+}
+
+_TRAFFIC_CLASS_SHORT_V2 = {
+    WEB_SCREEN: u'Web画面',
+    WEB_PART: u'画面部品',
+    SPA_SCREEN: u'SPA画面',
+    SPA_UPDATE: u'SPA更新',
+    API: u'API通信',
+}
+_CATEGORY_SHORT_V2 = {
+    u'Salesforce標準': u'Salesforce標準（推定）',
+    u'Apexカスタム': u'Apexカスタム（推定）',
+    u'ApexREST': u'Apex REST',
+    u'SalesforceREST': u'Salesforce REST',
+    u'Unknown': u'由来不明',
+}
+_PROTOCOL_SHORT_V2 = {
+    u'Aura': u'Aura通信',
+    u'GraphQL': u'GraphQL通信',
+    u'UI API': u'UI API通信',
+    u'REST': u'REST通信',
+    u'Web': u'Web通信',
+    u'File': u'静的ファイル',
+    u'Other': u'その他の通信',
+}
+
+
+def _v2_definition(traffic_class, category, protocol):
+    """Statistics2の集計行を短い自然な説明にする。"""
+    return u' / '.join((
+        _PROTOCOL_SHORT_V2.get(protocol, u'通信形式不明'),
+        _TRAFFIC_CLASS_SHORT_V2.get(traffic_class, u'分類不明'),
+        _CATEGORY_SHORT_V2.get(category, u'由来不明')))
+
+
 def _leading_number(comment):
     match = _LEADING_NUMBER_RE.match(comment or '')
     return match.group(1) if match else None
@@ -335,6 +487,13 @@ def _append_tag(comment, tag):
     if marker in (comment or ''):
         return comment or u''
     return ((comment or u'').rstrip() + (u' ' if comment else u'') + marker)
+
+
+def _prepend_tags(comment, tags):
+    """Statistics2のタグを既存Commentの先頭へ、順序を保って挿入する。"""
+    prefix = u' '.join(u'[%s]' % tag for tag in tags if tag)
+    text = (comment or u'').strip()
+    return prefix + (u' ' + text if prefix and text else text)
 
 
 def group_names(comment):
@@ -380,6 +539,60 @@ def annotate_analysis(records, add_class_tags=False, add_aggregation_tags=False,
             record['item'].setHighlight(color_name)
             colored += 1
     return updated, colored
+
+
+def annotate_analysis_v2(records, add_dimension_tags=True, add_aggregation_tags=False,
+                        clear_comments_first=False, color_targets=False, color_name='gray'):
+    """Statistics2用注釈。3軸タグと集約タグを既存Commentの先頭へ追加する。"""
+    updated = colored = 0
+    original_numbers = dict((record['packet_no'], _leading_number(_comment_text(record['item'].getComment() or u'')))
+                            for record in records)
+    for record in records:
+        old = _comment_text(record['item'].getComment() or u'')
+        comment = u'' if clear_comments_first else _strip_statistics2_dimension_tags(old)
+        tags = []
+        if add_dimension_tags:
+            tags.extend((u'Protocol=%s' % (record.get('protocol') or u'Other'),
+                         u'Traffic Class=%s' % (record.get('traffic_class') or record.get('class') or API),
+                         u'Category=%s' % (record.get('category') or u'Unknown')))
+        if add_aggregation_tags and record['agg_role'] == u'target':
+            representative = record['agg_rep']
+            rep_number = original_numbers.get(representative['packet_no']) if representative else None
+            tags.append(u'集約対象_集約先No%s' % rep_number if rep_number else
+                        (u'集約対象_集約先PacketNo%s' % representative['packet_no']
+                         if representative else u'集約対象'))
+        comment = _prepend_tags(comment, tags) if tags else comment
+        if comment != old:
+            record['item'].setComment(comment)
+            updated += 1
+        if color_targets and record['agg_role'] == u'target':
+            record['item'].setHighlight(color_name)
+            colored += 1
+    return updated, colored
+
+
+def _strip_statistics2_dimension_tags(comment):
+    """Statistics2自身が生成した3軸タグだけを差し替え前に除去する。"""
+    labels = (u'trafficclass=', u'category=', u'protocol=')
+    out = []
+    cursor = 0
+    while cursor < len(comment):
+        start = comment.find(u'[', cursor)
+        if start == -1:
+            out.append(comment[cursor:])
+            break
+        end = comment.find(u']', start + 1)
+        if end == -1:
+            out.append(comment[cursor:])
+            break
+        label = comment[start + 1:end]
+        compact = u''.join(label.strip().split()).lower()
+        if any(compact.startswith(prefix) for prefix in labels):
+            out.append(comment[cursor:start])
+        else:
+            out.append(comment[cursor:end + 1])
+        cursor = end + 1
+    return u''.join(out).strip()
 
 
 def clear_analysis_annotations(callbacks, start_packet_no=None, end_packet_no=None):

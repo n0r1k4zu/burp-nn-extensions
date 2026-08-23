@@ -21,48 +21,59 @@ class _UiRunnable(Runnable):
 
 class _SummaryModel(AbstractTableModel):
     COLUMNS = ['Class', 'Packets (including aggregation)', 'Packets (excluding aggregation)', 'Definition']
-    def __init__(self):
+    COLUMNS_V2 = ['Protocol', 'Traffic Class', 'Category', 'Packets (including aggregation)',
+                  'Packets (excluding aggregation)', 'Definition']
+    def __init__(self, statistics2=False):
         AbstractTableModel.__init__(self)
         self.rows = []
+        self.statistics2 = statistics2
     def set_rows(self, rows):
         self.rows = rows
         self.fireTableDataChanged()
     def getRowCount(self): return len(self.rows)
-    def getColumnCount(self): return len(self.COLUMNS)
-    def getColumnName(self, col): return self.COLUMNS[col]
-    def getColumnClass(self, col): return Integer if col in (1, 2) else str
+    def getColumnCount(self): return len(self.COLUMNS_V2 if self.statistics2 else self.COLUMNS)
+    def getColumnName(self, col): return (self.COLUMNS_V2 if self.statistics2 else self.COLUMNS)[col]
+    def getColumnClass(self, col): return Integer if col in ((3, 4) if self.statistics2 else (1, 2)) else str
     def getValueAt(self, row, col):
         data = self.rows[row]
+        if self.statistics2:
+            return [data['protocol'], data['traffic_class'], data['category'],
+                    Integer(data['including_aggregated']), Integer(data['excluding_aggregated']),
+                    data['definition']][col]
         return [data['class'], Integer(data['including_aggregated']),
                 Integer(data['excluding_aggregated']), data['definition']][col]
 
 
 class StatisticsPanel(JPanel):
-    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None):
+    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None, statistics2=False):
         JPanel.__init__(self, BorderLayout())
         self.callbacks = callbacks
         self.helpers = helpers
         self.log_fn = log_fn
         self.error_fn = error_fn
+        self.statistics2 = statistics2
+        self.title = 'Statistics' if statistics2 else 'Statistics_old'
         self.records = []
         self._worker = None
 
         top = JPanel(); top.setLayout(BoxLayout(top, BoxLayout.Y_AXIS))
 
         build_section = JPanel(FlowLayout(FlowLayout.LEFT))
-        build_section.setBorder(BorderFactory.createTitledBorder('1. Build statistics'))
+        build_section.setBorder(BorderFactory.createTitledBorder('1. Build %s' % self.title))
         build_section.add(JLabel('Packet No range:'))
         self.start_field = JTextField(6); build_section.add(self.start_field)
         build_section.add(JLabel('to'))
         self.end_field = JTextField(6); build_section.add(self.end_field)
         build_section.add(JButton('All', actionPerformed=self._on_all))
-        self.build_button = JButton('Build statistics', actionPerformed=self._on_build); build_section.add(self.build_button)
-        self._build_button_text = 'Build statistics'
+        self.build_button = JButton('Build %s' % self.title, actionPerformed=self._on_build); build_section.add(self.build_button)
+        self._build_button_text = 'Build %s' % self.title
         top.add(build_section)
 
         annotation_section = JPanel(); annotation_section.setLayout(BoxLayout(annotation_section, BoxLayout.Y_AXIS))
         annotation_section.setBorder(BorderFactory.createTitledBorder('2. Annotation options'))
-        self.add_class = JCheckBox('Add class [tag] to comments', True); annotation_section.add(self.add_class)
+        class_label = ('Add Protocol / Traffic Class / Category [tags] to comments'
+                       if statistics2 else 'Add class [tag] to comments')
+        self.add_class = JCheckBox(class_label, True); annotation_section.add(self.add_class)
         self.add_agg = JCheckBox('Add aggregation [tag] to comments', True); annotation_section.add(self.add_agg)
         color_row = JPanel(FlowLayout(FlowLayout.LEFT))
         self.color_targets = JCheckBox('Color aggregation targets', False); color_row.add(self.color_targets)
@@ -81,17 +92,19 @@ class StatisticsPanel(JPanel):
         top.add(apply_section)
         self.add(top, BorderLayout.NORTH)
 
-        self.model = _SummaryModel()
+        self.model = _SummaryModel(statistics2)
         self.table = JTable(self.model)
         center = JPanel(BorderLayout())
         center.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0))
         center.add(JScrollPane(self.table), BorderLayout.CENTER)
-        definitions = JLabel('Definitions: Web screen = non-SPA HTML; web part = static asset; '
-                             'SPA screen = SPA bootstrap HTML; SPA update = Aura message/context; API = other API-like traffic. '
-                             'Aggregation groups adjacent Aura updates with the same key.')
+        definitions = JLabel(
+            ('Protocol = Aura/GraphQL/UI API/REST/Web/File/Other; Traffic Class = Web screen/web part/SPA screen/SPA update/API; '
+             'Category = Salesforce標準/Apexカスタム/ApexREST/SalesforceREST/Unknown. ' if statistics2 else
+             'Definitions: Web screen = non-SPA HTML; web part = static asset; SPA screen = SPA bootstrap HTML; SPA update = Aura message/context; API = other API-like traffic. ') +
+            'Aggregation groups adjacent Aura updates with the same key.')
         center.add(definitions, BorderLayout.SOUTH)
         self.add(center, BorderLayout.CENTER)
-        self.status = JLabel('Build statistics for a Packet No range or All. Use Numbering & Grouping for comment annotations.')
+        self.status = JLabel('Build %s for a Packet No range or All. Use Numbering & Grouping for comment annotations.' % self.title)
         self.add(self.status, BorderLayout.SOUTH)
 
     def _range(self):
@@ -119,7 +132,7 @@ class StatisticsPanel(JPanel):
         self._worker = True
         self.build_button.setEnabled(False); self.apply_button.setEnabled(False)
         self.clear_annotations_button.setEnabled(False)
-        self.build_button.setText('Building...' if label == 'Building statistics' else 'Build statistics')
+        self.build_button.setText('Building...' if label == 'Building %s' % self.title else self._build_button_text)
         self.apply_button.setText('Applying...' if label == 'Applying annotations' else 'Apply selected annotations')
         self.clear_annotations_button.setText('Clearing...' if label == 'Clearing annotations' else 'Clear annotations')
         self.status.setText(label + ' (background)...')
@@ -136,11 +149,11 @@ class StatisticsPanel(JPanel):
         self._restore_operation_buttons()
         if finish: finish(result)
         else: self.status.setText('%s complete: %s.' % (label, result))
-        if self.log_fn: self.log_fn('Statistics: %s complete: %s.' % (label, result))
+        if self.log_fn: self.log_fn('%s: %s complete: %s.' % (self.title, label, result))
 
     def _failed(self, label, error):
         self._worker = None; self._restore_operation_buttons(); self.status.setText('%s failed: %s' % (label, error))
-        if self.error_fn: self.error_fn('Statistics', '%s failed: %s' % (label, error))
+        if self.error_fn: self.error_fn(self.title, '%s failed: %s' % (label, error))
 
     def _restore_operation_buttons(self):
         self.build_button.setEnabled(True); self.build_button.setText(self._build_button_text)
@@ -150,20 +163,25 @@ class StatisticsPanel(JPanel):
     def _on_build(self, event):
         start, end = self._range()
         if end == 'error': return
-        self._run('Building statistics', lambda: statistics_engine.analyze_history(self.callbacks, self.helpers, start, end),
+        analyzer = statistics_engine.analyze_history_v2 if self.statistics2 else statistics_engine.analyze_history
+        self._run('Building %s' % self.title, lambda: analyzer(self.callbacks, self.helpers, start, end),
                   lambda records: self._set_records(records, start, end))
 
     def _set_records(self, records, start, end):
-        self.records = records; self.model.set_rows(statistics_engine.summary_rows(records))
+        self.records = records
+        self.model.set_rows(statistics_engine.summary_rows_v2(records) if self.statistics2 else
+                            statistics_engine.summary_rows(records))
         targets = len([record for record in records if record['agg_role'] == u'target'])
         scope = 'all HTTP History' if start is None and end is None else 'selected range'
-        self.status.setText('%d packet(s) analyzed in %s; %d aggregation target(s).' % (len(records), scope, targets))
+        self.status.setText('%s: %d packet(s) analyzed in %s; %d aggregation target(s).' %
+                            (self.title, len(records), scope, targets))
 
     def _on_apply(self, event):
         if not self.records:
             self.status.setText('Build statistics before applying annotations.')
             return
-        self._run('Applying annotations', lambda: statistics_engine.annotate_analysis(
+        annotator = statistics_engine.annotate_analysis_v2 if self.statistics2 else statistics_engine.annotate_analysis
+        self._run('Applying annotations', lambda: annotator(
             self.records, self.add_class.isSelected(), self.add_agg.isSelected(), False,
             self.color_targets.isSelected(), str(self.color_combo.getSelectedItem())))
 
@@ -179,3 +197,9 @@ class StatisticsPanel(JPanel):
             return
         self._run('Clearing annotations', lambda: statistics_engine.clear_analysis_annotations(
             self.callbacks, start, end))
+
+
+class Statistics2Panel(StatisticsPanel):
+    """Protocol × Traffic Class × Origin Categoryで集計するStatistics。"""
+    def __init__(self, callbacks, helpers, log_fn=None, error_fn=None):
+        StatisticsPanel.__init__(self, callbacks, helpers, log_fn, error_fn, statistics2=True)

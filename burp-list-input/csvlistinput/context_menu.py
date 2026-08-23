@@ -186,7 +186,7 @@ class _ExportPacketInsertionPointsAction(ActionListener):
 
 
 class _ExportPacketInsertionPointsWithStatisticsAction(ActionListener):
-    """Number, annotate, then export only the selected HTTP History items."""
+    """現在のStatistics注釈を付けて、選択したHistoryだけをExportする。"""
     def __init__(self, callbacks, helpers, messages, log_fn, error_fn):
         self.callbacks = callbacks
         self.helpers = helpers
@@ -202,20 +202,18 @@ class _ExportPacketInsertionPointsWithStatisticsAction(ActionListener):
         try:
             # Keep the exact original Java/Python comment value.  If the user
             # chooses cleanup after a successful export, restoration is safer
-            # than trying to infer which old number/tag was already present.
+            # than trying to infer which user-written comment/tag was present.
             original_comments = [(message, message.getComment()) for message in self.messages]
-            # The Numbering & Grouping tab's defaults are Start=1, Digits=4.
-            numbered = statistics_engine.number_selected(self.messages, 1, 4)
             selected_numbers = set(no for no in insertion_point_export._packet_numbers(
                 self.callbacks, self.messages) if no != '')
             # Build aggregation against the whole History so an Aura target
             # selected alone still receives the same classification/role it
             # has in the Statistics tab.  Only selected records are changed.
-            all_records = statistics_engine.analyze_history(self.callbacks, self.helpers)
+            all_records = statistics_engine.analyze_history_v2(self.callbacks, self.helpers)
             selected_records = [record for record in all_records
                                 if record['packet_no'] in selected_numbers]
-            annotated, _colored = statistics_engine.annotate_analysis(
-                selected_records, add_class_tags=True, add_aggregation_tags=True)
+            annotated, _colored = statistics_engine.annotate_analysis_v2(
+                selected_records, add_dimension_tags=True, add_aggregation_tags=True)
 
             def report_detection_error(message):
                 if self.log_fn:
@@ -224,9 +222,9 @@ class _ExportPacketInsertionPointsWithStatisticsAction(ActionListener):
             rows = insertion_point_export.build_rows(
                 self.callbacks, self.helpers, self.messages, on_error=report_detection_error)
             insertion_point_export.write_csv(chooser.getSelectedFile().getAbsolutePath(), rows)
-            message = ('Numbered %d and added Statistics tags to %d selected packet(s); '
+            message = ('Added current Statistics tags to %d selected packet(s); '
                        'exported %d insertion point row(s).'
-                       % (numbered, annotated, len(rows)))
+                       % (annotated, len(rows)))
             if self.log_fn:
                 self.log_fn('Export Packet & Insertion Point with Statistics comment: ' + message)
             JOptionPane.showMessageDialog(
@@ -234,7 +232,7 @@ class _ExportPacketInsertionPointsWithStatisticsAction(ActionListener):
                 JOptionPane.INFORMATION_MESSAGE)
             cleanup = JOptionPane.showConfirmDialog(
                 None,
-                'Remove the numbering and Statistics comments added for this export?\n'
+                'Remove the Statistics comments added for this export?\n'
                 'Yes restores each selected packet comment to its state before this export.\n'
                 'No keeps the added comments.',
                 'MyTools: Keep or remove export comments',

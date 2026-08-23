@@ -64,6 +64,8 @@ _OBJECT_PARAMETER_NAMES = set([
 # 通信ごとに変わっても業務上の操作を表さないAura値。重複候補の照合では除外する。
 # recordId等の業務パラメータは除外しないため、別レコードへの操作を誤って重複扱いにしない。
 _DEDUP_VOLATILE_FORM_KEYS = set([u'aura.context', u'aura.token'])
+_PLANNING_COMMENT_TAG_RE = re.compile(
+    r'(?:^|\s)\[AP:(?:Protocol|TrafficClass|Origin|Duplicate)=[^\]]*\]')
 
 
 def parse_destination_rules(text):
@@ -712,6 +714,24 @@ def _origin(descriptor, params=None):
     if scheme == u'apex':
         return _origin_for_apex_class(controller)
     return (u'Unknown', u'low', u'descriptor scheme is missing or not recognized')
+
+
+def _origin_category(origin, path):
+    """表示を簡潔にする5分類。詳細なOrigin値は別に保持する。"""
+    lowered_path = (_display(path) or u'').lower()
+    if lowered_path.startswith(u'/services/apexrest/'):
+        return u'ApexREST'
+    if (lowered_path.startswith(u'/services/data/') or
+            lowered_path.startswith(u'/services/connect/') or
+            lowered_path.startswith(u'/services/async/') or
+            lowered_path.startswith(u'/services/soap/')):
+        return u'SalesforceREST'
+    origin = _display(origin)
+    if origin == u'Salesforce Standard':
+        return u'Salesforce標準'
+    if origin in (u'Org Custom Apex', u'Managed or Namespaced Apex'):
+        return u'Apexカスタム'
+    return u'Unknown'
 
 
 def _generic_apex_operation(params, fallback):
@@ -1732,6 +1752,7 @@ def _finalize_operation(operation, resources):
     operation['app_ids'] = sorted(operation.pop('_app_ids'))
     operation['aura_endpoints'] = sorted(operation.pop('_aura_endpoints'))
     operation['salesforce_features'] = sorted(operation.pop('_salesforce_features'))
+    operation['origin_category'] = _origin_category(operation.get('origin'), operation.get('path'))
     return operation
 
 
@@ -2105,6 +2126,111 @@ def _annotate_exact_duplicates(packets, operations):
         packet['deduplication'] = details_by_packet.get(packet.get('packet_no'), [])
         packet.pop('_dedup_signature', None)
     return duplicate_count
+
+
+def packet_annotation_rows(result):
+    """Packet Commentへ追記する受動解析の要約を作る。"""
+    operations = dict((operation.get('operation_id'), operation)
+                      for operation in (result.get('operations') or []))
+    rows = []
+    for packet in result.get('packets') or []:
+        origins = []
+        origin_categories = []
+        for operation_id in packet.get('operation_ids') or []:
+            operation = operations.get(operation_id) or {}
+            origin = _display(operation.get('origin'))
+            if origin and origin not in origins:
+                origins.append(origin)
+            category = _display(operation.get('origin_category'))
+            if category and category not in origin_categories:
+                origin_categories.append(category)
+        details = packet.get('deduplication') or []
+        representatives = sorted(set(
+            _display(detail.get('representative_packet_no')) for detail in details
+            if _display(detail.get('status')) == u'Exact duplicate' and
+            detail.get('representative_packet_no') not in (None, u'', '')))
+        duplicate = (u'Yes;RepresentativePacketNo=' + u','.join(representatives)
+                     if representatives else u'No')
+        rows.append({
+            'packet_no': packet.get('packet_no'), 'item': packet.get('item'),
+            'protocol': _display(packet.get('protocol_kind')),
+            'traffic_class': _display(packet.get('traffic_class')),
+            'origin': u' | '.join(origins) if origins else u'Unknown',
+            'origin_category': u' | '.join(origin_categories) if origin_categories else u'Unknown',
+            'duplicate': duplicate,
+        })
+    return rows
+
+
+def apply_packet_comment_annotations(result):
+    """既存Commentを保持し、Authorization Planningの4タグだけを更新する。"""
+    updated = skipped = 0
+    for row in packet_annotation_rows(result):
+        item = row.get('item')
+        if item is None:
+            skipped += 1
+            continue
+        try:
+            old = _display(item.getComment() or u'')
+            # 再適用時に当機能の古い値だけを置換し、Group等のユーザーCommentは残す。
+            base = _PLANNING_COMMENT_TAG_RE.sub(u'', old)
+            base = re.sub(r'[ \t]{2,}', u' ', base).strip()
+            tags = [u'[AP:Protocol=%s]' % row['protocol'],
+                    u'[AP:TrafficClass=%s]' % row['traffic_class'],
+                    u'[AP:Origin=%s]' % row['origin_category'],
+                    u'[AP:Duplicate=%s]' % row['duplicate']]
+            # 認可計画の判定タグを先頭へ固定し、既存のGroup・採番・手入力Commentは
+            # その後ろへ残す。再適用してもAPタグの位置・数は安定する。
+            new = u' '.join(tags) + (u' ' + base if base else u'')
+            if new != old:
+                item.setComment(new)
+                updated += 1
+        except Exception:
+            skipped += 1
+    return updated, skipped
+
+
+def export_rows(result):
+    """CSV用のOperation／Packet一覧。秘密値・生Request/Responseは含めない。"""
+    rows = []
+    for operation in result.get('operations') or []:
+        rows.append({
+            'Record Type': u'Operation', 'Packet No': u','.join([_display(number) for number in operation.get('packet_nos') or []]),
+            'Host': _display(operation.get('host')), 'Method': _display(operation.get('method')),
+            'Path': _display(operation.get('path')), 'Protocol': _display(operation.get('protocol_kind')),
+            'Traffic Class': u' | '.join(operation.get('traffic_classes') or []),
+            'Origin': _display(operation.get('origin_category')),
+            'Origin Detail': _display(operation.get('origin')),
+            'Operation': _display(operation.get('operation_name')),
+            'Descriptor': _display(operation.get('descriptor')), 'Group': u' | '.join(operation.get('observed_groups') or []),
+            'Status': u','.join([_display(value) for value in operation.get('status_codes') or []]),
+            'Representative Packet No': _display(operation.get('representative_packet_no')),
+            'Exact Duplicate Packet Nos': u','.join([_display(value) for value in operation.get('exact_duplicate_packet_nos') or []]),
+            'Test Variants': _display(operation.get('test_variants')),
+            'Duplicate Groups': _display(len(operation.get('deduplication_groups') or [])),
+            'Deduplication': u'',
+        })
+    annotations = dict((row.get('packet_no'), row) for row in packet_annotation_rows(result))
+    for packet in result.get('packets') or []:
+        annotation = annotations.get(packet.get('packet_no'), {})
+        details = packet.get('deduplication') or []
+        rows.append({
+            'Record Type': u'Packet', 'Packet No': _display(packet.get('packet_no')),
+            'Host': _display(packet.get('host')), 'Method': _display(packet.get('method')),
+            'Path': _display(packet.get('normalized_path') or packet.get('path')),
+            'Protocol': _display(packet.get('protocol_kind')),
+            'Traffic Class': _display(packet.get('traffic_class')),
+            'Origin': _display(annotation.get('origin_category')),
+            'Origin Detail': _display(annotation.get('origin')),
+            'Operation': u' | '.join(packet.get('operation_ids') or []),
+            'Descriptor': u'', 'Group': u' | '.join(packet.get('groups') or []),
+            'Status': _display(packet.get('status')), 'Representative Packet No': u','.join(sorted(set(
+                _display(detail.get('representative_packet_no')) for detail in details
+                if detail.get('representative_packet_no') not in (None, u'', '')))),
+            'Exact Duplicate Packet Nos': u'', 'Test Variants': u'', 'Duplicate Groups': u'',
+            'Deduplication': _display(annotation.get('duplicate')),
+        })
+    return rows
 
 
 def _build_salesforce_feature_catalog(operations):
