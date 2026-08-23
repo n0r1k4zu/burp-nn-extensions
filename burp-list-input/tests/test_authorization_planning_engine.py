@@ -185,6 +185,36 @@ class AuthorizationPlanningEngineTest(unittest.TestCase):
             row['representative_action_id'] for row in result['operations']))
         self.assertIn(standard['origin_confidence'], (u'low', u'medium', u'high'))
 
+    def test_aura_cmp_def_query_is_retained_in_operation_catalog_path(self):
+        """GET auraCmpDefはqueryの_defを捨てず、定義ごとにCatalogへ出す。"""
+        item = _Item(
+            _request(u'GET',
+                     u'/cst/s/sfsites/auraCmpDef?aura.app=markup%3A%2F%2Fsiteforce%3AcommunityApp'
+                     u'&_def=markup%3A%2F%2Fc%3AloanWizard'),
+            _response(body=u'$A.componentService.addComponent({})', content_type=u'text/javascript'))
+        result = self._analyze([item])
+        operation = result['operations'][0]
+        expected_path = u'/cst/s/sfsites/auraCmpDef?_def=markup://c:loanWizard'
+        self.assertEqual(expected_path, operation['path'])
+        self.assertEqual(u'Aura component definition: markup://c:loanWizard',
+                         operation['operation_name'])
+        self.assertIn(u'markup://siteforce:communityApp', operation['app_ids'])
+        self.assertEqual(u'/cst/s/sfsites/auraCmpDef', result['packets'][0]['path'])
+
+    def test_aura_cmp_def_literal_markup_url_in_query_is_not_absolute_request_target(self):
+        """_def内の`://`をabsolute-form URLと誤認しない。"""
+        item = _Item(
+            _request(u'GET',
+                     u'/cst/s/sfsites/auraCmpDef?aura.app=markup://siteforce:communityApp'
+                     u'&_def=markup://runtime_feature_usage_sdk:feature'),
+            _response(body=u'{}'))
+        result = self._analyze([item])
+        operation = result['operations'][0]
+        self.assertEqual(
+            u'/cst/s/sfsites/auraCmpDef?_def=markup://runtime_feature_usage_sdk:feature',
+            operation['path'])
+        self.assertEqual(u'/cst/s/sfsites/auraCmpDef', result['packets'][0]['path'])
+
     def test_generic_apex_controller_uses_class_namespace_and_method(self):
         actions = [
             {'id': '1;a', 'descriptor': 'aura://ApexActionController/ACTION$execute',

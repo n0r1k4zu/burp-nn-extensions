@@ -247,14 +247,33 @@ def _parse_form(text):
     return result
 
 
+def _merge_request_values(parsed_request):
+    """Queryとform本文の値を、Aura判定用にひとつへまとめる。
+
+    auraCmpDef/auraResourcesはGET queryにaura.appや_defを載せるため、本文だけを
+    見るとAura文脈と対象コンポーネントを取り落とす。両方に同名の値がある場合も
+    観測値として保持する。
+    """
+    merged = {}
+    query_values = _parse_form(parsed_request.get('query'))
+    body_values = _parse_form(parsed_request.get('body'))
+    for source in (query_values, body_values):
+        for key, values in source.items():
+            merged.setdefault(key, []).extend(values)
+    return merged
+
+
 def _parse_request(text):
     head, body = _split_head_body(text)
     lines, header_rows, headers = _parse_headers(head)
     first = lines[0].split() if lines else []
     method = _display(first[0]).upper() if first else u''
     target = _display(first[1]) if len(first) > 1 else u'/'
-    # absolute-form request-targetにも対応する。
-    if u'://' in target:
+    # absolute-form request-targetにも対応する。ただし、auraCmpDefの
+    # `_def=markup://namespace:component`のようなquery値にも`://`が現れる。
+    # target全体に含まれるだけでabsolute-formと誤認すると、query値後半が
+    # Path（例: //runtime_feature_usage_sdk:...）になってしまう。
+    if re.match(r'^[A-Za-z][A-Za-z0-9+.-]*://', target):
         remainder = target.split(u'://', 1)[1]
         slash = remainder.find(u'/')
         target = remainder[slash:] if slash >= 0 else u'/'
@@ -336,6 +355,40 @@ def _normalized_path(path):
     if value != u'/' and value.endswith(u'/'):
         value = value[:-1]
     return value or u'/'
+
+
+def _aura_component_definition_path(normalized_path, request_values):
+    """auraCmpDef系をコンポーネント単位でCatalogへ残す表示用Pathを返す。
+
+    通常のCatalog Pathはqueryを除くため、`auraCmpDef?_def=...`がすべて一行へ
+    集約され、どのコンポーネント定義を取得した通信か分からなくなる。`_def`は
+    その定義を特定する非秘密の識別子なので、Aura component definitionに限り
+    canonical queryとして保持する。ルール照合用の正規化Pathは変更しない。
+    """
+    lowered = (_display(normalized_path) or u'').lower()
+    if u'auracmpdef' not in lowered and u'auraresources' not in lowered:
+        return normalized_path
+    definition = (request_values.get(u'_def') or
+                  request_values.get(u'def') or
+                  request_values.get(u'aura.def') or [u''])[0]
+    definition = _display(definition).strip()
+    if not definition:
+        return normalized_path
+    return normalized_path + u'?_def=' + definition
+
+
+def _aura_component_operation_name(normalized_path, request_values):
+    """descriptorを持たないAura定義取得にも識別可能なOperation名を付ける。"""
+    lowered = (_display(normalized_path) or u'').lower()
+    definition = (request_values.get(u'_def') or
+                  request_values.get(u'def') or
+                  request_values.get(u'aura.def') or [u''])[0]
+    definition = _display(definition).strip()
+    if u'auracmpdef' in lowered:
+        return u'Aura component definition' + (u': ' + definition if definition else u'')
+    if u'auraresources' in lowered:
+        return u'Aura resources' + (u': ' + definition if definition else u'')
+    return u'Aura endpoint'
 
 
 def _is_binary_content_type(content_type):
@@ -1378,6 +1431,12 @@ def _aura_context_info(form, parsed_request):
         value = context.get(key)
         if value:
             app_ids.add(_display(value))
+    # auraCmpDef/auraResources GETではJSON contextではなくqueryのaura.appに
+    # アプリ識別子が載る。
+    for key in (u'aura.app', u'aura.application', u'app'):
+        for value in form.get(key, []):
+            if value:
+                app_ids.add(_display(value))
     loaded = context.get('loaded')
     if isinstance(loaded, dict):
         for raw_key in loaded.keys():
@@ -2316,11 +2375,16 @@ def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None
             session['_hosts'].add(host)
         session['_observed_groups'].update(groups)
 
-        form = _parse_form(parsed_request['body'])
+        # Aura action POSTだけでなく、auraCmpDef/auraResourcesのGET queryも
+        # 同じ文脈として扱う。
+        form = _merge_request_values(parsed_request)
         aura_context = _aura_context_info(form, parsed_request)
+        operation_path = _aura_component_definition_path(normalized_path, form)
+        aura_component_operation = _aura_component_operation_name(normalized_path, form)
         packet_context = {
             'packet_no': packet_no, 'item': item, 'host': host,
             'method': parsed_request['method'], 'normalized_path': normalized_path,
+            'operation_path': operation_path,
             'session_fingerprint': fingerprint, 'auth_kind': auth_kind,
             'app_ids': aura_context.get('app_ids', []),
             'page_uri': aura_context.get('page_uri', u''),
@@ -2376,17 +2440,17 @@ def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None
                     packet_operation_ids.append(operation_id)
                     aura_actions += 1
             elif aura_present:
-                operation_id = _operation_id([u'Aura', host, parsed_request['method'], normalized_path,
-                                              u'Aura endpoint'])
+                operation_id = _operation_id([u'Aura', host, parsed_request['method'], operation_path,
+                                              aura_component_operation])
                 operation = operations.get(operation_id)
                 if operation is None:
                     operation = _new_operation(
                         operation_id, u'Aura', u'Unknown', u'low',
                         u'no parseable Aura action descriptor was available', host,
-                        parsed_request['method'], normalized_path, u'', u'', u'Aura endpoint',
-                        _behavior(parsed_request['method'], u'Aura endpoint'), item, packet_no)
+                        parsed_request['method'], operation_path, u'', u'', aura_component_operation,
+                        _behavior(parsed_request['method'], aura_component_operation), item, packet_no)
                     operation['_salesforce_features'].update(_salesforce_features(
-                        u'Aura endpoint', u'', normalized_path,
+                        aura_component_operation, u'', normalized_path,
                         aura_context.get('page_uri', u''), None))
                     operations[operation_id] = operation
                 _set_route_metadata(operation, packet_context)

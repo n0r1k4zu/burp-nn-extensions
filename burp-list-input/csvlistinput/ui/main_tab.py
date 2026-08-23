@@ -102,7 +102,7 @@ class MainTab(ITab):
         self.tabbed_pane.addTab("Comment Snapshots", self.comment_snapshot_panel)
         self.tabbed_pane.addTab("Backup & Restore", self.settings_backup_panel)
         self.tabbed_pane.addTab("Aura Diagnostic", self.aura_audit_panel)
-        self.tabbed_pane.addTab("Authrizetion Planning for Aura", self.authorization_planning_panel)
+        self.tabbed_pane.addTab("Authorization Planning for Aura", self.authorization_planning_panel)
         self.errors_tab_index = self.tabbed_pane.getTabCount()
         self.tabbed_pane.addTab("Errors", self.errors_panel)
         self._update_errors_tab_title()
