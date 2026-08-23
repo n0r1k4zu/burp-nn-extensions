@@ -1040,6 +1040,19 @@
         <p class="section-dek">Aura、Apex、通常HTTP、オンプレ中継候補と、Aura requestの代表パラメータを平易に説明します。</p>
       </div>
       <p>初めて使う場合は、詳細な<a href="salesforce_aura_guide.md">Salesforce / Experience Cloud / Aura 通信ガイド</a>を先に読んでください。Aura requestの<code>message</code>、<code>aura.context</code>、<code>aura.pageURI</code>、<code>aura.token</code>、Apexとの関係、<code>/web11/...</code>の通常HTTP経路、認可テスト時の注意点をまとめています。</p>
+      <h3>画面・Aura・REST API・オンプレ経路の見分け方</h3>
+      <p>Experience Cloudを操作したときのHistoryには、画面表示、Auraの画面操作、REST API、対象システム固有のバックエンド通信が混在します。URLの見た目だけで、すべてをAuraやApexとして扱ってはいけません。</p>
+      <table>
+        <thead><tr><th>通信の形</th><th>意味</th><th>Apexとの関係</th></tr></thead>
+        <tbody>
+          <tr><td><code>/csa/s/otc</code></td><td>Experience Cloudの画面ルート候補。<code>csa</code>と<code>otc</code>は対象組織固有の可能性があるため、サイト設定で確認する。</td><td>画面表示そのものはApexとは限らない。後続Aura actionがApexを呼ぶことがある。</td></tr>
+          <tr><td><code>/.../aura</code> + <code>message</code></td><td>Auraの画面操作通信。</td><td><code>apex://...</code>はApex候補、<code>aura://...</code>は標準Controller候補。</td></tr>
+          <tr><td><code>/services/apexrest/...</code></td><td>Apex REST API。</td><td>Apex RESTクラスへの直接入口。</td></tr>
+          <tr><td><code>/services/data/...</code>、<code>/services/oauth2/...</code>等</td><td>Salesforce標準API・認証API。画面コンテンツではない。</td><td>URL自体はカスタムApex入口ではない。更新後にFlowやTriggerが動く可能性はある。</td></tr>
+          <tr><td><code>/web11/...</code></td><td>対象システム固有のバックエンド／オンプレ経路候補。</td><td>ブラウザが直接送りAura値が無ければ、当該リクエストは通常Apexを経由しない。</td></tr>
+        </tbody>
+      </table>
+      <p><code>/web11/...</code>がオンプレ宛か、同一HostのGateway経由か、オンプレ側からSalesforce APIへ再接続するかは、HTTP Historyだけでは確定できません。仕様書、Destination rule、Gateway設定、Apexコード、連携ログを照合してください。</p>
       <div class="callout warn">
         <span class="callout-label">短い要点</span>
         <p>Aura通信、Apex、オンプレAPIは別物です。<code>message</code>はactionと引数、<code>aura.context</code>はFramework文脈、<code>aura.pageURI</code>は画面URI、<code>aura.token</code>はFramework保護用の値です。いずれも単独では認可可否や物理宛先を確定しません。</p>

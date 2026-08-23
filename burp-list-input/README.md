@@ -38,6 +38,8 @@ Salesforce / Experience Cloud / Auraが初めての場合は、先に[Salesforce
 
 `Authrizetion Planning for Aura`のOriginは、Aura actionの`descriptor`と、汎用Apex入口で観測できる`params`から付ける**通信上のヒューリスティック（経験則）**です。Salesforceの組織設定、インストール済みパッケージ、Apexソースコードを参照しないため、分類だけで標準機能・カスタム実装・脆弱性を確定するものではありません。Operation Catalogの`Origin reason`と`Origin confidence`を確認し、必要に応じてSalesforce設定およびApex実装と照合してください。
 
+Experience CloudのHistoryでは、画面ルート（例：`/csa/s/otc`）、Aura画面操作（`message`を含む`/.../aura`）、REST API（`/services/...`）、通常バックエンド経路（例：`/web11/...`）を別物として扱います。`/services/apexrest/...`はApex RESTへの直接入口ですが、`/services/data/...`や`/services/oauth2/...`は標準API・認証APIであり、URLだけからカスタムApexとは判断しません。`/web11/...`が仕様書上オンプレ宛で、ブラウザが直接送信しAura値が無ければ、そのHTTPリクエストは通常Apexを経由しません。物理的な宛先やオンプレ側からの再連携は、仕様書・Gateway設定・Apexコード・連携ログとの照合が必要です。詳細は[Salesforce / Experience Cloud / Aura 通信ガイド](docs/salesforce_aura_guide.md)を参照してください。
+
 | Origin | 通信上の判定基準 | Confidence | 例 |
 |---|---|---|---|
 | Salesforce Standard | `aura://`または`servicecomponent://` scheme。ただし次の汎用Apex入口は先に個別判定する | high | `aura://RecordUiController/ACTION$getRecord` |

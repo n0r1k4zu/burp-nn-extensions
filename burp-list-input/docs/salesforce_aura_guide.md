@@ -1,6 +1,6 @@
 # Salesforce / Experience Cloud / Aura 通信ガイド
 
-対象は、許可を得たWebアプリケーションの認可診断です。ここでは、MyTools の Authorization Planning を読むために必要なSalesforce知識だけを、できるだけ平易に説明します。
+対象は、許可を得たWebアプリケーションの認可診断です。ここでは、MyTools の Authrizetion Planning for Aura を読むために必要なSalesforce知識だけを、できるだけ平易に説明します。
 
 ## まず結論
 
@@ -106,6 +106,47 @@ Aura通信だから必ずApex、ではありません。Apexが関係してい�
 | `ApexActionController`経由 | 汎用入口。paramsのclass名・method名から実体候補を追えることがある。 | Authorization PlanningのOrigin Reason、params。 |
 | `/services/apexrest/...` | Apex RESTとしてApexが関係する可能性が高い。 | Path、Method、Apex REST実装、認証・共有。 |
 | `/web11/.../Login`等の通常HTTP | Path名だけではApexとの関係は不明。 | 仕様書、LB/API Gateway、レスポンスヘッダー、実装。 |
+
+## 画面、Aura、REST API、オンプレ経路を分けて考える
+
+同じExperience Cloudサイトを操作していても、HTTP Historyには役割の違う通信が混ざります。URLの見た目だけで「全部Aura」「全部Apex」と判断しないでください。
+
+| URLの例 | まず何として扱うか | Apexとの関係 | 確認方法 |
+| --- | --- | --- | --- |
+| `/csa/s/otc` | Experience Cloudの画面・画面ルート候補 | この画面表示リクエスト自体がApexとは限らない。画面の後にAura actionがApexを呼ぶことがある。 | Hostとサイト設定、直後の`/.../aura`通信、`aura.pageURI`、action descriptorを対応させる。 |
+| `/.../aura`、本文に`message` | Auraの画面操作通信 | `apex://...`ならApex候補。`aura://...`はSalesforce標準Controller候補。 | `message.actions[].descriptor`、`params`、Responseのaction結果を見る。 |
+| `/services/apexrest/...` | Apex REST API | Apex RESTクラスへの直接入口。 | URL mapping、HTTP method、Apex REST実装、認証と共有設定を確認する。 |
+| `/services/data/...`、`/services/oauth2/...`など | Salesforce標準API・認証API | URL自体はカスタムApex入口ではない。ただし更新後にFlowやTrigger等が動く可能性はある。 | `/services/`の次のパス、HTTP method、Response、設定・ログを確認する。 |
+| `/web11/...` | 対象システム固有のバックエンド／オンプレ経路候補 | ブラウザが直接送っておりAura値が無ければ、そのリクエストは通常Apexを経由しない。 | 仕様書、Destination rule、Host、TLS/DNS、Gateway設定、後続通信を照合する。 |
+
+### `/csa/s/otc` はExperience Cloudの画面か
+
+`/csa/s/otc`の形は、`/csa`をサイトのベースパス、`/s/otc`を画面ルートとして使うExperience Cloud構成と矛盾しません。ただし`csa`と`otc`はSalesforce共通の予約語ではないため、**対象組織のサイト設定を見ない限り確定はできません**。
+
+画面リクエストの後に`message`を含むAura POSTが続き、そこに`aura.pageURI=/csa/s/otc`または対応する画面URIがあれば、その画面がAura操作を発生させた有力な証拠です。画面表示と後続Aura actionは、認可テストでは別々のOperationとして記録します。
+
+### REST APIはExperience Cloudの画面ではない
+
+Experience CloudのサイトURL上に`/services/...`があっても、それはHTML画面ではなくAPIの入口です。外部アプリ、JavaScript画面、連携基盤のいずれからでも呼ばれ得ます。
+
+```text
+画面表示: Browser → /csa/s/otc → HTML / JavaScript
+画面操作: Browser → /.../aura → action → 標準Controller または Apex
+REST API : Client  → /services/data/...     → Salesforce標準API
+REST API : Client  → /services/apexrest/... → Apex REST
+```
+
+`/services/apexrest/...`はApex RESTとして直接Apexに入るため、Aura actionと同じように認可確認の対象です。一方で`/services/data/...`等は標準APIです。標準APIへの更新が後段のFlow・Trigger・Apexを起動することはありますが、パスだけから「カスタムApex API」とは分類しません。
+
+### `/web11/...` はApexを経由するか
+
+仕様書で`/web11/...`がオンプレ宛と定義され、ブラウザがそのPathへ直接送信し、本文に`message`、`aura.context`等のAura値が無いなら、当該HTTPリクエストは通常次の経路です。
+
+```text
+Browser → /web11/... → Reverse Proxy / Gateway → オンプレWebアプリ
+```
+
+この場合、ブラウザからオンプレまでのリクエストが自動的にApexを通るわけではありません。ただし、オンプレ側が後からSalesforce APIを呼ぶ、あるいは別のApex処理がオンプレへCalloutする設計はあり得ます。これはブラウザの1本のHTTP通信だけでは断定できないため、仕様書・Gateway設定・Apexコード・連携ログで確認します。
 
 ## `/web11/...`は外部サイトか
 
