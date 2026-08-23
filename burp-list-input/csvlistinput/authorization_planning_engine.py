@@ -1079,6 +1079,8 @@ def _new_operation(operation_id, protocol_kind, origin, confidence, reason,
         'route_classification': u'', 'route_confidence': u'low', 'route_evidence': [],
         'destination_label': u'', 'destination_confidence': u'low',
         'destination_source': u'', 'destination_evidence': [],
+        # Aura batch内の別actionが同じ生HTTP Packetを共有することをUIへ伝える。
+        'representative_action_id': u'', 'representative_action_index': None,
         'representative_item': item, 'representative_packet_no': packet_no,
     }
 
@@ -1196,6 +1198,8 @@ def _operation_for_action(operations, action, action_index, packet_context,
             descriptor, calling, operation_name,
             _behavior(packet_context['method'], operation_name),
             packet_context['item'], packet_context['packet_no'])
+        operation['representative_action_id'] = _display(action.get('id'))
+        operation['representative_action_index'] = action_index
         operations[operation_id] = operation
     _set_route_metadata(operation, packet_context)
     if graphql_details:
@@ -1301,6 +1305,14 @@ def _add_non_aura_request_parameters(operation, parsed_request, packet_no,
 
 def _add_operation_occurrence(operation, packet_context, status, request_content_type,
                               response_content_type, groups, traffic_class):
+    # Operation Catalogは同じ操作を複数Packetから集約する。最初に観測した
+    # Packetがレスポンス未取得でも、後続にレスポンス付きPacketがあれば、画面の
+    # Request / Response Viewerには同じ完全な一組を代表として表示させる。
+    # これを行わないと、Requestだけ見えてResponseが空に見えることがある。
+    if packet_context.get('has_response') and not operation.get('_representative_has_response'):
+        operation['representative_item'] = packet_context.get('item')
+        operation['representative_packet_no'] = packet_context.get('packet_no')
+        operation['_representative_has_response'] = True
     operation['occurrences'] += 1
     operation['_packet_nos'].add(packet_context['packet_no'])
     if status is not None:
@@ -2313,6 +2325,9 @@ def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None
             'app_ids': aura_context.get('app_ids', []),
             'page_uri': aura_context.get('page_uri', u''),
             'aura_endpoint': u'',
+            # Noneだけを「History上でレスポンス未取得」と扱う。空レスポンスも
+            # 実際に存在するHTTPメッセージとしてViewerへ渡す。
+            'has_response': response_bytes is not None,
         }
         message_present = u'message' in form
         aura_message = None

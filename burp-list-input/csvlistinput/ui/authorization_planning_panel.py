@@ -6,7 +6,7 @@ import time
 from threading import Thread
 
 from java.awt import BorderLayout, Color, FlowLayout
-from java.awt.event import ActionListener
+from java.awt.event import ActionListener, MouseAdapter
 from java.lang import Integer, Runnable
 from java.util import Comparator
 from java.util.regex import Pattern
@@ -15,6 +15,8 @@ from javax.swing import (BorderFactory, JButton, JCheckBox, JLabel, JPanel, JPro
                          ListSelectionModel, RowFilter, SwingUtilities, Timer)
 from javax.swing.event import DocumentListener, ListSelectionListener
 from javax.swing.table import AbstractTableModel, DefaultTableCellRenderer, TableRowSorter
+
+from burp import IMessageEditorController
 
 from csvlistinput import authorization_planning_engine
 from csvlistinput.utils import to_display_text
@@ -99,6 +101,36 @@ class _UiRunnable(Runnable):
         self.fn()
 
 
+class _OperationEditorController(IMessageEditorController):
+    """選択中の代表PacketをBurp Message Editorへ正しく関連付ける。"""
+    def __init__(self):
+        self.item = None
+
+    def getHttpService(self):
+        if self.item is None:
+            return None
+        try:
+            return self.item.getHttpService()
+        except Exception:
+            return None
+
+    def getRequest(self):
+        if self.item is None:
+            return None
+        try:
+            return self.item.getRequest()
+        except Exception:
+            return None
+
+    def getResponse(self):
+        if self.item is None:
+            return None
+        try:
+            return self.item.getResponse()
+        except Exception:
+            return None
+
+
 class _NaturalNumberComparator(Comparator):
     """Packet No等の数列を辞書順ではなく整数列として比較する。"""
     def compare(self, left, right):
@@ -153,6 +185,15 @@ class _OperationSelectionListener(ListSelectionListener):
     def valueChanged(self, event):
         if not event.getValueIsAdjusting():
             self.panel._show_selected_operation()
+
+
+class _OperationMouseListener(MouseAdapter):
+    """同じ行の再クリックでもViewerを同期する。"""
+    def __init__(self, panel):
+        self.panel = panel
+
+    def mouseReleased(self, event):
+        self.panel._show_selected_operation()
 
 
 class _FindDocumentListener(DocumentListener):
@@ -455,6 +496,7 @@ class AuthorizationPlanningPanel(JPanel):
         self.operation_table = self._new_table(self.operation_model, [30], semantic=(10, 19))
         self.operation_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.operation_table.getSelectionModel().addListSelectionListener(_OperationSelectionListener(self))
+        self.operation_table.addMouseListener(_OperationMouseListener(self))
 
         self.parameter_model = _RowsModel(self.PARAMETER_COLUMNS, [0, 5])
         self.parameter_table = self._new_table(self.parameter_model, [6])
@@ -472,8 +514,11 @@ class AuthorizationPlanningPanel(JPanel):
         detail_tabs.addTab(u'Parameters', parameter_panel)
         detail_tabs.addTab(u'Response Fields', response_panel)
 
-        self.request_editor = self.callbacks.createMessageEditor(None, False)
-        self.response_editor = self.callbacks.createMessageEditor(None, False)
+        # None controllerでは、BurpのResponse editorが選択変更後も以前の
+        # メッセージ状態を保持する環境がある。選択中Packetを明示する。
+        self.message_controller = _OperationEditorController()
+        self.request_editor = self.callbacks.createMessageEditor(self.message_controller, False)
+        self.response_editor = self.callbacks.createMessageEditor(self.message_controller, False)
         messages = JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
                               self.request_editor.getComponent(), self.response_editor.getComponent())
         messages.setResizeWeight(0.5)
@@ -1226,6 +1271,7 @@ class AuthorizationPlanningPanel(JPanel):
                 response = item.getResponse()
             except Exception as error:
                 errors.append(u'getResponse: ' + _text(error))
+        self.message_controller.item = item
         try:
             self.request_editor.setMessage(request if request is not None else self._empty_bytes, True)
         except Exception as error:
@@ -1238,8 +1284,18 @@ class AuthorizationPlanningPanel(JPanel):
         if operation:
             packet_no = _text(operation.get('representative_packet_no') or u'(not available)')
             name = _text(operation.get('operation_name') or operation.get('operation_id') or u'')
+            action_index = operation.get('representative_action_index')
+            action_id = _text(operation.get('representative_action_id'))
+            action_note = u''
+            if action_index is not None:
+                action_note = u' — Aura action #%s%s; raw HTTP message may be shared with other actions in this Packet' % (
+                    _text(action_index), (u' (id ' + action_id + u')') if action_id else u'')
+            response_note = (u'Response: %s bytes' % _text(len(response))
+                             if response is not None else
+                             u'Response: not available in HTTP History')
             self.message_context_label.setText(
-                u'Representative Packet No %s — %s' % (packet_no, name))
+                u'Representative Packet No %s — %s%s — %s' %
+                (packet_no, name, action_note, response_note))
         else:
             self.message_context_label.setText(
                 u'Representative Request / Response: select an Operation Catalog row.')

@@ -143,6 +143,17 @@ class AuthorizationPlanningEngineTest(unittest.TestCase):
         self.assertTrue(cancelled['summary']['cancelled'])
         self.assertEqual(1, cancelled['summary']['packets_analyzed'])
 
+    def test_operation_representative_prefers_packet_with_response(self):
+        """集約行のViewerがRequestだけになる代表Packetを選ばない。"""
+        items = [
+            _Item(_request(u'GET', u'/api/orders'), None),
+            _Item(_request(u'GET', u'/api/orders'), _response(body=u'{"id":"1"}')),
+        ]
+        result = self._analyze(items)
+        operation = result['operations'][0]
+        self.assertEqual(2, operation['representative_packet_no'])
+        self.assertIsNotNone(operation['representative_item'].getResponse())
+
     def test_aura_batch_creates_distinct_actions_and_classifies_origins(self):
         actions = [
             {'id': '1;a', 'descriptor': 'aura://RecordUiController/ACTION$getRecord',
@@ -168,6 +179,10 @@ class AuthorizationPlanningEngineTest(unittest.TestCase):
         standard = next(row for row in result['operations'] if row['operation_name'] == u'getRecord')
         self.assertEqual(u'markup://c:Caller', standard['calling_descriptor'])
         self.assertTrue(standard['origin_reason'])
+        self.assertEqual(set([0, 1, 2, 3]), set(
+            row['representative_action_index'] for row in result['operations']))
+        self.assertEqual(set([u'1;a', u'2;a', u'3;a', u'4;a']), set(
+            row['representative_action_id'] for row in result['operations']))
         self.assertIn(standard['origin_confidence'], (u'low', u'medium', u'high'))
 
     def test_generic_apex_controller_uses_class_namespace_and_method(self):

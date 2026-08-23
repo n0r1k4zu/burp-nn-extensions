@@ -1157,7 +1157,7 @@
           <tbody>
             <tr><td>Parameters</td><td>Region（Path／Query／Header／Cookie／Body等）、Type、Nesting、構造Path、値の例、候補分類を表示します。Aura action内の値はaction相対Pathへ結び付けます。</td></tr>
             <tr><td>Response Fields</td><td>レスポンスJSON／Aura responseから得た構造Path、型、出現回数、値の例です。binaryや壊れたJSONはTechnical Gapsを確認します。</td></tr>
-            <tr><td>Representative Request / Response</td><td>Historyにある代表通信をBurp標準ビューアで表示します。Viewer直上の<code>Representative Packet No</code>で、現在どのOperationの通信を見ているか確認できます。Parameters／Response Fieldsの行選択ではなく、Operation Catalogの行選択で更新されます。取得失敗時は前回の通信を残さず空表示になります。カタログ列では秘密値を伏せますが、このビューアは元のHistoryをそのまま表示するため取り扱いに注意してください。</td></tr>
+            <tr><td>Representative Request / Response</td><td>Historyにある代表通信をBurp標準ビューアで表示します。Viewer直上の<code>Representative Packet No</code>とOperation名で、現在の対象を確認できます。Aura batchでは複数actionが同じ生HTTP Packetを共有するため、別actionを選んでもRequest／Response本文が同じことがあります。その場合はViewer直上の<code>Aura action #</code>表示と、下部Parameters／Response Fieldsを確認してください。Parameters／Response Fieldsの行選択ではなく、Operation Catalogの行選択で更新されます。取得失敗時は前回の通信を残さず空表示になります。カタログ列では秘密値を伏せますが、このビューアは元のHistoryをそのまま表示するため取り扱いに注意してください。</td></tr>
           </tbody>
         </table>
       </div>
