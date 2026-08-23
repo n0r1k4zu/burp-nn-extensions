@@ -101,11 +101,15 @@ class StatisticsPanel(JPanel):
         center = JPanel(BorderLayout())
         center.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0))
         center.add(JScrollPane(self.table), BorderLayout.CENTER)
+        # Swing/JythonのJLabel境界では日本語を含む長文が文字化けする環境があるため、
+        # 画面下の補助説明はASCIIだけの短い固定文にする。日本語の分類値は表・Commentで保持する。
         definitions = JLabel(
-            ('Protocol = Aura/GraphQL/UI API/REST/Web/File/Other; Traffic Class = Web screen/web part/SPA screen/SPA update/API; '
-             'Category = Salesforce標準/Apexカスタム/ApexREST/SalesforceREST/Unknown. ' if statistics2 else
-             'Definitions: Web screen = non-SPA HTML; web part = static asset; SPA screen = SPA bootstrap HTML; SPA update = Aura message/context; API = other API-like traffic. ') +
-            'Aggregation groups adjacent Aura updates with the same key.')
+            ('Protocol: Aura / GraphQL / UI API / REST / Web / File / Other | '
+             'Traffic Class: Web / SPA / API | '
+             'Category: Salesforce Standard / Custom Apex / ApexREST / SalesforceREST / Unknown. '
+             if statistics2 else
+             'Definitions: Web screen / web part / SPA screen / SPA update / API. ') +
+            'Aggregation: adjacent matching Aura updates.')
         center.add(definitions, BorderLayout.SOUTH)
         self.add(center, BorderLayout.CENTER)
         self.status = JLabel('Build %s for a Packet No range or All. Use Numbering & Grouping for comment annotations.' % self.title)
