@@ -322,7 +322,8 @@ class AuthorizationPlanningPanel(JPanel):
                          u'Interaction Confidence', u'Interaction Reasons', u'CRUD Intents',
                          u'GraphQL Kind', u'GraphQL Operation', u'GraphQL Metadata', u'Salesforce Features',
                          u'Request Content Types', u'Response Content Types', u'Occurrences',
-                         u'Packet No', u'Status', u'Parameters', u'Candidates']
+                         u'Packet No', u'Representative Packet', u'Exact Duplicate Packets',
+                         u'Test Variants', u'Duplicate Groups', u'Status', u'Parameters', u'Candidates']
     PARAMETER_COLUMNS = [u'#', u'Region', u'Type', u'Nesting', u'Parameter Path', u'Occurrences',
                          u'Packet No', u'Sample Values', u'Candidate/Framework classification',
                          u'Score/Reasons']
@@ -348,7 +349,8 @@ class AuthorizationPlanningPanel(JPanel):
                         u'Request Content Types', u'Response Content Types', u'Status', u'Parameters',
                         u'Operations', u'Groups', u'Sessions', u'Occurrences', u'Packet No']
     PACKET_COLUMNS = [u'Packet No', u'Route Classification', u'Destination Label', u'Protocol', u'Host',
-                      u'Method', u'Normalized Path', u'Status', u'Group', u'Operations', u'Operation Count']
+                      u'Method', u'Normalized Path', u'Status', u'Group', u'Operations', u'Operation Count',
+                      u'Deduplication', u'Representative Packet', u'Reason']
     COVERAGE_COLUMNS = [u'#', u'Category', u'Severity', u'Scope', u'Operation', u'State', u'Reason',
                         u'Recommendation', u'Evidence']
 
@@ -492,8 +494,8 @@ class AuthorizationPlanningPanel(JPanel):
         return panel
 
     def _build_operations(self):
-        self.operation_model = _RowsModel(self.OPERATION_COLUMNS, [0, 29, 32, 33])
-        self.operation_table = self._new_table(self.operation_model, [30], semantic=(10, 19))
+        self.operation_model = _RowsModel(self.OPERATION_COLUMNS, [0, 29, 31, 33, 34, 36, 37])
+        self.operation_table = self._new_table(self.operation_model, [30, 31, 32], semantic=(10, 19))
         self.operation_table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self.operation_table.getSelectionModel().addListSelectionListener(_OperationSelectionListener(self))
         self.operation_table.addMouseListener(_OperationMouseListener(self))
@@ -904,6 +906,9 @@ class AuthorizationPlanningPanel(JPanel):
                                                              entry.get('sf_feature_flags')),
                 _join(entry.get('request_content_types')), _join(entry.get('response_content_types')),
                 _integer(entry.get('occurrences')), _packet_text(entry.get('packet_nos') or entry.get('packet_no')),
+                _integer(entry.get('representative_packet_no')),
+                _packet_text(entry.get('exact_duplicate_packet_nos')),
+                _integer(entry.get('test_variants')), _integer(_count(entry.get('deduplication_groups'))),
                 _join(entry.get('status_codes')), _integer(_count(entry.get('parameters'))),
                 _integer(_count(entry.get('resource_candidates')))])
         self.operation_model.set_rows(rows, operations)
@@ -1159,13 +1164,26 @@ class AuthorizationPlanningPanel(JPanel):
         rows = []
         for entry in entries:
             operation_ids = entry.get('operation_ids') or []
+            deduplication = entry.get('deduplication') or []
+            labels, representatives, reasons = [], [], []
+            for detail in deduplication:
+                status = _text(detail.get('status'))
+                if status and status not in labels:
+                    labels.append(status)
+                representative = detail.get('representative_packet_no')
+                if representative not in (None, u'', '') and representative not in representatives:
+                    representatives.append(representative)
+                reason = _text(detail.get('reason'))
+                if reason and reason not in reasons:
+                    reasons.append(reason)
             rows.append([
                 _integer(entry.get('packet_no')), _text(entry.get('route_classification')),
                 _text(entry.get('destination_label')), _text(entry.get('protocol_kind')),
                 _text(entry.get('host')), _text(entry.get('method')),
                 _text(entry.get('path') or entry.get('normalized_path')),
                 _text(entry.get('status')), _join(entry.get('groups')),
-                _join(operation_ids), _integer(entry.get('operation_count', _count(operation_ids)))])
+                _join(operation_ids), _integer(entry.get('operation_count', _count(operation_ids))),
+                _join(labels), _packet_text(representatives), _join(reasons)])
         return rows, entries
 
     def _set_packet_catalog(self, prepared=None):

@@ -215,6 +215,43 @@ class AuthorizationPlanningEngineTest(unittest.TestCase):
             operation['path'])
         self.assertEqual(u'/cst/s/sfsites/auraCmpDef', result['packets'][0]['path'])
 
+    def test_exact_duplicate_aura_actions_are_linked_to_a_representative_packet(self):
+        """Aura action IDだけが異なる同じ画面更新は重複候補として見える。"""
+        first = {'id': '1;a', 'descriptor': 'apex://OrderController/ACTION$getOrder',
+                 'params': {'recordId': '801000000000001'}}
+        second = {'id': '99;a', 'descriptor': 'apex://OrderController/ACTION$getOrder',
+                  'params': {'recordId': '801000000000001'}}
+        items = [
+            _Item(_request(u'POST', u'/s/sfsites/aura', _aura_body([first]),
+                           [u'Content-Type: application/x-www-form-urlencoded']),
+                  _response(body=u'{"actions":[]}')),
+            _Item(_request(u'POST', u'/s/sfsites/aura', _aura_body([second]),
+                           [u'Content-Type: application/x-www-form-urlencoded']),
+                  _response(body=u'{"actions":[]}')),
+        ]
+        result = self._analyze(items)
+        operation = result['operations'][0]
+        self.assertEqual([2], operation['exact_duplicate_packet_nos'])
+        self.assertEqual(1, operation['test_variants'])
+        self.assertEqual(1, operation['deduplication_groups'][0]['representative_packet_no'])
+        self.assertEqual(u'Exact duplicate', result['packets'][1]['deduplication'][0]['status'])
+
+    def test_different_aura_resource_values_remain_separate_test_variants(self):
+        """別recordIdは同一Operationでも重複として省略しない。"""
+        first = {'id': '1;a', 'descriptor': 'apex://OrderController/ACTION$getOrder',
+                 'params': {'recordId': '801000000000001'}}
+        second = {'id': '2;a', 'descriptor': 'apex://OrderController/ACTION$getOrder',
+                  'params': {'recordId': '801000000000002'}}
+        items = [
+            _Item(_request(u'POST', u'/s/sfsites/aura', _aura_body([first]),
+                           [u'Content-Type: application/x-www-form-urlencoded']), _response(body=u'{}')),
+            _Item(_request(u'POST', u'/s/sfsites/aura', _aura_body([second]),
+                           [u'Content-Type: application/x-www-form-urlencoded']), _response(body=u'{}')),
+        ]
+        operation = self._analyze(items)['operations'][0]
+        self.assertEqual([], operation['exact_duplicate_packet_nos'])
+        self.assertEqual(2, operation['test_variants'])
+
     def test_generic_apex_controller_uses_class_namespace_and_method(self):
         actions = [
             {'id': '1;a', 'descriptor': 'aura://ApexActionController/ACTION$execute',

@@ -1159,6 +1159,7 @@
             <tr><td>Salesforce Features</td><td>getItems、getConfigData、Self-registration、GraphQL Pagination等、観測された特徴のタグです。</td></tr>
             <tr><td>Request/Response Content Types / Status</td><td>観測したContent-TypeとHTTPステータスの集合です。同一Operationで複数種類・複数Statusがあれば併記されます。</td></tr>
             <tr><td>Occurrences / Packet No</td><td>観測回数と元のHistory番号群です。Packet Noを使って元通信へ戻れます。</td></tr>
+            <tr><td>Representative Packet / Exact Duplicate Packets / Test Variants / Duplicate Groups</td><td>同じSubject、Operation、業務パラメータ値を持つ通信だけを完全重複候補としてまとめます。Representative Packetは確認・再テストの基準にするPacket、Exact Duplicate Packetsは省略候補、Test Variantsは値・主体が異なるため残すべきテスト単位、Duplicate Groupsは代表と重複の組数です。Auraの<code>id</code>、<code>aura.context</code>、<code>aura.token</code>は照合から除外しますが、recordId・金額・状態・更新値などは残します。更新値や対象IDが異なる通信は自動で重複扱いにしません。</td></tr>
             <tr><td>Parameters / Candidates</td><td>抽出済みパラメータ数とResource候補数です。0は「存在しない」の断定ではなく、受動解析で見つからなかったことを示します。</td></tr>
           </tbody>
         </table>

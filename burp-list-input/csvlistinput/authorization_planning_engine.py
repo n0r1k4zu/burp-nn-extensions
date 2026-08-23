@@ -61,6 +61,10 @@ _OBJECT_PARAMETER_NAMES = set([
     u'sobjectname', u'apiname', u'entitynameorid', u'scope', u'recordid',
 ])
 
+# 通信ごとに変わっても業務上の操作を表さないAura値。重複候補の照合では除外する。
+# recordId等の業務パラメータは除外しないため、別レコードへの操作を誤って重複扱いにしない。
+_DEDUP_VOLATILE_FORM_KEYS = set([u'aura.context', u'aura.token'])
+
 
 def parse_destination_rules(text):
     """利用者が指定する宛先ラベル規則を解析する。
@@ -261,6 +265,48 @@ def _merge_request_values(parsed_request):
         for key, values in source.items():
             merged.setdefault(key, []).extend(values)
     return merged
+
+
+def _canonical_aura_message(value):
+    """Aura action IDだけを除いて、同じ画面操作を比較可能な形にする。"""
+    message = _safe_json(value)
+    if not isinstance(message, dict):
+        return _display(value)
+    actions = message.get('actions')
+    if isinstance(actions, list):
+        normalized_actions = []
+        for action in actions:
+            if isinstance(action, dict):
+                copied = dict(action)
+                # idは一送信内のresponse対応番号であり、操作対象そのものではない。
+                copied.pop('id', None)
+                normalized_actions.append(copied)
+            else:
+                normalized_actions.append(action)
+        message = dict(message)
+        message['actions'] = normalized_actions
+    try:
+        return _display(json.dumps(message, ensure_ascii=True, sort_keys=True,
+                                   separators=(u',', u':')))
+    except Exception:
+        return _display(value)
+
+
+def _dedup_signature(parsed_request, request_values):
+    """秘密値を保存せず、完全一致候補だけを保守的に判定するfingerprint。"""
+    parts = [_display(parsed_request.get('method')).upper(),
+             _display(parsed_request.get('path'))]
+    for key in sorted(request_values.keys(), key=lambda value: _display(value).lower()):
+        lowered = _display(key).lower()
+        if lowered in _DEDUP_VOLATILE_FORM_KEYS:
+            continue
+        values = request_values.get(key) or []
+        canonical_values = []
+        for value in values:
+            canonical_values.append(_canonical_aura_message(value) if lowered == u'message'
+                                    else _display(value))
+        parts.append(_display(key) + u'=' + u'|'.join(sorted(canonical_values)))
+    return _sha256(u'\n'.join(parts))
 
 
 def _parse_request(text):
@@ -1997,8 +2043,68 @@ def _build_packet_catalog(packets):
             'status': packet.get('status'), 'groups': list(packet.get('groups', [])),
             'operation_ids': list(packet.get('operation_ids', [])),
             'operation_count': len(packet.get('operation_ids', [])),
+            'deduplication': list(packet.get('deduplication', [])),
         })
     return rows
+
+
+def _annotate_exact_duplicates(packets, operations):
+    """Operation内の完全一致候補を、代表Packetと重複Packetとして可視化する。
+
+    session fingerprintと業務パラメータを含む保守的なsignatureを使う。別ユーザー、
+    別レコード、異なる更新値は別variantのままであり、自動的に省略しない。
+    """
+    operation_map = dict((operation.get('operation_id'), operation) for operation in operations)
+    buckets = {}
+    for packet in packets:
+        signature = packet.get('_dedup_signature', u'')
+        for operation_id in packet.get('operation_ids', []):
+            key = (operation_id, packet.get('session_fingerprint', u''), signature)
+            buckets.setdefault(key, []).append(packet)
+
+    details_by_packet = dict((packet.get('packet_no'), []) for packet in packets)
+    variants_by_operation = {}
+    groups_by_operation = {}
+    duplicate_count = 0
+    for (operation_id, _session, _signature), members in buckets.items():
+        variants_by_operation.setdefault(operation_id, 0)
+        variants_by_operation[operation_id] += 1
+        if len(members) < 2:
+            continue
+        # Responseを持つ最初のPacketを優先し、代表Request/Responseの確認も可能にする。
+        representative = next((packet for packet in members if packet.get('status') is not None), members[0])
+        representative_no = representative.get('packet_no')
+        member_nos = sorted(packet.get('packet_no') for packet in members)
+        duplicate_nos = [number for number in member_nos if number != representative_no]
+        if not duplicate_nos:
+            continue
+        duplicate_count += len(duplicate_nos)
+        group = {'representative_packet_no': representative_no,
+                 'duplicate_packet_nos': duplicate_nos,
+                 'reason': u'same operation, subject, and request values (Aura framework context/token excluded)'}
+        groups_by_operation.setdefault(operation_id, []).append(group)
+        details_by_packet.setdefault(representative_no, []).append({
+            'status': u'Representative', 'representative_packet_no': representative_no,
+            'duplicate_packet_nos': duplicate_nos, 'operation_id': operation_id,
+            'reason': group['reason']})
+        for duplicate_no in duplicate_nos:
+            details_by_packet.setdefault(duplicate_no, []).append({
+                'status': u'Exact duplicate', 'representative_packet_no': representative_no,
+                'duplicate_packet_nos': [], 'operation_id': operation_id,
+                'reason': group['reason']})
+
+    for operation in operations:
+        operation_id = operation.get('operation_id')
+        groups = groups_by_operation.get(operation_id, [])
+        operation['deduplication_groups'] = groups
+        operation['test_variants'] = variants_by_operation.get(operation_id, 0)
+        operation['exact_duplicate_packet_nos'] = sorted(set(
+            number for group in groups for number in group['duplicate_packet_nos']))
+        operation['exact_duplicate_packet_count'] = len(operation['exact_duplicate_packet_nos'])
+    for packet in packets:
+        packet['deduplication'] = details_by_packet.get(packet.get('packet_no'), [])
+        packet.pop('_dedup_signature', None)
+    return duplicate_count
 
 
 def _build_salesforce_feature_catalog(operations):
@@ -2570,6 +2676,8 @@ def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None
             'default_app_reason': aura_context.get('default_app_reason', u''),
             'default_app_confidence': aura_context.get('default_app_confidence', u'low'),
             'comment': comment, 'highlight': highlight, 'traffic_class': traffic_class,
+            # fingerprintのみ保持する。元のRequestや認証情報はこの集約情報へ複製しない。
+            '_dedup_signature': _dedup_signature(parsed_request, form),
         })
         if not packet_operation_ids:
             gaps.append({'packet_no': packet_no, 'stage': u'operation_catalog',
@@ -2625,6 +2733,7 @@ def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None
     access_matrix = _build_access_matrix(operation_rows)
     app_endpoint_catalog = _build_app_endpoint_catalog(packets, operation_rows)
     endpoint_catalog = _build_endpoint_catalog(packets, operation_rows)
+    exact_duplicate_packets = _annotate_exact_duplicates(packets, operation_rows)
     packet_catalog = _build_packet_catalog(packets)
     salesforce_features = _build_salesforce_feature_catalog(operation_rows)
     planning_gaps = _build_planning_gaps(
@@ -2656,6 +2765,7 @@ def analyze_history(callbacks, helpers, start_packet_no=None, end_packet_no=None
             'aura_endpoints': len(set((row.get('host'), row.get('aura_endpoint'))
                                       for row in app_endpoint_catalog)),
             'http_endpoints': len(endpoint_catalog),
+            'exact_duplicate_packets': exact_duplicate_packets,
             'packets_without_operation': len([row for row in packet_catalog
                                                if not row.get('operation_ids')]),
         },
