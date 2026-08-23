@@ -478,7 +478,13 @@ class AuthorizationPlanningPanel(JPanel):
                               self.request_editor.getComponent(), self.response_editor.getComponent())
         messages.setResizeWeight(0.5)
         messages.setOneTouchExpandable(True)
-        lower = JSplitPane(JSplitPane.VERTICAL_SPLIT, detail_tabs, messages)
+        message_panel = JPanel(BorderLayout())
+        self.message_context_label = JLabel(
+            u'Representative Request / Response: select an Operation Catalog row.')
+        self.message_context_label.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 4))
+        message_panel.add(self.message_context_label, BorderLayout.NORTH)
+        message_panel.add(messages, BorderLayout.CENTER)
+        lower = JSplitPane(JSplitPane.VERTICAL_SPLIT, detail_tabs, message_panel)
         lower.setResizeWeight(0.42)
         lower.setOneTouchExpandable(True)
         operation_list = self._table_with_find(
@@ -815,6 +821,10 @@ class AuthorizationPlanningPanel(JPanel):
         return rows
 
     def _set_operations(self, operations):
+        # JTableはモデル更新後も旧選択indexを保持する場合がある。その状態では
+        # 同じ表示行を再度クリックしてもselection eventが来ず、前回のmessageが
+        # 残って見えるため、Buildごとに明示的に選択を解除する。
+        self.operation_table.clearSelection()
         rows = []
         for index, entry in enumerate(operations):
             operation_parts = []
@@ -1199,18 +1209,43 @@ class AuthorizationPlanningPanel(JPanel):
                 _packet_text(entry.get('packet_nos') or entry.get('packet_no')),
                 _join(entry.get('sample_values') or entry.get('value_samples') or entry.get('values'))])
         self.response_model.set_rows(response_rows, response_entries)
+        # 失敗時も前回選択の通信を残さない。先に両viewerを空にしてから、今回の
+        # representative packetを個別に設定する。
+        request = None
+        response = None
         item = (operation or {}).get('representative_item')
         if item is None and operation:
             item = self._packet_items.get(_text(operation.get('representative_packet_no')))
+        errors = []
+        if item is not None:
+            try:
+                request = item.getRequest()
+            except Exception as error:
+                errors.append(u'getRequest: ' + _text(error))
+            try:
+                response = item.getResponse()
+            except Exception as error:
+                errors.append(u'getResponse: ' + _text(error))
         try:
-            request = item.getRequest() if item is not None else None
-            response = item.getResponse() if item is not None else None
             self.request_editor.setMessage(request if request is not None else self._empty_bytes, True)
+        except Exception as error:
+            errors.append(u'request viewer: ' + _text(error))
+        try:
             self.response_editor.setMessage(response if response is not None else self._empty_bytes, False)
         except Exception as error:
-            if self.error_fn:
-                self.error_fn(u'Authorization Planning',
-                              u'Representative message preview failed: %s' % _text(error))
+            errors.append(u'response viewer: ' + _text(error))
+
+        if operation:
+            packet_no = _text(operation.get('representative_packet_no') or u'(not available)')
+            name = _text(operation.get('operation_name') or operation.get('operation_id') or u'')
+            self.message_context_label.setText(
+                u'Representative Packet No %s — %s' % (packet_no, name))
+        else:
+            self.message_context_label.setText(
+                u'Representative Request / Response: select an Operation Catalog row.')
+        if errors and self.error_fn:
+            self.error_fn(u'Authorization Planning',
+                          u'Representative message preview failed: ' + u'; '.join(errors))
 
     def _response_entries(self, operation):
         entries = []
