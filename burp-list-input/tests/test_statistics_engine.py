@@ -32,6 +32,19 @@ class _Helpers(object):
     def bytesToString(self, value): return value
 
 
+class _ScopeInfo(object):
+    def __init__(self, url): self.url = url
+    def getUrl(self): return self.url
+
+
+class _ScopeHelpers(_Helpers):
+    def analyzeRequest(self, item): return _ScopeInfo(item.url)
+
+
+class _ScopeCallbacks(_Callbacks):
+    def isInScope(self, url): return url.startswith('https://in-scope.example/')
+
+
 class StatisticsEngineTest(unittest.TestCase):
     def test_classification_definitions(self):
         self.assertEqual(statistics_engine.WEB_SCREEN,
@@ -61,9 +74,20 @@ class StatisticsEngineTest(unittest.TestCase):
         self.assertIn((statistics_engine.API, u'ApexREST', u'REST'), observed)
         self.assertIn((statistics_engine.API, u'SalesforceREST', u'REST'), observed)
         rows = statistics_engine.summary_rows_v2(records)
-        self.assertEqual(3, sum(row['including_aggregated'] for row in rows))
+        self.assertEqual(3, sum(row['including_aggregated'] for row in rows if row['protocol'] != u'Total'))
+        self.assertEqual(3, rows[-1]['including_aggregated'])
+        self.assertEqual(3, rows[-1]['excluding_aggregated'])
         self.assertIn(u'通信', rows[0]['definition'])
         self.assertIn(u' / ', rows[0]['definition'])
+
+    def test_statistics_scope_only_excludes_out_of_scope_items(self):
+        inside = _Item('GET /inside HTTP/1.1\r\n\r\n', '')
+        outside = _Item('GET /outside HTTP/1.1\r\n\r\n', '')
+        inside.url = 'https://in-scope.example/inside'
+        outside.url = 'https://outside.example/outside'
+        records = statistics_engine.analyze_history_v2(
+            _ScopeCallbacks([inside, outside]), _ScopeHelpers(), scope_only=True)
+        self.assertEqual([1], [record['packet_no'] for record in records])
 
     def test_statistics2_annotations_prepend_all_dimensions_and_clear(self):
         body = ('message=%7B%22actions%22%3A%5B%7B%22descriptor%22%3A%22apex%3A%2F%2F'

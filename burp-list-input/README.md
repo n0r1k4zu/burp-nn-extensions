@@ -26,8 +26,8 @@ Burp Suite 用の Jython 拡張です。Repeaterで送るリクエストの複�
 - **Packet Grep** — 指定したワードでHTTP History全体（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索し、ヒットした前後を指定文字数（既定30文字）だけ切り出して一覧表示します。各行にヒット領域（Path / Header / Bodyなど）を表示します。検索後は`Find in results`で出力結果だけを再検索できます（新しいPacket Grepは実行しません）。`hoge & piyo`で同じPacket Noに両方ある通信、`hoge | piyo`でどちらかがある通信を検索できます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします（`&`と`|`の混在は不可）。Packet Noの開始・終了を指定すれば、その範囲だけを検索できます（空欄なら全件）。同じパケット内に複数ヒットがあれば、それぞれ別の行として表示されます。Before / Match / Afterはセル単位で選択でき、右クリックからコピーできます。行を選択すると、該当パケットのリクエスト/レスポンスをその場でプレビューでき、リスト下部のプルダウン（既定URL Decode、Noneも選択可）で選んだ方式を選択中の行のBefore/Match/Afterへその場で適用して確認できます。
 - **Parameter & Value Enum** — Proxy HTTP Historyのリクエストを、Target & List Mappingと同じJSON/XML・ネスト値対応パーサーで解析し、構造パスごとに重複なく一覧化します。Groupの次にPath / Query、Header、Body、Cookie、Multipart bodyなどのRegion列を表示します。Find in resultsは入力後に遅延適用して軽快に動作します。Packet No rangeで範囲を指定でき、`All`で全件に戻せます。`Clear`で上下の結果を消去します。上下それぞれに検索欄があり、列見出しクリックでソートできます（件数・番号は数値順）。上段のパラメータを選ぶと、下段に値ごとの出現回数・Packet No群を表示し、値を選択してOuter / Innerの2段Codec（None/URL/Base64/Hex/HTML Entity/Unicode/ROT13）を選べば、URL→Base64など入れ子のデコード結果を確認できます。Decoded Value欄はSplitterで高さを調整でき、さらに下部のManual Decodeでは左側に任意文字列を貼り付け、右側へ2段Codecの結果を表示できます。`Focus`（初期OFF）をONにすると候補を色付けし、`Aggressive`（初期OFF）をONにするとuser/account/owner/権限/金銭/認証/PIIに関連する部分文字列まで広く候補化します。結果は手動確認が必要です。
 - **Authorization Planning for Aura** — 指定したPacket No範囲またはHTTP History全体を受動解析し、認可テスト計画に必要な情報を10画面（Overview / Operation Catalog / Operation x Subject / Objects & Fields / Apps & Endpoints / Test Plan / Sessions / Planning Coverage / Technical Gaps / Resource Corpus）へ整理します。`Target scope only`（初期OFF）をONにすると、選択範囲をBurp Target scope内の通信だけへ限定できます。Auraだけでなく、`/web11/.../Login`等の通常HTTP／対象システム固有バックエンド経路もOperation CatalogとApps & Endpoints内の`All HTTP Endpoints`へ必ず棚卸しし、`Packet Coverage`で各解析PacketがどのOperationへ入ったか確認できます。Operation Catalogでは、同じSubject・Operation・業務パラメータ値の通信を完全重複候補としてまとめ、代表Packet、重複Packet、残すべきTest Variantを表示します。Aura action ID、`aura.context`、`aura.token`だけの差は重複候補にできますが、record ID・金額・状態・更新値が異なる通信は自動で省略しません。`Origin Category`は`Salesforce標準`、`Apexカスタム`、`ApexREST`、`SalesforceREST`、`Unknown`の5分類です。Build後は`Export CSV...`でOperation／Packetの解析結果をUTF-8 CSVへ出力でき、`Add planning tags to comments`で既存Commentを保持したまま`[AP:Protocol=...]`、`[AP:TrafficClass=...]`、`[AP:Origin=...]`、`[AP:Duplicate=...]`を追記できます。通常のREST・GraphQL・UI API等に加え、Aura batch内のaction、`executeGraphQL`、`getConfigData`、`getItems`等を識別し、実装由来（標準／カスタム／名前空間付き）とデータ操作種別（Read/List/Create/Update/Delete等）を別々の根拠・確信度で表示します。任意の`Destination rule`へ`Label | Host regex | Path regex`を入力すると、仕様書に基づく`On-prem`等の宛先ラベルを付けられます。これは利用者定義の注釈であり、HTTP通信だけから物理基盤を断定した結果ではありません。通信の再送・変更は行わず、未観測のSubject×OperationをDeniedとは判定しません。
-- **Statistics** — Packet No range／`All`／Aura集約／色付け／Comment注釈を行う集計タブです。表は`Protocol`（Aura／GraphQL／UI API／REST／Web／File／Other）、`Traffic Class`（既存の通信分類）、`Category`（Salesforce標準／Apexカスタム／ApexREST／SalesforceREST／Unknown）ごとに、集約対象を含む件数と除いた件数を表示します。Definition列は`Aura通信 / SPA更新 / Apexカスタム（推定）`のような短い説明です。CategoryとProtocolは通信からの推定で、確定できない場合はUnknownまたはOtherです。注釈は既存Commentの先頭へ`[Protocol=...] [Traffic Class=...] [Category=...]`の順で入り、集約対象には従来どおり集約先タグも入ります。旧Statistics（`Statistics_old`）は互換性のため実装内に残していますが、画面には表示しません。
-- **Numbering & Grouping** — 採番、採番解除、範囲内のグループ／`[]`タグ削除をStatisticsから分離した専用タブで実行します。右クリックで選択Historyへ`[group="user1"]`形式のグループ定義を追加できます。グループ定義はParametersとHistory Searchの専用Group列へ表示されます。
+- **Statistics** — Packet No range／`All`／Aura集約／色付け／Comment注釈を行う集計タブです。`Target scope only`は初期ONで、Burp Target scope内のURLだけを解析・Comment注釈・注釈消去の対象にします。表は`Protocol`（Aura／GraphQL／UI API／REST／Web／File／Other）、`Traffic Class`（既存の通信分類）、`Category`（Salesforce標準／Apexカスタム／ApexREST／SalesforceREST／Unknown）ごとに、集約対象を含む件数と除いた件数を表示します。最終行の`Total`は表示中の分類行のPackets合計です。Definition列は`Aura通信 / SPA更新 / Apexカスタム（推定）`のような短い説明です。CategoryとProtocolは通信からの推定で、確定できない場合はUnknownまたはOtherです。注釈は既存Commentの先頭へ`[Protocol=...] [Traffic Class=...] [Category=...]`の順で入り、集約対象には従来どおり集約先タグも入ります。旧Statistics（内部名`Statistics_old`）は互換性のため実装内に残していますが、画面には表示しません。
+- **Numbering & Grouping** — 採番、採番解除、範囲内のグループ／`[]`タグ削除をStatisticsから分離した専用タブで実行します。右クリックで選択Historyへ`[group="user1"]`形式のグループ定義を追加できます。グループ定義はParameter & Value EnumとPacket Grepの専用Group列へ表示されます。
 - **Live Grep** — Packet Grepと同じ形式（List No / Packet No / Region / Req/Resp / Before / Match / After、選択行のプレビュー、Decodeプルダウンでのその場デコード）で、既存のhistoryをまとめて検索するのではなく、**選択したツールを通るリアルタイムの通信**を監視し、指定したワードがヒットした瞬間に1行ずつ追加していきます。Live GrepはCommentを持たないため、Group列は表示しません。`&`による同一Packet No内のAND検索、`|`によるOR検索を使えます。演算子を文字として検索する場合は、Windowsでは`\&`・`\|`・`\\`、日本語Macでは`¥&`・`¥|`・`¥¥`でエスケープします。Before / Match / Afterはセル単位で選択し、右クリックからコピーできます。DecodeはNone（変換なし）も選択可能です。armは不要で、Match & Replaceと同様に「Enabled」と対象ツールフラグで動作します。**Scope only**での絞り込み、1通信あたり200件のヒット上限、5MB超の本文のスキップにより、Burp全体への負荷を抑えています。
 
 ## Authorization Planning for AuraのAura origin分類
@@ -111,7 +111,7 @@ Proxy historyの色分け状態をまるごと退避しておきたい場合:
 
 Proxy history全体から特定のワードを検索したい場合:
 
-1. **History Search** タブの **Search word** にワードを入力する
+1. **Packet Grep** タブの **Search word** にワードを入力する
 2. **Chars before** / **Chars after** で、ヒット箇所の前後それぞれ何文字を切り出すかを指定する（既定はどちらも30文字）
 3. 必要ならPacket Noの開始・終了を指定する（空欄または**All**で全件）。`hoge & piyo`で同一Packet No内のAND、`hoge | piyo`でOR。記号を文字として探す場合はWindowsで`\&`/`\|`/`\\`、日本語Macで`¥&`/`¥|`/`¥¥`を使う
 4. **Search** を押すと、指定範囲のProxy history（リクエスト・レスポンスの生バイト）を大文字小文字を区別せず検索する
@@ -122,18 +122,18 @@ Proxy history全体から特定のワードを検索したい場合:
 
 Proxy historyのリクエストパラメータを集計したい場合:
 
-1. **Parameters** タブの **Range...** から対象Packet No範囲を設定する（既定は全HTTP History）
+1. **Parameter & Value Enum** タブの **Range...** から対象Packet No範囲を設定する（既定は全HTTP History）
 2. **Build parameter list** を押す
 3. 構造パス、出現回数、出現Packet No群を確認する。赤は認可・アカウント・金銭関連、黄は識別子・トークン・PII候補で、診断の優先確認用の目印です
 
 リアルタイムの通信を監視して、ワードがヒットした瞬間に確認したい場合:
 
-1. **Live Word Watch** タブの **Search word** にワードを入力し、必要なら **Chars before** / **Chars after** も調整する（既定はどちらも30文字）
+1. **Live Grep** タブの **Search word** にワードを入力し、必要なら **Chars before** / **Chars after** も調整する（既定はどちらも30文字）
 2. **Tool flags to watch** で監視対象のツール（既定はRepeaterのみ）にチェックを入れる
 3. Proxyツールを監視対象に含める場合は、**Scope only** のONを強く推奨します（Burpの Target &gt; Scope で対象ホストを設定しておいてください）。ONにすると、Scope外の通信（広告・トラッキング・CDN等、閲覧中に大量に発生する無関係な通信）を本文の変換・検索より前の段階でスキップします
-4. **Live Word Watch: Enabled** をONにする
-5. 対象ツールを通る通信でワードがヒットするたびに、結果一覧（History Searchと同じ List No / Packet No / Req/Resp / Before / Match / After 形式）に自動で行が追加されていく
-6. 行を選択するとリクエスト/レスポンスのプレビューと、下部のDecodeプルダウンによるその場デコードが利用できる（History Searchと同じ操作感）
+4. **Live Grep: Enabled** をONにする
+5. 対象ツールを通る通信でワードがヒットするたびに、結果一覧（Packet Grepと同じ List No / Packet No / Region / Req/Resp / Before / Match / After 形式）に自動で行が追加されていく
+6. 行を選択するとリクエスト/レスポンスのプレビューと、下部のDecodeプルダウンによるその場デコードが利用できる（Packet Grepと同じ操作感）
 7. **Search word**・**Chars before**・**Chars after**・監視対象ツール・**Scope only**はEnabled中でも編集でき、次に処理される通信から即座に反映される（Match & Replaceのルール編集と同じ考え方）
 8. **Clear** を押すと結果一覧だけがクリアされる（設定値は保持されます）
 
@@ -177,11 +177,11 @@ csvlistinput/               # 拡張の実装本体 -- csv_list_input.py と同�
   decode_replace_settings.py            # Target & Replace with Decode & Encode: 有効/無効・対象ツール・Insertion Point毎のルール保持
   color_snapshot_store.py                # Color Snapshots: スナップショット履歴の保持
   color_snapshot_engine.py                # Color Snapshots: Proxy historyの色の読み取り/書き戻し
-  word_search_engine.py                    # History Search: Proxy historyの生バイトに対するワード検索・前後切り出し（Live Word Watchとも共有）
-  proxy_history_lookup.py                   # Log / Live Word Watch共通: (http_service, request)からProxy History上の位置を逆引き
-  live_word_watch_settings.py                # Live Word Watch: 有効/無効・検索ワード・前後文字数・対象ツール
-  live_word_watch_store.py                    # Live Word Watch: ヒット履歴の保持
-  live_word_watch_listener.py                  # Live Word Watch: IHttpListener実装（ライブ通信の監視・ヒット検出）
+  word_search_engine.py                    # Packet Grep: Proxy historyの生バイトに対するワード検索・前後切り出し（Live Grepとも共有）
+  proxy_history_lookup.py                   # Log / Live Grep共通: (http_service, request)からProxy History上の位置を逆引き
+  live_word_watch_settings.py                # Live Grep: 有効/無効・検索ワード・前後文字数・対象ツール
+  live_word_watch_store.py                    # Live Grep: ヒット履歴の保持
+  live_word_watch_listener.py                  # Live Grep: IHttpListener実装（ライブ通信の監視・ヒット検出）
   utils.py                       # バイト列/文字列境界の処理・エスケープ
   ui/                              # Swing UI（Authorization Planning for Auraを含むMyTools各タブ）
 docs/manual.html              # 利用マニュアル（HTML）

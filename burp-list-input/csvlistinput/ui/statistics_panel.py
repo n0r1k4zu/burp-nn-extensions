@@ -65,6 +65,10 @@ class StatisticsPanel(JPanel):
         build_section.add(JLabel('to'))
         self.end_field = JTextField(6); build_section.add(self.end_field)
         build_section.add(JButton('All', actionPerformed=self._on_all))
+        self.scope_only_checkbox = JCheckBox('Target scope only', True)
+        self.scope_only_checkbox.setToolTipText(
+            'Analyze and annotate only URLs included in Burp Target scope. Default: ON.')
+        build_section.add(self.scope_only_checkbox)
         self.build_button = JButton('Build %s' % self.title, actionPerformed=self._on_build); build_section.add(self.build_button)
         self._build_button_text = 'Build %s' % self.title
         top.add(build_section)
@@ -130,7 +134,7 @@ class StatisticsPanel(JPanel):
             self.status.setText('An operation is already running.')
             return
         self._worker = True
-        self.build_button.setEnabled(False); self.apply_button.setEnabled(False)
+        self.build_button.setEnabled(False); self.apply_button.setEnabled(False); self.scope_only_checkbox.setEnabled(False)
         self.clear_annotations_button.setEnabled(False)
         self.build_button.setText('Building...' if label == 'Building %s' % self.title else self._build_button_text)
         self.apply_button.setText('Applying...' if label == 'Applying annotations' else 'Apply selected annotations')
@@ -157,6 +161,7 @@ class StatisticsPanel(JPanel):
 
     def _restore_operation_buttons(self):
         self.build_button.setEnabled(True); self.build_button.setText(self._build_button_text)
+        self.scope_only_checkbox.setEnabled(True)
         self.apply_button.setEnabled(True); self.apply_button.setText(self._apply_button_text)
         self.clear_annotations_button.setEnabled(True); self.clear_annotations_button.setText(self._clear_annotations_button_text)
 
@@ -164,15 +169,18 @@ class StatisticsPanel(JPanel):
         start, end = self._range()
         if end == 'error': return
         analyzer = statistics_engine.analyze_history_v2 if self.statistics2 else statistics_engine.analyze_history
-        self._run('Building %s' % self.title, lambda: analyzer(self.callbacks, self.helpers, start, end),
-                  lambda records: self._set_records(records, start, end))
+        scope_only = bool(self.scope_only_checkbox.isSelected())
+        self._run('Building %s' % self.title,
+                  lambda: analyzer(self.callbacks, self.helpers, start, end, scope_only=scope_only),
+                  lambda records: self._set_records(records, start, end, scope_only))
 
-    def _set_records(self, records, start, end):
+    def _set_records(self, records, start, end, scope_only=False):
         self.records = records
         self.model.set_rows(statistics_engine.summary_rows_v2(records) if self.statistics2 else
                             statistics_engine.summary_rows(records))
         targets = len([record for record in records if record['agg_role'] == u'target'])
         scope = 'all HTTP History' if start is None and end is None else 'selected range'
+        scope += ' (Burp Target scope only)' if scope_only else ' (Target scope filter OFF)'
         self.status.setText('%s: %d packet(s) analyzed in %s; %d aggregation target(s).' %
                             (self.title, len(records), scope, targets))
 
@@ -196,7 +204,7 @@ class StatisticsPanel(JPanel):
         if ret != JOptionPane.YES_OPTION:
             return
         self._run('Clearing annotations', lambda: statistics_engine.clear_analysis_annotations(
-            self.callbacks, start, end))
+            self.callbacks, start, end, self.helpers, bool(self.scope_only_checkbox.isSelected())))
 
 
 class Statistics2Panel(StatisticsPanel):

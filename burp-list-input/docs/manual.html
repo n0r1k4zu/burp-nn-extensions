@@ -422,12 +422,12 @@
         <a href="#decode">Decode（デコード）</a>
         <a href="#color-snapshots">Color Snapshots（色のバックアップ/リストア）</a>
         <a href="#comment-snapshots">Comment Snapshots（Commentのバックアップ/リストア）</a>
-        <a href="#history-search">History Search（ワード検索）</a>
-        <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
-        <a href="#parameters">Parameters（パラメータ棚卸し）</a>
+        <a href="#packet-grep">Packet Grep（ワード検索）</a>
+        <a href="#live-grep">Live Grep（リアルタイム監視）</a>
+        <a href="#parameter-value-enum">Parameter &amp; Value Enum（パラメータ棚卸し）</a>
         <a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>
         <a href="#authorization-planning">Authorization Planning for Aura（認可テスト計画）</a>
-        <a href="#statistics2">Statistics（Protocol / Traffic Class / Category）</a>
+        <a href="#statistics">Statistics（Protocol / Traffic Class / Category）</a>
         <a href="#numbering-grouping">Numbering &amp; Grouping</a>
         <a href="#ui-reference">画面の見方</a>
       </li>
@@ -943,10 +943,10 @@
     </section>
 
     <!-- ================= HISTORY SEARCH ================= -->
-    <section class="doc-section" id="history-search">
+    <section class="doc-section" id="packet-grep">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
-        <h2>History Search（ワード検索）</h2>
+        <h2>Packet Grep（ワード検索）</h2>
         <p class="section-dek">Proxy history全体から特定のワードを探し、ヒット箇所の前後を一覧表示するタブです。</p>
       </div>
 
@@ -971,8 +971,9 @@
           <p>
             Proxy history全件（リクエスト・レスポンスの両方）を対象に検索します。結果は
             <span class="k">List No</span>（結果内の通し番号）/ <span class="k">Packet No</span>（検索時点の
-            Proxy history内での通し番号）/ <span class="k">Req/Resp</span>（そのヒットがリクエスト側・
-            レスポンス側どちらで見つかったか）/ <span class="k">Before</span>（前方の切り出し）/
+            Proxy history内での通し番号）/ <span class="k">Group</span>（Commentの[group="..."]）/
+            <span class="k">Req/Resp</span>（そのヒットがリクエスト側・レスポンス側どちらで見つかったか）/
+            <span class="k">Region</span>（Path / Header / Body等の領域）/ <span class="k">Before</span>（前方の切り出し）/
             <span class="k">Match</span>（実際にヒットした文字列。元のバイト列そのままの大文字小文字）/
             <span class="k">After</span>（後方の切り出し）の一覧表になります。
           </p>
@@ -1023,13 +1024,13 @@
       </div>
     </section>
 
-    <section class="doc-section" id="parameters">
+    <section class="doc-section" id="parameter-value-enum">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
-        <h2>Parameters（パラメータ棚卸し）</h2>
+        <h2>Parameter &amp; Value Enum（パラメータ棚卸し）</h2>
         <p class="section-dek">指定したHTTP History範囲のリクエストから、構造化されたパラメータ一覧を作成します。</p>
       </div>
-      <p>History Searchと同じ<span class="k">Packet No range</span>で開始・終了Packet Noを指定し（空欄または<span class="k">All</span>は全HTTP History）、<span class="k">Build parameter list</span>を押します。<span class="k">Clear</span>は上下の集計結果を消去します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。</p>
+      <p>Packet Grepと同じ<span class="k">Packet No range</span>で開始・終了Packet Noを指定し（空欄または<span class="k">All</span>は全HTTP History）、<span class="k">Build parameter list</span>を押します。<span class="k">Clear</span>は上下の集計結果を消去します。Target &amp; List Mappingと同じパーサーでURL/Cookie/Header、JSON/XML、ネストしたJSON/XMLを可能な限り解析します。</p>
       <p>上段の一覧は <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> です。行を選ぶと、下段にはそのパラメータの値ごとの <span class="k">#</span> / <span class="k">Group</span> / <span class="k">Value</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span> を表示します。上下それぞれのFind欄で全列を絞り込め、列見出しクリックでソートできます（番号・出現回数・Packet No群は数値として比較）。下段の値を選び、<span class="k">Outer</span> と <span class="k">Inner</span> の2段Codec（None/URL/Base64/Hex/HTML Entity/Unicode/ROT13）を選ぶと、URL→Base64など入れ子のデコード結果を確認できます。<span class="k">Focus</span>（初期OFF）は候補の色付け、<span class="k">Aggressive</span>（初期OFF）はuser/account/owner/認証/権限/金銭/PII関連の部分文字列まで候補を広げる判定です。これは脆弱性の自動判定ではなく、認可不備などの観点で優先して確認する入力点の目印です。</p>
     </section>
 
@@ -1220,7 +1221,7 @@
       </div>
     </section>
 
-    <section class="doc-section" id="statistics">
+    <section class="doc-section" id="statistics-old">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
         <h2>Statistics_old（旧機能・画面非表示）</h2>
@@ -1238,29 +1239,29 @@
         <li><strong>集約しない・信用しすぎない条件</strong>：descriptor、対象オブジェクト、Apex class/method、page URI、認証状態のいずれかが違えば別グループです。一方で、一般的な<code>params</code>の値（record ID、金額、状態、検索条件等）は現在の集約キーに含めません。そのため、これらの値が異なる通信でも同じ候補になる場合があります。認可テストでは集約対象を機械的に除外せず、値の差分を確認してください。</li>
       </ol>
       <p><span class="k">Apply selected annotations</span>では、分類を<code>[Web画面]</code>等で追記、集約対象を<code>[集約対象]</code>で追記できます。代表パケットのComment先頭に<code>[1992]</code>のような採番がある場合は、集約対象へ<code>[集約対象_集約先No1992]</code>を追記します。<span class="k">Clear annotations</span>はStatisticsが追加した分類・集約タグだけを削除し、採番・グループ・その他のタグは残します。</p>
-      <h2 id="statistics2">Statistics（Protocol / Traffic Class / Category）</h2>
-      <p>Statisticsは、範囲指定、<span class="k">All</span>、Aura集約、色付け、Commentへの注釈、注釈の消去を使います。通信を再送・変更することはありません。集約の判定条件と注意点は直前の「集約判定の条件」と同一です。集計表では、<strong>Protocol</strong>、<strong>Traffic Class</strong>、<strong>Category</strong>の3軸ごとに、集約対象を含む件数と除いた件数を表示します。</p>
+      <h2 id="statistics">Statistics（Protocol / Traffic Class / Category）</h2>
+      <p>Statisticsは、範囲指定、<span class="k">All</span>、Aura集約、色付け、Commentへの注釈、注釈の消去を使います。<span class="k">Target scope only</span>は初期ONで、BurpのTarget scopeに含まれるURLだけを解析・Comment注釈・注釈消去の対象にします。Scope外も含めたい場合だけOFFにします。通信を再送・変更することはありません。集約の判定条件と注意点は直前の「集約判定の条件」と同一です。集計表では、<strong>Protocol</strong>、<strong>Traffic Class</strong>、<strong>Category</strong>の3軸ごとに、集約対象を含む件数と除いた件数を表示します。表の最終行<strong>Total</strong>は、表示中の分類行のPackets合計です。</p>
       <p><strong>Traffic Class</strong>は既存Statisticsの通信分類（Web画面、Web個別パーツ取得、SPA（画面）、SPA（画面更新）、API）です。<strong>Category</strong>は認可テスト計画と同じ由来分類で、<code>Salesforce標準</code>、<code>Apexカスタム</code>、<code>ApexREST</code>、<code>SalesforceREST</code>、<code>Unknown</code>を表示します。<strong>Protocol</strong>は通信の形を示し、Aura、GraphQL、UI API、REST、Web、File、Otherに分類します。Definitionは、たとえば<code>Aura通信 / SPA更新 / Apexカスタム（推定）</code>のように、この3項目の意味を短く示します。CategoryとProtocolはHTTP通信からの推定であり、確定できない場合はUnknownまたはOtherです。</p>
       <p><span class="k">Add Protocol / Traffic Class / Category [tags] to comments</span>は、既存Commentの先頭へ<code>[Protocol=Aura]</code>、<code>[Traffic Class=SPA（画面更新）]</code>、<code>[Category=Apexカスタム]</code>をこの順で追加します。集約対象には従来どおり<code>[集約対象_集約先No0001]</code>等も追加します。<span class="k">Clear annotations</span>を使うと、Statisticsが追加した分類・集約タグだけを消去できます。</p>
       <h2 id="numbering-grouping">Numbering &amp; Grouping</h2>
-      <p>採番・採番解除・グループ削除・ブラケットタグ削除は専用タブへ分離しました。全HTTP HistoryのComment先頭へ指定桁数・開始番号で<code>[0001]</code>のように付与し、採番解除で先頭番号だけを外します。Proxy Historyで複数パケットを選択し、右クリックの<span class="k">MyTools: Group selected History packets</span>からグループ名を入力すると、各Commentへ<code>[group="user1"]</code>形式の明示的なグループ定義を追加します。この定義はParameters上下のGroup列とHistory SearchのGroup列へ表示されます。範囲指定で特定グループだけを削除でき、<span class="k">Clear all [tags] in range</span>は範囲内のすべての<code>[...]</code>タグを削除します。</p>
+      <p>採番・採番解除・グループ削除・ブラケットタグ削除は専用タブへ分離しました。全HTTP HistoryのComment先頭へ指定桁数・開始番号で<code>[0001]</code>のように付与し、採番解除で先頭番号だけを外します。Proxy Historyで複数パケットを選択し、右クリックの<span class="k">MyTools: Group selected History packets</span>からグループ名を入力すると、各Commentへ<code>[group="user1"]</code>形式の明示的なグループ定義を追加します。この定義はParameter &amp; Value Enum上下のGroup列とPacket GrepのGroup列へ表示されます。範囲指定で特定グループだけを削除でき、<span class="k">Clear all [tags] in range</span>は範囲内のすべての<code>[...]</code>タグを削除します。</p>
     </section>
 
     <!-- ================= LIVE WORD WATCH ================= -->
-    <section class="doc-section" id="live-word-watch">
+    <section class="doc-section" id="live-grep">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
-        <h2>Live Word Watch（リアルタイム監視）</h2>
-        <p class="section-dek">History Searchと同じ結果表示で、既存historyをまとめて検索する代わりにリアルタイムの通信を監視するタブです。</p>
+        <h2>Live Grep（リアルタイム監視）</h2>
+        <p class="section-dek">Packet Grepと同じ結果表示で、既存historyをまとめて検索する代わりにリアルタイムの通信を監視するタブです。</p>
       </div>
 
       <p>
-        <a href="#history-search">History Search</a> が「今あるProxy history」をまとめて検索するのに対し、
+        <a href="#packet-grep">Packet Grep</a> が「今あるProxy history」をまとめて検索するのに対し、
         こちらは<strong>これから流れる通信</strong>を監視し、指定したワードがヒットした瞬間に1行ずつ結果へ
         追加していきます。armは不要で、<a href="#match-replace">Match &amp; Replace</a>と同じように
         「Enabled」と対象ツールフラグだけで動作します。結果一覧・行選択時のプレビュー・その場デコードは
-        History Searchと同じ形（<span class="k">List No</span> / <span class="k">Packet No</span> /
-        <span class="k">Req/Resp</span> / <span class="k">Before</span> / <span class="k">Match</span> /
+        Packet Grepと同じ形（<span class="k">List No</span> / <span class="k">Packet No</span> /
+        <span class="k">Region</span> / <span class="k">Req/Resp</span> / <span class="k">Before</span> / <span class="k">Match</span> /
         <span class="k">After</span>）です。
       </p>
 
@@ -1281,7 +1282,7 @@
           </p>
         </li>
         <li class="step">
-          <h4><span class="k">Live Word Watch: Enabled</span> をONにする</h4>
+          <h4><span class="k">Live Grep: Enabled</span> をONにする</h4>
           <p>
             ONにした瞬間から、チェックした対象ツールを通る通信のリクエスト・レスポンス（生バイト）に対して、
             大文字小文字を区別せずワードの一致を監視します。ヒットするたびに、結果一覧へ自動で行が追加され、
@@ -1300,7 +1301,7 @@
             一覧から行を選択すると、下部にそのパケットのリクエスト/レスポンスがプレビュー表示されます。
             さらにその下の <span class="k">Decode</span> プルダウン（既定はURL Decode）で方式を選ぶと、
             選択中の行のBefore/Match/Afterそれぞれへその方式を適用した結果がその場で表示されます
-            （History Searchタブと同じ操作感です）。
+            （Packet Grepタブと同じ操作感です）。
           </p>
         </li>
         <li class="step">
@@ -1315,7 +1316,7 @@
       <div class="callout tip">
         <span class="callout-label">Packet No について</span>
         <p>
-          <a href="#history-search">History Search</a>タブの同名列と同じ考え方で、その通信がBurpのProxy
+          <a href="#packet-grep">Packet Grep</a>タブの同名列と同じ考え方で、その通信がBurpのProxy
           History上で何番目かを表します。Repeater等、Proxyツールを経由しない通信では見つからず
           <code>-</code> と表示されます（<a href="#ui-reference">Logタブ</a>のPacket No列と同じ制約です）。
         </p>
@@ -1429,7 +1430,7 @@
               </td></tr>
             <tr><td><span class="k">Packet No</span></td>
               <td>
-                その送信がBurpの<strong>Proxy History上で何番目か</strong>（1始まり）。History Searchタブの
+                その送信がBurpの<strong>Proxy History上で何番目か</strong>（1始まり）。Packet Grepタブの
                 同名の列と同じ考え方で、Proxy Historyから見つからない場合は <code>-</code> と表示されます
                 （Repeater等、Proxyツールを経由しない送信では見つからないのが通常です）。行が初めて画面に
                 表示されたタイミングで検索し、その結果をキャッシュします（送信の都度Proxy History全体を
@@ -1476,7 +1477,7 @@
         </table>
       </div>
 
-      <h3>History Search タブ</h3>
+      <h3>Packet Grep タブ</h3>
       <div class="table-wrap">
         <table>
           <thead><tr><th>項目</th><th>説明</th></tr></thead>
@@ -1500,32 +1501,32 @@
         </table>
       </div>
 
-      <h3>Live Word Watch タブ</h3>
+      <h3>Live Grep タブ</h3>
       <div class="table-wrap">
         <table>
           <thead><tr><th>項目</th><th>説明</th></tr></thead>
           <tbody>
-            <tr><td><span class="k">Live Word Watch: Enabled</span></td>
+            <tr><td><span class="k">Live Grep: Enabled</span></td>
               <td>機能全体の有効/無効を切り替えるマスタースイッチです。</td></tr>
             <tr><td><span class="k">Scope only</span></td>
               <td>ONにすると、Burpの Target &gt; Scope で対象と判定された通信のみを検索対象にします（既定はOFF）。
                 Proxyツールを監視対象にする場合は、Burp全体の負荷を抑えるためONを強く推奨します。</td></tr>
             <tr><td><span class="k">Search word</span> / <span class="k">Chars before</span> / <span class="k">Chars after</span></td>
-              <td>History Searchタブと同じ意味の設定です。Enabled中でも編集でき、次に処理される通信から反映されます。</td></tr>
+              <td>Packet Grepタブと同じ意味の設定です。Enabled中でも編集でき、次に処理される通信から反映されます。</td></tr>
             <tr><td><span class="k">Tool flags to watch</span></td>
               <td>監視対象のBurpツール（既定はRepeaterのみ）。Match &amp; Replaceタブのツール選択とは独立した、この機能専用の設定です。</td></tr>
             <tr><td>結果一覧の列</td>
-              <td>History Searchタブと同じ<span class="k">List No</span> / <span class="k">Packet No</span> / <span class="k">Req/Resp</span> /
+              <td>Packet Grepタブと同じ<span class="k">List No</span> / <span class="k">Packet No</span> / <span class="k">Region</span> / <span class="k">Req/Resp</span> /
                 <span class="k">Before</span> / <span class="k">Match</span> / <span class="k">After</span>。ヒットのたびに自動で行が追加されます。</td></tr>
             <tr><td>結果行の選択 / <span class="k">Decode</span> プルダウン</td>
-              <td>History Searchタブと同じく、下部にリクエスト/レスポンスのプレビューが表示され、Decodeプルダウンでその場デコードができます。</td></tr>
+              <td>Packet Grepタブと同じく、下部にリクエスト/レスポンスのプレビューが表示され、Decodeプルダウンでその場デコードができます。</td></tr>
             <tr><td><span class="k">Clear</span></td>
               <td>結果一覧・プレビュー・デコード表示だけをクリアします。Enabled状態や各設定値は保持されます。</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Parameters タブ</h3>
+      <h3>Parameter &amp; Value Enum タブ</h3>
       <div class="table-wrap">
         <table>
           <thead><tr><th>項目</th><th>説明</th></tr></thead>
@@ -1533,7 +1534,7 @@
             <tr><td><span class="k">Packet No range</span> / <span class="k">All</span></td><td>開始・終了Packet Noを指定します。空欄またはAllは全HTTP Historyです。</td></tr>
             <tr><td><span class="k">Build parameter list</span></td><td>指定範囲のリクエストをTarget &amp; List Mappingと同じパーサーで解析し、構造パスを重複なく集計します。</td></tr>
             <tr><td><span class="k">Clear</span></td><td>パラメータ一覧と、選択行に対応する下段の値一覧を消去します。</td></tr>
-            <tr><td>一覧の列</td><td><span class="k">#</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet Nos</span>。</td></tr>
+            <tr><td>一覧の列</td><td><span class="k">#</span> / <span class="k">Group</span> / <span class="k">Region</span> / <span class="k">Identified Parameter</span> / <span class="k">Occurrences</span> / <span class="k">Packet No</span>。</td></tr>
             <tr><td>赤 / 黄の行</td><td>赤は認可・アカウント・金銭関連、黄はトークン・識別子・PII候補です。脆弱性の検出結果ではなく、診断上の優先確認用の目印です。</td></tr>
           </tbody>
         </table>
