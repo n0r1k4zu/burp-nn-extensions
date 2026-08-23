@@ -426,7 +426,7 @@
         <a href="#live-word-watch">Live Word Watch（リアルタイム監視）</a>
         <a href="#parameters">Parameters（パラメータ棚卸し）</a>
         <a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>
-        <a href="#authorization-planning">Authorization Planning（認可テスト計画）</a>
+        <a href="#authorization-planning">Authrizetion Planning for Aura（認可テスト計画）</a>
         <a href="#statistics">Statistics（分類・集約）</a>
         <a href="#numbering-grouping">Numbering &amp; Grouping</a>
         <a href="#ui-reference">画面の見方</a>
@@ -1049,7 +1049,7 @@
     <section class="doc-section" id="authorization-planning">
       <div class="section-head">
         <p class="section-eyebrow">Usage</p>
-        <h2>Authorization Planning（認可テスト計画の見える化）</h2>
+        <h2>Authrizetion Planning for Aura（認可テスト計画の見える化）</h2>
         <p class="section-dek">指定範囲のHTTP Historyを受動解析し、Subject（利用者）× Operation（操作）× Resource（対象資源）のテスト計画を作るための観測情報を整理します。</p>
       </div>
       <p>Salesforce / Experience Cloud / Auraそのものが初めての場合は、先に<a href="#salesforce-aura-guide">Salesforce / Aura 入門ガイド</a>を読んでください。</p>
@@ -1511,7 +1511,7 @@
         </table>
       </div>
 
-      <h3>Authorization Planning タブ</h3>
+      <h3>Authrizetion Planning for Aura タブ</h3>
       <div class="table-wrap">
         <table>
           <thead><tr><th>項目</th><th>説明</th></tr></thead>
@@ -2119,7 +2119,7 @@
         <li>Match &amp; Replaceは<span class="k">Transfer-Encoding: chunked</span>のレスポンスに対して、Content-Lengthの自動調整を行いません（そのヘッダー自体が無いため）。chunkの境界自体を書き換える機能ではありません。</li>
         <li>Match &amp; Replace・Target &amp; Replace with Decode &amp; Encodeの正規表現はPythonの<code>re</code>モジュール準拠です（後方参照は<code>\1</code>形式）。不正な正規表現を入力した行は無視され、拡張はクラッシュしません。</li>
         <li>Target &amp; Replace with Decode &amp; EncodeのHTML Entityエンコード（再エンコード時）は<code>&amp;&lt;&gt;"'</code>の5文字のみを再エスケープします。デコード時に解釈した名前付き実体・数値文字参照すべてを同じ形式で書き戻すわけではありません。</li>
-        <li>Authorization Planningは、選択範囲のHTTP Historyに現れた通信だけを受動解析します。未操作の機能や別権限でしか現れない操作は補完しません。Aura originと優先度はヒューリスティックであり、Salesforce設定やApexコードを確認せずに脆弱性を確定するものではありません。</li>
+        <li>Authrizetion Planning for Auraは、選択範囲のHTTP Historyに現れた通信だけを受動解析します。未操作の機能や別権限でしか現れない操作は補完しません。Aura originと優先度はヒューリスティックであり、Salesforce設定やApexコードを確認せずに脆弱性を確定するものではありません。</li>
       </ul>
     </section>
 

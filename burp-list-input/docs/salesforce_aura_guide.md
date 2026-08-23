@@ -1,4 +1,4 @@
-# 猿でもわかる Salesforce / Experience Cloud / Aura 通信ガイド
+# Salesforce / Experience Cloud / Aura 通信ガイド
 
 対象は、許可を得たWebアプリケーションの認可診断です。ここでは、MyTools の Authorization Planning を読むために必要なSalesforce知識だけを、できるだけ平易に説明します。
 
